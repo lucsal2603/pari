@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.3.1';
+const APP_VERSION = '1.4.0';
 const KEY = 'pari:v1';
 const CATS = [
   { id: 'cibo', name: 'Cibo', icon: 'c-cibo' },
@@ -180,7 +180,7 @@ function entryRow(e, i) {
   const mine = myShare(e);
   return `<a class="row${isPay ? ' payment' : ''}" href="#/spesa/${e.id}" style="--i:${i}">
     <span class="cat-ic${isPay ? ' pay' : ''}">${icon(isPay ? 'c-pagamento' : c.icon)}</span>
-    <span class="main"><span class="title">${esc(isPay ? `${payer.name} ha pagato ${to ? to.name : ''}` : e.desc)}</span><span class="sub">${esc(relDay(e.date))}${isPay ? '' : ' · ' + esc(payer.id === me().id ? 'hai pagato tu' : payer.name + ' ha pagato')}${e.recurringOf || e.recurring ? ' · ricorrente' : ''}${e.demo ? ' · esempio' : ''}</span></span>
+    <span class="main"><span class="title">${esc(isPay ? `${payer.name} ha pagato ${to ? to.name : ''}` : e.desc)}</span><span class="sub">${esc(relDay(e.date))}${isPay ? '' : ' · ' + esc(payer.id === me().id ? 'hai pagato tu' : payer.name + ' ha pagato')}${e.recurringOf || e.recurring ? ' · ricorrente' : ''}</span></span>
     <span class="right"><span class="money ${mine.cls}">${mine.big}</span><span class="by muted">${mine.small}</span></span>
   </a>`;
 }
@@ -192,28 +192,30 @@ function myShare(e) {
   if (owedByMe > 0) return { big: '− ' + money(owedByMe), cls: 'red', small: 'tot. ' + money(e.amount), label: 'Devi ' + money(owedByMe) };
   return { big: money(e.amount), cls: 'muted', small: 'non ti riguarda', label: '' };
 }
-function emptyBox(t, d, withImg) { return `<div class="empty">${withImg ? '<img class="empty-img" src="img/nessuna-spesa.png" alt="">' : ''}<div class="t">${esc(t)}</div><div class="small">${esc(d)}</div>${withImg ? '<button type="button" class="btn soft sm" data-demo-seed style="margin-top:14px">Prova con spese di esempio</button>' : ''}</div>`; }
-/* Spese di esempio: si caricano dallo stato vuoto e si tolgono con un tocco da Profilo → Esporta dati */
-function seedDemo() {
-  const d = (off) => { const x = new Date(); x.setDate(x.getDate() - off); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); };
-  const a = S.members[0].id, b = S.members[1].id; const half = (v) => ({ [a]: Math.ceil(v / 2), [b]: Math.floor(v / 2) });
-  const list = [
-    ['Cena sushi', 5500, 'cibo', a, 1, 'Sushi Yama'], ['Spesa supermercato', 4830, 'spesa', b, 2, ''], ['Cinema', 2100, 'tempo-libero', a, 5, ''],
-    ['Bolletta luce', 8920, 'bollette', b, 9, 'Bimestre'], ['Benzina', 6000, 'trasporti', b, 12, ''], ['Pizza da asporto', 2650, 'cibo', a, 14, ''],
-    ['Spesa Esselunga', 7210, 'spesa', b, 18, ''], ['Aperitivo', 1800, 'tempo-libero', a, 21, ''], ['Farmacia', 1890, 'salute', b, 26, ''],
-    ['Weekend a Verona', 24000, 'viaggi', a, 33, 'Hotel + treno'], ['Spesa', 5120, 'spesa', b, 40, ''], ['Bolletta gas', 6450, 'bollette', a, 44, ''],
-    ['Regalo compleanno mamma', 4500, 'regali', b, 52, ''], ['Ristorante', 7800, 'cibo', a, 58, 'Anniversario'], ['Crocchette gatto', 3200, 'animali', b, 63, ''],
-    ['Spesa', 6400, 'spesa', a, 75, ''], ['Bolletta acqua', 3900, 'bollette', b, 88, ''], ['Concerto', 9000, 'tempo-libero', a, 97, ''],
-  ];
-  list.forEach(([desc, amount, cat, paidBy, off, notes]) => S.entries.push({ id: 'demo-' + uid(), kind: 'expense', desc, amount, date: d(off), cat, paidBy, splitMethod: 'equal', splitInput: {}, owed: half(amount), notes, demo: true, createdAt: nowISO(), updatedAt: nowISO(), deleted: false }));
-  // affitto ricorrente e un pagamento già fatto
-  S.entries.push({ id: 'demo-' + uid(), kind: 'expense', desc: 'Affitto', amount: 65000, date: d(95).slice(0, 8) + '01', cat: 'casa', paidBy: a, splitMethod: 'equal', splitInput: {}, owed: half(65000), notes: '', demo: true, recurring: 'monthly', createdAt: nowISO(), updatedAt: nowISO(), deleted: false });
-  S.entries.push({ id: 'demo-' + uid(), kind: 'payment', desc: 'Pagamento', amount: 30000, date: d(30), cat: '', paidBy: b, splitMethod: 'exact', splitInput: {}, owed: { [a]: 30000 }, notes: 'Bonifico', demo: true, createdAt: nowISO(), updatedAt: nowISO(), deleted: false });
-  save(); materializeRecurring(); S.entries.filter((e) => e.recurringOf && String(e.recurringOf).startsWith('demo-')).forEach((e) => (e.demo = true)); save(); sync.schedule(); render();
-  toast('Spese di esempio caricate: le togli da Profilo → Esporta dati');
+function emptyBox(t, d, withImg) { return `<div class="empty">${withImg ? '<img class="empty-img" src="img/nessuna-spesa.png" alt="">' : ''}<div class="t">${esc(t)}</div><div class="small">${esc(d)}</div></div>`; }
+/* Spese vere riportate da Splitwise (screenshot del 4/9/2026), caricate una volta sola su ogni telefono.
+   Gli id sono fissi così i due telefoni creano le stesse voci e la sincronizzazione non le raddoppia. */
+const SPLITWISE_2026_09 = [
+  ['sw-20260904-spesa-1024', '2026-09-04', 'Spesa', 1024, 'spesa', 'm1', { m1: 512, m2: 512 }],
+  ['sw-20260904-decathlon', '2026-09-04', 'Decathlon', 8094, 'shopping', 'm1', { m1: 4047, m2: 4047 }],
+  ['sw-20260904-spesa-2430', '2026-09-04', 'Spesa', 2430, 'spesa', 'm1', { m1: 1215, m2: 1215 }],
+  ['sw-20260831-spesa-2175', '2026-08-31', 'Spesa', 2175, 'spesa', 'm2', { m1: 1087, m2: 1088 }],
+  ['sw-20260831-spesa-1504', '2026-08-31', 'Spesa', 1504, 'spesa', 'm2', { m1: 752, m2: 752 }],
+  ['sw-20260831-spesa-4544', '2026-08-31', 'Spesa', 4544, 'spesa', 'm2', { m1: 2272, m2: 2272 }],
+  ['sw-20260831-cabina-sardegna', '2026-08-31', 'Cabina sardegna', 13500, 'viaggi', 'm2', { m1: 6750, m2: 6750 }],
+  ['sw-20260830-casa-sardegna', '2026-08-30', 'Casa sardegna', 60888, 'viaggi', 'm2', { m1: 30444, m2: 30444 }],
+  ['sw-20260830-condominio-6', '2026-08-30', 'Sesta rata spese condominiali', 18380, 'casa', 'm2', { m1: 9190, m2: 9190 }],
+];
+function importSplitwiseOnce() {
+  if (S.settings.splitwiseImported) return;
+  const t = nowISO(); let changed = false;
+  S.entries.forEach((e) => { if (e.demo && !e.deleted) { e.deleted = true; e.updatedAt = t; changed = true; } });
+  SPLITWISE_2026_09.forEach(([id, date, desc, amount, cat, paidBy, owed]) => {
+    if (S.entries.some((e) => e.id === id)) return;
+    S.entries.push({ id, kind: 'expense', desc, amount, date, cat, paidBy, splitMethod: 'equal', splitInput: {}, owed, notes: '', createdAt: t, updatedAt: t, deleted: false }); changed = true;
+  });
+  S.settings.splitwiseImported = true; save(); if (changed) sync.schedule();
 }
-function removeDemo() { const t = nowISO(); S.entries.forEach((e) => { if (e.demo && !e.deleted) { e.deleted = true; e.updatedAt = t; } }); save(); sync.schedule(); render(); toast('Spese di esempio rimosse'); }
-const hasDemo = () => S.entries.some((e) => e.demo && !e.deleted);
 function monthNav(ymStr, hrefBase) {
   return `<div class="monthnav"><button class="icon-btn" data-month="-1" aria-label="Mese precedente">${icon('i-left')}</button><button class="label" data-month="0" title="Torna al mese corrente">${esc(monthName(ymStr))}</button><button class="icon-btn" data-month="1" aria-label="Mese successivo">${icon('i-right')}</button></div>`;
 }
@@ -512,7 +514,7 @@ function pageExport() {
       <label class="menu-import">${icon('i-upload')}<span>Importa backup <span class="d">Unisce un file JSON esportato da Pari: niente doppioni.</span></span><span></span>${icon('i-right', 'ic chev')}<input type="file" accept="application/json,.json" id="import-file" hidden></label>
     </div></section>
     <h2 class="sec-title section">Zona pericolosa</h2>
-    <section class="card"><div class="menu">${hasDemo() ? `<button type="button" data-demo-remove>${icon('i-undo')}<span>Rimuovi le spese di esempio <span class="d">Toglie solo le voci segnate "esempio".</span></span><span></span>${icon('i-right', 'ic chev')}</button>` : ''}<button type="button" class="danger" data-reset>${icon('i-trash')}<span>Cancella tutti i dati <span class="d">Solo su questo telefono. Chiede conferma.</span></span><span></span>${icon('i-right', 'ic chev')}</button></div></section>
+    <section class="card"><div class="menu"><button type="button" class="danger" data-reset>${icon('i-trash')}<span>Cancella tutti i dati <span class="d">Solo su questo telefono. Chiede conferma.</span></span><span></span>${icon('i-right', 'ic chev')}</button></div></section>
   </div>`;
 }
 function pageSync() {
@@ -566,8 +568,6 @@ function bind(r) {
   $$('[data-back]').forEach((b) => b.addEventListener('click', () => { if (r.name === 'nuova' || r.name === 'modifica') F = null; back(b.dataset.back); }));
   $$('[data-month]').forEach((b) => b.addEventListener('click', () => { const d = +b.dataset.month; S.ui.month = d === 0 ? curYM() : shiftYM(S.ui.month, d); save(); render(); const l = $('.monthnav .label'); if (l) l.classList.add('swap'); }));
   $$('[data-year]').forEach((b) => b.addEventListener('click', () => { S.ui.month = String(+S.ui.month.slice(0, 4) + +b.dataset.year) + S.ui.month.slice(4); save(); render(); }));
-  $$('[data-demo-seed]').forEach((b) => b.addEventListener('click', seedDemo));
-  $$('[data-demo-remove]').forEach((b) => b.addEventListener('click', () => confirmSheet('Rimuovere le spese di esempio?', 'Le spese vere, se ne avete già aggiunte, restano.', 'Rimuovi', removeDemo)));
   $$('[data-install-hide]').forEach((b) => b.addEventListener('click', () => { sessionStorage.setItem('pari:install-hide', '1'); b.closest('.install').remove(); }));
   bindSeg($('[data-seg="homeMode"]'), (v) => { S.ui.homeMode = v; save(); render(); });
   bindSeg($('[data-seg="balTab"]'), (v) => { S.ui.balTab = +v; save(); render(); });
@@ -746,6 +746,7 @@ function toast(text, action) {
 }
 
 /* ---------- Avvio ---------- */
+importSplitwiseOnce();
 materializeRecurring();
 route();
 if (sync.enabled()) sync.run();
