@@ -68,6 +68,11 @@ svg.ic { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-wid
 .head { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; min-height: 52px; margin: 2px 0 14px; }
 .head .title { text-align: center; font-weight: 700; font-size: 19px; letter-spacing: -.01em; }
 .head.left { grid-template-columns: 1fr auto auto; }
+.head.left.with-back { grid-template-columns: 44px 1fr auto; }
+.head.left.with-back .title { padding-left: 4px; }
+.profile-head { position: relative; }
+.profile-back { position: absolute; left: 10px; top: calc(var(--sat) + 8px); color: var(--white); }
+.profile-back:active { background: rgba(255,255,255,.15); }
 .head.left .title { text-align: left; font-size: 24px; letter-spacing: -.02em; }
 .head .icon-btn:last-child { justify-self: end; }
 .icon-btn { position: relative; width: 44px; height: 44px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--ink); transition: background-color .2s ease, transform .16s var(--ease-out); }

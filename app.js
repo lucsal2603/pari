@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.7.1';
+const APP_VERSION = '1.7.2';
 const KEY = 'pari:v1';
 const CATS = [
   { id: 'cibo', name: 'Cibo', icon: 'c-cibo' },
@@ -154,7 +154,9 @@ function materializeRecurring() {
 
 /* ---------- Router ---------- */
 const view = $('#view'); const tabbar = $('#tabbar');
-let prevHash = '', curHash = location.hash || '#/home';
+let prevHash = '', curHash = location.hash || '#/home', viaTab = false;
+tabbar.addEventListener('click', () => { viaTab = true; });
+const tabOf = (h) => { const n = (h || '').slice(2).split(/[/?]/)[0] || 'home'; return { spesa: 'spese', modifica: 'spese', attivita: 'spese', statistiche: 'bilanci', nuova: 'home' }[n] || n; };
 function route() {
   prevHash = curHash; curHash = location.hash || '#/home';
   const hash = location.hash || '#/home';
@@ -162,6 +164,9 @@ function route() {
   const parts = path.split('/'); const q = Object.fromEntries(new URLSearchParams(qs || ''));
   const r = { name: parts[0] || 'home', id: parts[1] || '', sub: parts[1] || '', q };
   if (r.name === 'spese' && q.sezione !== undefined) { speseFilter.group = q.sezione; speseFilter.q = ''; speseFilter.cat = ''; }
+  // arrivati da un link (non dalla barra in basso) e da un'altra area: mostro il tasto indietro
+  const fromLink = !viaTab && prevHash && prevHash !== curHash && !/^#\/(nuova|modifica)/.test(prevHash);
+  r.back = fromLink && tabOf(prevHash) !== tabOf(curHash) ? prevHash : null; viaTab = false;
   render(r);
 }
 window.addEventListener('hashchange', route);
@@ -287,9 +292,9 @@ function pageHome() {
 
 /* ---------- SPESE ---------- */
 let speseFilter = { q: '', cat: '', group: '' };
-function pageSpese() {
+function pageSpese(r) {
   return `<div class="page">
-    <div class="head left"><div class="title">${speseFilter.group && groups().find((g) => g.id === speseFilter.group) ? esc(groups().find((g) => g.id === speseFilter.group).name) : 'Spese'}</div><a class="icon-btn" href="#/attivita" aria-label="Attività">${icon('i-repeat')}</a></div>
+    <div class="head left${r.back ? ' with-back' : ''}">${r.back ? `<button class="icon-btn" data-back="${esc(r.back)}" aria-label="Indietro">${icon('i-back')}</button>` : ''}<div class="title">${speseFilter.group && groups().find((g) => g.id === speseFilter.group) ? esc(groups().find((g) => g.id === speseFilter.group).name) : 'Spese'}</div><a class="icon-btn" href="#/attivita" aria-label="Attività">${icon('i-repeat')}</a></div>
     <label class="search">${icon('i-search')}<input id="q" type="search" placeholder="Cerca una spesa…" value="${esc(speseFilter.q)}" autocomplete="off"></label>
     ${groups().length ? `<div class="chips" id="group-chips"><button class="chip${!speseFilter.group ? ' on' : ''}" data-group="">Tutte le sezioni</button>${groups().map((g) => `<button class="chip${speseFilter.group === g.id ? ' on' : ''}" data-group="${g.id}">${esc(g.name)}</button>`).join('')}</div>` : ''}
     <div class="chips" id="chips"><button class="chip${!speseFilter.cat ? ' on' : ''}" data-cat="">Tutte</button>${CATS.map((c) => `<button class="chip${speseFilter.cat === c.id ? ' on' : ''}" data-cat="${c.id}">${icon(c.icon)}${esc(c.name)}</button>`).join('')}</div>
@@ -307,7 +312,7 @@ function speseList() {
 }
 
 /* ---------- BILANCI ---------- */
-function pageBilanci() {
+function pageBilanci(r) {
   const tab = S.ui.balTab; const bal = balances(); const sent = balanceSentence(bal); const a = me(), b = other();
   const owesAB = Math.max(0, -(bal[a.id] || 0)), owesBA = Math.max(0, bal[a.id] || 0);
   let body;
@@ -337,7 +342,7 @@ function pageBilanci() {
     <section class="card">${barChart(m)}<div class="legend">${S.members.map((x) => `<span><span class="pd" style="--c:${x.color}"></span>${esc(x.name)}</span>`).join('')}</div></section>`;
   }
   return `<div class="page">
-    <div class="head left"><div class="title">Bilanci</div><a class="icon-btn" href="#/statistiche" aria-label="Statistiche">${icon('i-chart')}</a></div>
+    <div class="head left${r.back ? ' with-back' : ''}">${r.back ? `<button class="icon-btn" data-back="${esc(r.back)}" aria-label="Indietro">${icon('i-back')}</button>` : ''}<div class="title">Bilanci</div><a class="icon-btn" href="#/statistiche" aria-label="Statistiche">${icon('i-chart')}</a></div>
     ${segHTML([{ v: '0', t: 'Totali' }, { v: '1', t: 'Per periodo' }], tab, '', 'balTab')}
     <div class="section">${body}</div>
   </div>`;
@@ -502,7 +507,7 @@ function pageProfilo(r) {
   const together = S.settings.together ? `Insieme dal ${esc(S.settings.together)} <span aria-hidden="true">❤️</span>` : 'Le nostre spese, a metà <span aria-hidden="true">❤️</span>';
   const syncOn = sync.enabled();
   return `<div class="page">
-    <div class="profile-head"><div class="couple-circle"><img src="img/coppia.png" alt=""></div><div class="n">${esc(S.members[0].name)} &amp; ${esc(S.members[1].name)}</div><div class="s">${together}</div></div>
+    <div class="profile-head">${r.back ? `<button class="icon-btn profile-back" data-back="${esc(r.back)}" aria-label="Indietro">${icon('i-back')}</button>` : ''}<div class="couple-circle"><img src="img/coppia.png" alt=""></div><div class="n">${esc(S.members[0].name)} &amp; ${esc(S.members[1].name)}</div><div class="s">${together}</div></div>
     <section class="card profile-list"><div class="menu">
       <a href="#/profilo/account">${icon('i-gear')}<span>Impostazioni account</span><span class="val">Io sono ${esc(a.name)}</span>${icon('i-right', 'ic chev')}</a>
       <a href="#/profilo/sezioni">${icon('i-list')}<span>Sezioni</span><span class="val">${groups().length}</span>${icon('i-right', 'ic chev')}</a>
