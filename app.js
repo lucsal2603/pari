@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.10.0';
+const APP_VERSION = '1.10.1';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -128,16 +128,19 @@ const LOVE = [
   'Ti amo, e non è mai una cosa da poco.',
   'Siamo una squadra, la migliore.',
 ];
+const LOVE_FORCE = { day: '2026-09-04', idx: 4 }; // frase imposta per un giorno preciso (ricompare anche se già vista)
 function showDailyLove() {
   if (S.settings.me !== 'm2') return;
   const today = todayStr(); let st = {}; try { st = JSON.parse(localStorage.getItem('pari:love') || '{}'); } catch (_) {}
-  if (st.day === today) return;
+  const forced = LOVE_FORCE.day === today && st.forced !== today;
+  if (st.day === today && !forced) return;
   let idx = Math.floor(Math.random() * LOVE.length); if (idx === st.last) idx = (idx + 1) % LOVE.length;
+  if (forced) idx = LOVE_FORCE.idx;
   const el = document.createElement('div'); el.className = 'love'; el.setAttribute('role', 'dialog');
   el.innerHTML = `<div class="love-in"><div class="love-heart" aria-hidden="true">♥</div><div class="love-t">${esc(LOVE[idx])}</div><div class="love-s">Il tuo Lu</div></div>`;
   document.body.appendChild(el);
   // segno "visto" solo quando la frase è rimasta a schermo: se l'app si ricarica prima (aggiornamento), ricompare
-  let done = false; const close = () => { if (done) return; done = true; try { localStorage.setItem('pari:love', JSON.stringify({ day: today, last: idx })); } catch (_) {} el.classList.add('out'); setTimeout(() => el.remove(), 800); };
+  let done = false; const close = () => { if (done) return; done = true; try { localStorage.setItem('pari:love', JSON.stringify({ day: today, last: idx, forced: forced ? today : st.forced })); } catch (_) {} el.classList.add('out'); setTimeout(() => el.remove(), 800); };
   el.addEventListener('click', close); setTimeout(close, 5500);
 }
 
