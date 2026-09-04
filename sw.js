@@ -1,5 +1,7 @@
-/* Pari — service worker: app shell offline, font in cache, sync sempre in rete */
-const VERSION = 'pari-v1.1.0';
+/* Pari — service worker.
+   Shell (html/js/css): prima la rete, cache solo se offline → gli aggiornamenti si vedono subito.
+   Immagini, icone, font: prima la cache. Supabase: mai toccato. */
+const VERSION = 'pari-v1.1.1';
 const SHELL = [
   './', './index.html', './style.css', './app.js', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png', './icons/favicon.png',
@@ -17,30 +19,36 @@ self.addEventListener('activate', (e) => {
   );
 });
 
-self.addEventListener('message', (e) => {
-  if (e.data === 'skipWaiting') self.skipWaiting();
-});
+self.addEventListener('message', (e) => { if (e.data === 'skipWaiting') self.skipWaiting(); });
 
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
-  // Supabase e altre API: solo rete
   if (url.hostname.endsWith('supabase.co') || url.hostname.endsWith('supabase.in')) return;
-
   const isFont = url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com';
   const sameOrigin = url.origin === self.location.origin;
   if (!sameOrigin && !isFont) return;
 
-  // stale-while-revalidate: risposta immediata dalla cache, aggiornamento in sottofondo
+  const isShell = req.mode === 'navigate' || /\.(html|js|css|webmanifest)$/.test(url.pathname) || url.pathname.endsWith('/');
+  if (sameOrigin && isShell) {
+    // rete prima, con cache di riserva
+    e.respondWith(
+      fetch(req, { cache: 'no-cache' }).then((res) => {
+        if (res && res.ok) caches.open(VERSION).then((c) => c.put(req, res.clone()));
+        return res;
+      }).catch(() => caches.match(req, { ignoreSearch: true }).then((r) => r || caches.match('./index.html')))
+    );
+    return;
+  }
+  // cache prima per immagini, icone e font
   e.respondWith(
     caches.open(VERSION).then(async (cache) => {
-      const cached = await cache.match(req, { ignoreSearch: sameOrigin });
-      const network = fetch(req).then((res) => {
-        if (res && res.ok && (res.type === 'basic' || res.type === 'cors')) cache.put(req, res.clone());
-        return res;
-      }).catch(() => cached);
-      return cached || network;
+      const cached = await cache.match(req);
+      if (cached) return cached;
+      const res = await fetch(req);
+      if (res && res.ok && (res.type === 'basic' || res.type === 'cors')) cache.put(req, res.clone());
+      return res;
     })
   );
 });

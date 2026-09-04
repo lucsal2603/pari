@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.1.1';
 const KEY = 'pari:v1';
 const CATS = [
   { id: 'cibo', name: 'Cibo', icon: 'c-cibo' },
@@ -734,9 +734,13 @@ if (sync.enabled()) sync.run();
 document.addEventListener('visibilitychange', () => { if (!document.hidden) { materializeRecurring(); if (sync.enabled()) sync.run(); } });
 setInterval(() => { if (!document.hidden && sync.enabled()) sync.run(); }, 45000);
 if ('serviceWorker' in navigator) {
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (reloading) return; reloading = true; if (navigator.serviceWorker.controller) location.reload(); });
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').then((reg) => {
-      reg.addEventListener('updatefound', () => { const nw = reg.installing; nw && nw.addEventListener('statechange', () => { if (nw.state === 'installed' && navigator.serviceWorker.controller) toast('Nuova versione pronta', { label: 'Aggiorna', fn: () => { nw.postMessage('skipWaiting'); setTimeout(() => location.reload(), 300); } }); }); });
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then((reg) => {
+      reg.update().catch(() => {});
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) reg.update().catch(() => {}); });
+      reg.addEventListener('updatefound', () => { const nw = reg.installing; nw && nw.addEventListener('statechange', () => { if (nw.state === 'installed' && navigator.serviceWorker.controller) toast('Aggiornamento in arrivo…'); }); });
     }).catch(() => {});
   });
 }
