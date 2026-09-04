@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.1.4';
+const APP_VERSION = '1.2.0';
 const KEY = 'pari:v1';
 const CATS = [
   { id: 'cibo', name: 'Cibo', icon: 'c-cibo' },
@@ -370,6 +370,7 @@ function pageForm(r) {
   if (!F || F.routeKey !== location.hash) {
     F = editing ? { routeKey: location.hash, id: editing.id, kind: editing.kind, desc: editing.desc || '', amount: moneyPlain(editing.amount), date: editing.date, cat: editing.cat || '', paidBy: editing.paidBy, splitMethod: editing.splitMethod || 'equal', splitInput: { ...(editing.splitInput || {}) }, notes: editing.notes || '', recurring: editing.recurring === 'monthly', to: Object.keys(editing.owed || {})[0] }
       : { routeKey: location.hash, id: null, kind: r.q.tipo === 'pagamento' ? 'payment' : 'expense', desc: '', amount: '', date: todayStr(), cat: '', paidBy: me().id, splitMethod: 'equal', splitInput: {}, notes: '', recurring: false, to: other().id };
+    if (F.kind === 'expense') F.splitMethod = 'equal';
     if (!editing && F.kind === 'payment') { const bal = balances(); const v = bal[me().id] || 0; if (v < 0) { F.paidBy = me().id; F.to = other().id; F.amount = moneyPlain(-v); } else if (v > 0) { F.paidBy = other().id; F.to = me().id; F.amount = moneyPlain(v); } }
   }
   const isPay = F.kind === 'payment'; const a = me(), b = other();
@@ -381,22 +382,8 @@ function pageForm(r) {
       ${isPay ? '' : `<div class="field"><label for="desc">Descrizione</label><input id="desc" type="text" placeholder="Cena pizza" value="${esc(F.desc)}" autocomplete="off" enterkeyhint="next"></div>`}
       <div class="field"><label for="amount">Importo</label><div class="money-input"><span class="cur">€</span><input id="amount" type="text" inputmode="decimal" placeholder="0,00" value="${esc(F.amount)}" autocomplete="off"></div><div class="hint err" id="amount-err" hidden>Inserisci un importo valido.</div></div>
       ${isPay
-        ? `<div class="field"><div class="lbl">Chi paga?</div><div class="opts">${S.members.map((m) => optCard(m, F.paidBy === m.id, 'payer')).join('')}</div></div>
-           <div class="field"><div class="lbl">A chi?</div><div class="opts">${S.members.map((m) => optCard(m, F.to === m.id, 'to')).join('')}</div><div class="hint">${esc(payerOf(F.paidBy).name)} dà ${F.amount ? '€ ' + esc(F.amount) : 'questa somma'} a ${esc(payerOf(F.to).name)}: il saldo fra voi si aggiorna.</div></div>`
-        : `<div class="field"><div class="lbl">Chi ha pagato?</div><div class="opts">${S.members.map((m) => optCard(m, F.paidBy === m.id, 'payer')).join('')}</div></div>
-           <div class="field"><div class="lbl">Per chi è?</div><div class="opts">
-             <button type="button" class="opt on" data-soon="no"><span class="avatar-pair">${avatar(S.members[0])}${avatar(S.members[1])}</span><span><span class="t">Solo noi</span><span class="d">${esc(a.name)} e ${esc(b.name)}</span></span>${icon('i-right')}</button>
-             <button type="button" class="opt" data-soon="friends"><span class="cat-ic" style="width:34px;height:34px">${icon('i-users')}</span><span><span class="t">Altro</span><span class="d">Dividi con amici</span></span>${icon('i-right')}</button>
-           </div></div>
-           <div class="field"><div class="lbl">Come dividere?</div><div class="opts">
-             <button type="button" class="opt${F.splitMethod === 'equal' ? ' on' : ''}" data-split="equal"><span><span class="t">Metà e metà</span><span class="d">${F.amount && !isNaN(parseAmount(F.amount)) ? money(Math.round(parseAmount(F.amount) / 2)) + ' a testa' : 'In parti uguali'}</span></span>${icon('i-right')}</button>
-             <button type="button" class="opt${F.splitMethod !== 'equal' ? ' on' : ''}" data-split="custom"><span><span class="t">Personalizzata</span><span class="d">Importi o percentuali</span></span>${icon('i-right')}</button>
-           </div>
-           <div id="custom-split" ${F.splitMethod === 'equal' ? 'hidden' : ''}>
-             <div style="margin-top:12px">${segHTML([{ v: 'exact', t: 'Importi' }, { v: 'percent', t: 'Percentuali' }, { v: 'shares', t: 'Quote' }], ['exact', 'percent', 'shares'].indexOf(F.splitMethod === 'equal' ? 'exact' : F.splitMethod), 'small', 'splitMethod')}</div>
-             <div class="split-rows">${S.members.map((m) => `<div class="sr-row"><span class="who"><span class="pd" style="--c:${m.color}"></span>${esc(m.name)}</span><input class="input" type="text" inputmode="decimal" data-share="${m.id}" value="${esc(F.splitInput[m.id] ?? '')}" placeholder="${F.splitMethod === 'percent' ? '50' : F.splitMethod === 'shares' ? '1' : '0,00'}"></div>`).join('')}</div>
-             <div class="split-total" id="split-total"></div>
-           </div></div>
+        ? `<div class="field"><div class="lbl">Pagamento</div><div class="pay-dir">${avatar(payerOf(F.paidBy))}<span class="txt"><span class="t">${esc(payerOf(F.paidBy).name)} dà a ${esc(payerOf(F.to).name)}</span><span class="d">${F.amount ? '€ ' + esc(F.amount) : 'la somma qui sopra'} · il saldo fra voi si aggiorna</span></span>${avatar(payerOf(F.to))}</div></div>`
+        : `<div class="field"><div class="pay-dir soft">${avatar(payerOf(F.paidBy))}<span class="txt"><span class="t">${F.id ? 'Pagata da ' + esc(payerOf(F.paidBy).name) : 'Paghi tu, ' + esc(payerOf(F.paidBy).name)}</span><span class="d" id="half-hint">${F.amount && !isNaN(parseAmount(F.amount)) ? 'Metà a testa: ' + money(Math.round(parseAmount(F.amount) / 2)) : 'Divisa a metà con ' + esc(other().name)}</span></span></div></div>
            <div class="field"><div class="lbl">Categoria <small>(opzionale)</small></div><div class="cat-circles">${CATS.map((c) => `<button type="button" class="cat-circle${F.cat === c.id ? ' on' : ''}" data-cat="${c.id}" aria-label="${esc(c.name)}" title="${esc(c.name)}">${icon(c.icon)}</button>`).join('')}</div><div class="cat-name" id="cat-name">${F.cat ? esc(catOf(F.cat).name) : 'Nessuna categoria'}</div></div>`}
       <div class="field"><label for="date">Data</label><input id="date" type="date" value="${esc(F.date)}" max="2100-12-31"></div>
       <div class="field"><label for="notes">Note <small class="muted" style="font-weight:500">(opzionale)</small></label><textarea id="notes" placeholder="${isPay ? 'Es. bonifico, contanti…' : 'Es. Sushi Yama - Corso Buenos Aires'}">${esc(F.notes)}</textarea></div>
@@ -581,7 +568,7 @@ function bindForm(r) {
   bindSeg($('[data-seg="kind"]'), (v) => { F.kind = v; if (v === 'payment') { const bal = balances(); const m = bal[me().id] || 0; if (m < 0) { F.paidBy = me().id; F.to = other().id; F.amount = moneyPlain(-m); } else if (m > 0) { F.paidBy = other().id; F.to = me().id; F.amount = moneyPlain(m); } } rerender(); });
   bindSeg($('[data-seg="splitMethod"]'), (v) => { F.splitMethod = v; F.splitInput = {}; rerender(); });
   const desc = $('#desc'); if (desc) desc.addEventListener('input', () => (F.desc = desc.value));
-  const amount = $('#amount'); amount.addEventListener('input', () => { F.amount = amount.value; $('#amount-err').hidden = true; const d = $('[data-split="equal"] .d'); const v = parseAmount(F.amount); if (d) d.textContent = !isNaN(v) ? money(Math.round(v / 2)) + ' a testa' : 'In parti uguali'; validateSplit(); });
+  const amount = $('#amount'); amount.addEventListener('input', () => { F.amount = amount.value; $('#amount-err').hidden = true; const d = $('#half-hint'); const v = parseAmount(F.amount); if (d) d.textContent = !isNaN(v) ? 'Metà a testa: ' + money(Math.round(v / 2)) : 'Divisa a metà con ' + other().name; validateSplit(); });
   $('#date').addEventListener('change', (ev) => (F.date = ev.target.value || todayStr()));
   $('#notes').addEventListener('input', (ev) => (F.notes = ev.target.value));
   $$('[data-pick]').forEach((b) => b.addEventListener('click', () => { if (b.dataset.pick === 'payer') F.paidBy = b.dataset.id; else F.to = b.dataset.id; rerender(); }));

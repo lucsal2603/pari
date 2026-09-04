@@ -246,6 +246,12 @@ img.avatar.lg { width: 44px; height: 44px; }
 .opt.on { border-color: var(--green); background: var(--green-soft); }
 .opt.on .ic { color: var(--green); }
 .opt .ph.avatar { width: 34px; height: 34px; }
+.pay-dir { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; background: var(--green-soft); border: 1.5px solid var(--green-line); }
+.pay-dir.soft { background: var(--card); border-color: var(--line); }
+.pay-dir .txt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.pay-dir .t { font-weight: 700; font-size: 14.5px; }
+.pay-dir .d { font-size: 12.5px; color: var(--muted); font-weight: 500; }
+.pay-dir img.avatar { width: 40px; height: 40px; }
 .cat-circles { display: flex; gap: 10px; overflow-x: auto; padding: 4px 18px 8px; margin: 0 -18px; scrollbar-width: none; }
 .cat-circles::-webkit-scrollbar { display: none; }
 .cat-circle { flex: none; width: 54px; height: 54px; border-radius: 50%; background: var(--card); border: 1.5px solid var(--line); display: inline-flex; align-items: center; justify-content: center; color: var(--ink); transition: border-color .2s ease, background-color .2s ease, transform .16s var(--ease-out), color .2s ease; }
