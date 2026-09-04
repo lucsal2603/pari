@@ -126,8 +126,7 @@ img.avatar.lg { width: 44px; height: 44px; }
 .saldo-couple { height: 96px; margin-right: -6px; }
 .saldo-couple img + img { margin-left: -16%; }
 .couple-circle { width: 124px; height: 124px; border-radius: 50%; background: var(--bg); overflow: hidden; margin: 0 auto; box-shadow: 0 0 0 4px rgba(255,255,255,.14); }
-.couple-circle .couple { height: 100%; padding-top: 12px; }
-.couple-circle .couple img { height: 92%; }
+.couple-circle img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .empty-couple { height: 118px; margin-bottom: 12px; }
 .avatar-pair { display: inline-flex; flex: none; }
 .avatar-pair img.avatar { width: 30px; height: 30px; box-shadow: 0 0 0 2px var(--card); }

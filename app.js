@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.1.2';
+const APP_VERSION = '1.1.3';
 const KEY = 'pari:v1';
 const CATS = [
   { id: 'cibo', name: 'Cibo', icon: 'c-cibo' },
@@ -451,7 +451,7 @@ function pageProfilo(r) {
   const together = S.settings.together ? `Insieme dal ${esc(S.settings.together)} <span aria-hidden="true">❤️</span>` : 'Le nostre spese, a metà <span aria-hidden="true">❤️</span>';
   const syncOn = sync.enabled();
   return `<div class="page">
-    <div class="profile-head"><div class="couple-circle">${couple()}</div><div class="n">${esc(S.members[0].name)} &amp; ${esc(S.members[1].name)}</div><div class="s">${together}</div></div>
+    <div class="profile-head"><div class="couple-circle"><img src="img/coppia.png" alt=""></div><div class="n">${esc(S.members[0].name)} &amp; ${esc(S.members[1].name)}</div><div class="s">${together}</div></div>
     <section class="card profile-list"><div class="menu">
       <a href="#/profilo/account">${icon('i-gear')}<span>Impostazioni account</span><span class="val">Io sono ${esc(a.name)}</span>${icon('i-right', 'ic chev')}</a>
       <a href="#/profilo/categorie">${icon('i-grid')}<span>Categorie</span><span></span>${icon('i-right', 'ic chev')}</a>
