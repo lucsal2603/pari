@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.9.1';
+const APP_VERSION = '1.10.0';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -94,6 +94,52 @@ function renameGroup(id, name) { const g = S.groups.find((x) => x.id === id); if
 function deleteGroup(id) { const g = S.groups.find((x) => x.id === id); if (!g) return; g.deleted = true; g.updatedAt = nowISO(); S.settings.groupsUpdatedAt = g.updatedAt; if (S.settings.lastGroup === id) S.settings.lastGroup = (groups()[0] || {}).id || null; save(); sync.schedule(); }
 
 if (!S.settings.deviceId) { S.settings.deviceId = 'd-' + uid(); save(); }
+
+/* ---------- Un pensiero al giorno per Martina (solo sul suo telefono, alla prima apertura del giorno) ---------- */
+const LOVE = [
+  'Ricordati che ti amo.',
+  'Buongiorno amore, oggi pensami un secondo in più.',
+  'Sei la parte migliore delle mie giornate.',
+  'Ogni spesa con te è un investimento felice.',
+  'Ti amo più di ieri, meno di domani.',
+  'Con te anche le bollette fanno meno paura.',
+  'Sei casa mia, ovunque siamo.',
+  'Oggi sorridi: c\'è uno che ti pensa.',
+  'Ti scelgo ogni giorno, anche oggi.',
+  'Il conto migliore è quello dei giorni con te.',
+  'Sei la mia persona preferita.',
+  'Ti amo anche quando dividiamo a metà.',
+  'Grazie di esistere, amore mio.',
+  'La cosa più bella della mia vita sei tu.',
+  'Ogni giorno con te vale doppio.',
+  'Sei il mio posto felice.',
+  'Oggi ti amo forte forte.',
+  'Con te tutto torna, anche i conti.',
+  'Mi manchi già, e ti ho appena vista.',
+  'Sei bellissima, anche di lunedì.',
+  'Ti amo in tutte le lingue, ma soprattutto in silenzio.',
+  'Sei la mia fortuna più grande.',
+  'Il resto del mondo può aspettare: prima tu.',
+  'Con te voglio spendere tutto il tempo che ho.',
+  'Sei la mia spesa preferita: ne vale sempre la pena.',
+  'Amore, oggi va tutto bene perché ci sei tu.',
+  'Nessun saldo è in pari come il mio cuore con te.',
+  'Un bacio in anticipo per tutta la giornata.',
+  'Ti amo, e non è mai una cosa da poco.',
+  'Siamo una squadra, la migliore.',
+];
+function showDailyLove() {
+  if (S.settings.me !== 'm2') return;
+  const today = todayStr(); let st = {}; try { st = JSON.parse(localStorage.getItem('pari:love') || '{}'); } catch (_) {}
+  if (st.day === today) return;
+  let idx = Math.floor(Math.random() * LOVE.length); if (idx === st.last) idx = (idx + 1) % LOVE.length;
+  const el = document.createElement('div'); el.className = 'love'; el.setAttribute('role', 'dialog');
+  el.innerHTML = `<div class="love-in"><div class="love-heart" aria-hidden="true">♥</div><div class="love-t">${esc(LOVE[idx])}</div><div class="love-s">Il tuo Lu</div></div>`;
+  document.body.appendChild(el);
+  // segno "visto" solo quando la frase è rimasta a schermo: se l'app si ricarica prima (aggiornamento), ricompare
+  let done = false; const close = () => { if (done) return; done = true; try { localStorage.setItem('pari:love', JSON.stringify({ day: today, last: idx })); } catch (_) {} el.classList.add('out'); setTimeout(() => el.remove(), 800); };
+  el.addEventListener('click', close); setTimeout(close, 5500);
+}
 
 /* ---------- Notifiche ---------- */
 function notifText(e, actorName, balForMe) {
@@ -935,6 +981,7 @@ function toast(text, action) {
 
 /* ---------- Avvio ---------- */
 importSplitwiseOnce();
+showDailyLove();
 materializeRecurring();
 route();
 if (sync.enabled()) sync.run();
