@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.4.1';
 const KEY = 'pari:v1';
 const CATS = [
   { id: 'cibo', name: 'Cibo', icon: 'c-cibo' },
@@ -174,6 +174,8 @@ const ph = (label, cls = '') => `<span class="ph ${cls}">${esc(label)}</span>`;
 const imgKey = (m) => (m.id === 'm1' ? 'luca' : m.id === 'm2' ? 'martina' : '');
 const avatar = (m, lg = false) => imgKey(m) ? `<img class="avatar${lg ? ' lg' : ''}" src="img/${imgKey(m)}-avatar.png" alt="" title="${esc(m.name)}">` : `<span class="ph avatar${lg ? ' lg' : ''}" title="${esc(m.name)}">${esc(m.name.slice(0, 1))}</span>`;
 const couple = (cls = '') => `<div class="couple ${cls}" aria-hidden="true"><img src="img/luca.png" alt=""><img src="img/martina.png" alt=""></div>`;
+/* Scena in base al saldo: Luca deve → portafoglio vuoto; Martina deve → lei gli passa la banconota; pari → i due che si guardano */
+const coupleScene = (cls = '') => { const v = balances()[S.members[0].id] || 0; if (Math.abs(v) < 1) return couple(cls); return `<div class="couple scene ${cls}" aria-hidden="true"><img src="img/${v < 0 ? 'luca-deve' : 'martina-deve'}.png" alt=""></div>`; };
 function entryRow(e, i) {
   const c = catOf(e.cat); const payer = member(e.paidBy); const isPay = e.kind === 'payment';
   const to = isPay ? member(Object.keys(e.owed || {})[0]) : null;
@@ -241,7 +243,7 @@ function pageHome() {
       <div class="k">Saldo totale</div>
       <div class="amt">${sent.even ? money(0) : sent.sign + ' ' + money(sent.amount)}</div>
       <div class="s">${esc(sent.text)}</div>
-      ${couple('hero-couple')}
+      ${coupleScene('hero-couple')}
     </section>
     <div class="link-row"><h2 class="sec-title">Ultime spese</h2><a href="#/spese">Vedi tutte ${icon('i-right')}</a></div>
     <section class="card list-card"><div class="list stagger">${recent.length ? recent.map(entryRow).join('') : emptyBox('Nessuna spesa ancora', 'Aggiungi la prima con il tasto qui sotto.', true)}</div></section>
@@ -286,7 +288,7 @@ function pageBilanci() {
   const owesAB = Math.max(0, -(bal[a.id] || 0)), owesBA = Math.max(0, bal[a.id] || 0);
   let body;
   if (tab === 0) {
-    body = `<section class="card saldo${sent.even ? ' even' : ''}"><div><div class="k">Saldo attuale</div><div class="amt">${sent.even ? money(0) : sent.sign + ' ' + money(sent.amount)}</div><div class="s">${esc(sent.text)}</div></div>${couple('saldo-couple')}</section>
+    body = `<section class="card saldo${sent.even ? ' even' : ''}"><div><div class="k">Saldo attuale</div><div class="amt">${sent.even ? money(0) : sent.sign + ' ' + money(sent.amount)}</div><div class="s">${esc(sent.text)}</div></div>${coupleScene('saldo-couple')}</section>
     <h2 class="sec-title section">Dettaglio</h2>
     <section class="card"><div class="dlist">
       <button type="button" data-settle="${a.id}:${b.id}"><span class="t">${esc(a.name)} deve a ${esc(b.name)}</span><span class="money ${owesAB ? 'red' : ''}">${money(owesAB)}</span>${icon('i-right')}</button>
