@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.3.0';
+const APP_VERSION = '1.3.1';
 const KEY = 'pari:v1';
 const CATS = [
   { id: 'cibo', name: 'Cibo', icon: 'c-cibo' },
@@ -177,12 +177,20 @@ const couple = (cls = '') => `<div class="couple ${cls}" aria-hidden="true"><img
 function entryRow(e, i) {
   const c = catOf(e.cat); const payer = member(e.paidBy); const isPay = e.kind === 'payment';
   const to = isPay ? member(Object.keys(e.owed || {})[0]) : null;
-  const col = payer.id === S.members[0].id ? 'green' : 'orange';
+  const mine = myShare(e);
   return `<a class="row${isPay ? ' payment' : ''}" href="#/spesa/${e.id}" style="--i:${i}">
     <span class="cat-ic${isPay ? ' pay' : ''}">${icon(isPay ? 'c-pagamento' : c.icon)}</span>
-    <span class="main"><span class="title">${esc(isPay ? `${payer.name} ha pagato ${to ? to.name : ''}` : e.desc)}</span><span class="sub">${esc(relDay(e.date))}${!isPay && e.cat ? ' · ' + esc(c.name) : ''}${e.recurringOf || e.recurring ? ' · ricorrente' : ''}${e.demo ? ' · esempio' : ''}</span></span>
-    <span class="right"><span class="money">${money(e.amount)}</span><span class="by ${isPay ? 'green' : col}">${isPay ? 'Pagamento' : esc(payer.name) + ' ha pagato'}</span></span>
+    <span class="main"><span class="title">${esc(isPay ? `${payer.name} ha pagato ${to ? to.name : ''}` : e.desc)}</span><span class="sub">${esc(relDay(e.date))}${isPay ? '' : ' · ' + esc(payer.id === me().id ? 'hai pagato tu' : payer.name + ' ha pagato')}${e.recurringOf || e.recurring ? ' · ricorrente' : ''}${e.demo ? ' · esempio' : ''}</span></span>
+    <span class="right"><span class="money ${mine.cls}">${mine.big}</span><span class="by muted">${mine.small}</span></span>
   </a>`;
+}
+/* La mia parte di una voce: quanto ricevo (ho pagato io) o quanto devo (ha pagato l'altro) */
+function myShare(e) {
+  const my = me().id; const owedByMe = (e.owed || {})[my] || 0;
+  if (e.kind === 'payment') return { big: money(e.amount), cls: '', small: e.paidBy === my ? 'hai pagato tu' : 'ti ha pagato', label: '' };
+  if (e.paidBy === my) { const v = e.amount - owedByMe; return { big: '+ ' + money(v), cls: 'green', small: 'tot. ' + money(e.amount), label: 'Ricevi ' + money(v) }; }
+  if (owedByMe > 0) return { big: '− ' + money(owedByMe), cls: 'red', small: 'tot. ' + money(e.amount), label: 'Devi ' + money(owedByMe) };
+  return { big: money(e.amount), cls: 'muted', small: 'non ti riguarda', label: '' };
 }
 function emptyBox(t, d, withImg) { return `<div class="empty">${withImg ? '<img class="empty-img" src="img/nessuna-spesa.png" alt="">' : ''}<div class="t">${esc(t)}</div><div class="small">${esc(d)}</div>${withImg ? '<button type="button" class="btn soft sm" data-demo-seed style="margin-top:14px">Prova con spese di esempio</button>' : ''}</div>`; }
 /* Spese di esempio: si caricano dallo stato vuoto e si tolgono con un tocco da Profilo → Esporta dati */
@@ -375,6 +383,7 @@ function pageDetail(r) {
       <div class="date">${esc(dateLong(e.date))}${!isPay && e.cat ? ' · ' + esc(c.name) : ''}${e.recurringOf || e.recurring ? ' · si ripete ogni mese' : ''}</div>
       <div class="amt">${money(e.amount)}</div>
       <div class="by ${payer.id === S.members[0].id ? 'green' : 'orange'}">${isPay ? 'Saldo aggiornato' : 'Pagato da ' + esc(payer.name)}</div>
+      ${(() => { const m = myShare(e); return m.label ? `<div style="margin-top:10px"><span class="pill ${m.cls === 'green' ? 'green' : 'red'}">${esc(m.label)}</span></div>` : ''; })()}
     </div>
     ${isPay ? '' : `<h2 class="sec-title section">Diviso tra</h2>
     <section class="card"><div class="people">${parts.map(([id, v]) => `<div>${avatar(member(id))}<span>${esc(member(id).name)}</span><span class="money">${money(v)}</span></div>`).join('')}</div></section>`}
