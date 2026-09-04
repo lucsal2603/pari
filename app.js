@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.1.1';
+const APP_VERSION = '1.1.2';
 const KEY = 'pari:v1';
 const CATS = [
   { id: 'cibo', name: 'Cibo', icon: 'c-cibo' },
@@ -172,7 +172,7 @@ function render(r) {
 /* ---------- Componenti condivisi ---------- */
 const ph = (label, cls = '') => `<span class="ph ${cls}">${esc(label)}</span>`;
 const imgKey = (m) => (m.id === 'm1' ? 'luca' : m.id === 'm2' ? 'martina' : '');
-const avatar = (m, lg = false) => imgKey(m) ? `<img class="avatar${lg ? ' lg' : ''}" src="img/${imgKey(m)}-head.png" alt="" title="${esc(m.name)}">` : `<span class="ph avatar${lg ? ' lg' : ''}" title="${esc(m.name)}">${esc(m.name.slice(0, 1))}</span>`;
+const avatar = (m, lg = false) => imgKey(m) ? `<img class="avatar${lg ? ' lg' : ''}" src="img/${imgKey(m)}-avatar.png" alt="" title="${esc(m.name)}">` : `<span class="ph avatar${lg ? ' lg' : ''}" title="${esc(m.name)}">${esc(m.name.slice(0, 1))}</span>`;
 const couple = (cls = '') => `<div class="couple ${cls}" aria-hidden="true"><img src="img/luca.png" alt=""><img src="img/martina.png" alt=""></div>`;
 function entryRow(e, i) {
   const c = catOf(e.cat); const payer = member(e.paidBy); const isPay = e.kind === 'payment';

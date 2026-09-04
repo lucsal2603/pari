@@ -1,11 +1,11 @@
 /* Pari — service worker.
    Shell (html/js/css): prima la rete, cache solo se offline → gli aggiornamenti si vedono subito.
    Immagini, icone, font: prima la cache. Supabase: mai toccato. */
-const VERSION = 'pari-v1.1.1';
+const VERSION = 'pari-v1.1.2';
 const SHELL = [
   './', './index.html', './style.css', './app.js', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png', './icons/favicon.png',
-  './img/luca.png', './img/martina.png', './img/luca-head.png', './img/martina-head.png'
+  './img/luca.png', './img/martina.png', './img/luca-avatar.png', './img/martina-avatar.png'
 ];
 
 self.addEventListener('install', (e) => {

@@ -117,7 +117,7 @@ svg.ic { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-wid
 .pd { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--c, var(--ink)); flex: none; }
 
 /* Illustrazioni: Luca a sinistra, Martina a destra */
-img.avatar { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex: none; background: var(--white); border: 1.5px solid var(--line); display: inline-block; }
+img.avatar { width: 38px; height: 38px; border-radius: 50%; object-fit: cover; flex: none; background: transparent; display: inline-block; }
 img.avatar.lg { width: 44px; height: 44px; }
 .couple { display: flex; align-items: flex-end; justify-content: center; pointer-events: none; }
 .couple img { height: 100%; width: auto; display: block; }
@@ -130,9 +130,9 @@ img.avatar.lg { width: 44px; height: 44px; }
 .couple-circle .couple img { height: 92%; }
 .empty-couple { height: 118px; margin-bottom: 12px; }
 .avatar-pair { display: inline-flex; flex: none; }
-.avatar-pair img.avatar { width: 28px; height: 28px; border: 2px solid var(--card); }
+.avatar-pair img.avatar { width: 30px; height: 30px; box-shadow: 0 0 0 2px var(--card); }
 .avatar-pair img.avatar + img.avatar { margin-left: -10px; }
-.people img.avatar { width: 36px; height: 36px; }
+.people img.avatar { width: 38px; height: 38px; }
 
 /* Segnaposto bianchi (riserva) */
 .ph { background: var(--white); border: 1.5px dashed #D3CBBE; border-radius: var(--r); display: inline-flex; align-items: center; justify-content: center; color: #B7AFA2; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; text-align: center; padding: 6px; }
