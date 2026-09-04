@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.8.1';
+const APP_VERSION = '1.8.2';
 const KEY = 'pari:v1';
 const VAPID_PUBLIC = 'BAUQZ4UtSZAcJIDeoRF4b06elYpAl_pMJp5HzAA5nwbUB6Shslilu-bM9vjN0lnlrwTcfxgPi0ibyU3_UbAz-UI';
 const urlB64ToU8 = (b) => { const p = '='.repeat((4 - (b.length % 4)) % 4); const r = (b + p).replace(/-/g, '+').replace(/_/g, '/'); const raw = atob(r); return Uint8Array.from([...raw].map((c) => c.charCodeAt(0))); };
@@ -214,14 +214,16 @@ function route() {
   // arrivati da un link (non dalla barra in basso) e da un'altra area: mostro il tasto indietro
   const fromLink = !viaTab && prevHash && prevHash !== curHash && !/^#\/(nuova|modifica)/.test(prevHash);
   r.back = fromLink && tabOf(prevHash) !== tabOf(curHash) ? prevHash : null; viaTab = false;
-  render(r);
+  render(r, true);
 }
 window.addEventListener('hashchange', route);
 function go(h) { location.hash = h; }
 function back(fallback) { const ok = prevHash && prevHash !== curHash && !/^#\/(nuova|modifica)/.test(prevHash); go(ok ? prevHash : fallback); }
 
 let currentRoute = null;
-function render(r) {
+function render(r, toTop) {
+  // toTop solo quando cambia pagina: i ridisegni per un cambio di stato (Pagato/Quota, mese, tab) tengono la posizione
+  const keep = toTop ? 0 : window.scrollY;
   r = r || currentRoute || { name: 'home', id: '', q: {} }; currentRoute = r;
   const pages = { home: pageHome, spese: pageSpese, bilanci: pageBilanci, profilo: pageProfilo, nuova: pageForm, modifica: pageForm, spesa: pageDetail, statistiche: pageStats, attivita: pageActivity };
   const fn = pages[r.name] || pageHome;
@@ -229,7 +231,7 @@ function render(r) {
   const tabName = r.name === 'profilo' ? 'profilo' : r.name === 'statistiche' ? 'bilanci' : r.name;
   $$('.tab').forEach((t) => t.classList.toggle('on', t.dataset.tab === tabName));
   view.innerHTML = fn(r);
-  window.scrollTo(0, 0);
+  window.scrollTo(0, keep);
   bind(r); initSwipes();
   const reveal = () => { $$('.chart').forEach((c) => c.classList.add('in')); $$('[data-w]').forEach((el) => (el.style.width = el.dataset.w)); };
   requestAnimationFrame(() => requestAnimationFrame(reveal)); setTimeout(reveal, 80);
