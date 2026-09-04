@@ -73,6 +73,8 @@ svg.ic { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-wid
 .icon-btn { position: relative; width: 44px; height: 44px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--ink); transition: background-color .2s ease, transform .16s var(--ease-out); }
 .icon-btn:active { transform: scale(.9); background: var(--card-2); }
 .icon-btn.green { color: var(--green); }
+.icon-btn.red { color: var(--red); }
+.chips .chip .ic { width: 16px; height: 16px; }
 .greet { font-size: 24px; font-weight: 800; letter-spacing: -.02em; }
 .who-chip { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; }
 .sync-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); display: inline-block; }

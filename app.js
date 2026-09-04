@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.5.0';
+const APP_VERSION = '1.6.0';
 const KEY = 'pari:v1';
 const CATS = [
   { id: 'cibo', name: 'Cibo', icon: 'c-cibo' },
@@ -61,13 +61,16 @@ function defaultState() {
     ],
     entries: [],
     activity: [],
-    settings: { me: 'm1', currency: 'EUR', together: '', sync: { url: '', key: '', house: '' }, lastPull: null, membersUpdatedAt: null },
+    groups: [{ id: 'g1', name: 'Spese casa', createdAt: '2026-09-04T00:00:00.000Z', updatedAt: '2026-09-04T00:00:00.000Z', deleted: false }],
+    settings: { me: 'm1', currency: 'EUR', together: '', sync: { url: '', key: '', house: '' }, lastPull: null, membersUpdatedAt: null, groupsUpdatedAt: null, lastGroup: 'g1' },
     ui: { month: curYM(), statsRange: 'mese', balTab: 0, homeMode: 'paid' },
   };
 }
 let S = load();
 function load() {
-  try { const raw = localStorage.getItem(KEY); if (raw) { const s = JSON.parse(raw); const d = defaultState(); return { ...d, ...s, settings: { ...d.settings, ...(s.settings || {}), sync: { ...d.settings.sync, ...((s.settings || {}).sync || {}) } }, ui: { ...d.ui, ...(s.ui || {}), month: curYM() } }; } } catch (e) { console.warn('stato corrotto', e); }
+  try { const raw = localStorage.getItem(KEY); if (raw) { const s = JSON.parse(raw); const d = defaultState(); const st = { ...d, ...s, settings: { ...d.settings, ...(s.settings || {}), sync: { ...d.settings.sync, ...((s.settings || {}).sync || {}) } }, ui: { ...d.ui, ...(s.ui || {}), month: curYM() } };
+    if (!Array.isArray(s.groups)) { st.groups = d.groups; st.entries.forEach((e) => { if (!e.group) e.group = 'g1'; }); st.settings.lastGroup = 'g1'; }
+    return st; } } catch (e) { console.warn('stato corrotto', e); }
   return defaultState();
 }
 function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { toast('Memoria piena: impossibile salvare'); } }
@@ -75,6 +78,12 @@ const me = () => S.members.find((m) => m.id === S.settings.me) || S.members[0];
 const other = () => S.members.find((m) => m.id !== me().id) || S.members[1];
 const member = (id) => S.members.find((m) => m.id === id) || { id, name: '?', color: '#999' };
 const active = () => S.entries.filter((e) => !e.deleted);
+const groups = () => S.groups.filter((g) => !g.deleted);
+const groupOf = (e) => S.groups.find((g) => g.id === e.group && !g.deleted) || null;
+const groupName = (e) => { const g = groupOf(e); return g ? g.name : 'Senza sezione'; };
+function addGroup(name) { const g = { id: 'g-' + uid(), name: name.trim(), createdAt: nowISO(), updatedAt: nowISO(), deleted: false }; S.groups.push(g); S.settings.groupsUpdatedAt = nowISO(); save(); sync.schedule(); return g; }
+function renameGroup(id, name) { const g = S.groups.find((x) => x.id === id); if (!g || !name.trim()) return; g.name = name.trim(); g.updatedAt = nowISO(); S.settings.groupsUpdatedAt = g.updatedAt; save(); sync.schedule(); }
+function deleteGroup(id) { const g = S.groups.find((x) => x.id === id); if (!g) return; g.deleted = true; g.updatedAt = nowISO(); S.settings.groupsUpdatedAt = g.updatedAt; if (S.settings.lastGroup === id) S.settings.lastGroup = (groups()[0] || {}).id || null; save(); sync.schedule(); }
 
 /* ---------- Logica dei conti ---------- */
 function splitEqual(amount, ids) {
@@ -86,6 +95,11 @@ function balances() {
   const b = {}; S.members.forEach((m) => (b[m.id] = 0));
   active().forEach((e) => { b[e.paidBy] = (b[e.paidBy] || 0) + e.amount; for (const [id, c] of Object.entries(e.owed || {})) b[id] = (b[id] || 0) - c; });
   return b; // positivo = deve ricevere
+}
+function groupBalance(gid) {
+  const b = {}; S.members.forEach((m) => (b[m.id] = 0));
+  active().filter((e) => e.group === gid).forEach((e) => { b[e.paidBy] = (b[e.paidBy] || 0) + e.amount; for (const [id, c] of Object.entries(e.owed || {})) b[id] = (b[id] || 0) - c; });
+  return b;
 }
 function monthStats(ymStr) {
   const es = active().filter((e) => e.kind === 'expense' && ym(e.date) === ymStr);
@@ -182,7 +196,7 @@ function entryRow(e, i) {
   const mine = myShare(e);
   return `<div class="swipe" data-id="${e.id}" style="--i:${i}"><a class="row${isPay ? ' payment' : ''}" href="#/spesa/${e.id}">
     <span class="cat-ic${isPay ? ' pay' : ''}">${icon(isPay ? 'c-pagamento' : c.icon)}</span>
-    <span class="main"><span class="title">${esc(isPay ? `${payer.name} ha pagato ${to ? to.name : ''}` : e.desc)}</span><span class="sub">${esc(relDay(e.date))}${isPay ? '' : ' · ' + esc(payer.id === me().id ? 'hai pagato tu' : payer.name + ' ha pagato')}${e.recurringOf || e.recurring ? ' · ricorrente' : ''}</span></span>
+    <span class="main"><span class="title">${esc(isPay ? `${payer.name} ha pagato ${to ? to.name : ''}` : e.desc)}</span><span class="sub">${esc(relDay(e.date))}${isPay ? '' : ' · ' + esc(payer.id === me().id ? 'hai pagato tu' : payer.name + ' ha pagato')}${e.recurringOf || e.recurring ? ' · ricorrente' : ''}${groups().length > 1 ? ' · ' + esc(groupName(e)) : ''}</span></span>
     <span class="right"><span class="money ${mine.cls}">${mine.big}</span><span class="by muted">${mine.small}</span></span>
   </a><button type="button" class="swipe-del" aria-label="Elimina">${icon('i-trash')}Elimina</button></div>`;
 }
@@ -214,7 +228,7 @@ function importSplitwiseOnce() {
   S.entries.forEach((e) => { if (e.demo && !e.deleted) { e.deleted = true; e.updatedAt = t; changed = true; } });
   SPLITWISE_2026_09.forEach(([id, date, desc, amount, cat, paidBy, owed]) => {
     if (S.entries.some((e) => e.id === id)) return;
-    S.entries.push({ id, kind: 'expense', desc, amount, date, cat, paidBy, splitMethod: 'equal', splitInput: {}, owed, notes: '', createdAt: t, updatedAt: t, deleted: false }); changed = true;
+    S.entries.push({ id, kind: 'expense', desc, amount, date, cat, paidBy, splitMethod: 'equal', splitInput: {}, owed, notes: '', group: 'g1', createdAt: t, updatedAt: t, deleted: false }); changed = true;
   });
   S.settings.splitwiseImported = true; save(); if (changed) sync.schedule();
 }
@@ -264,20 +278,22 @@ function pageHome() {
 }
 
 /* ---------- SPESE ---------- */
-let speseFilter = { q: '', cat: '' };
+let speseFilter = { q: '', cat: '', group: '' };
 function pageSpese() {
   return `<div class="page">
     <div class="head left"><div class="title">Spese</div><a class="icon-btn" href="#/attivita" aria-label="Attività">${icon('i-repeat')}</a></div>
     <label class="search">${icon('i-search')}<input id="q" type="search" placeholder="Cerca una spesa…" value="${esc(speseFilter.q)}" autocomplete="off"></label>
+    ${groups().length > 1 ? `<div class="chips" id="group-chips"><button class="chip${!speseFilter.group ? ' on' : ''}" data-group="">Tutte le sezioni</button>${groups().map((g) => `<button class="chip${speseFilter.group === g.id ? ' on' : ''}" data-group="${g.id}">${esc(g.name)}</button>`).join('')}</div>` : ''}
     <div class="chips" id="chips"><button class="chip${!speseFilter.cat ? ' on' : ''}" data-cat="">Tutte</button>${CATS.map((c) => `<button class="chip${speseFilter.cat === c.id ? ' on' : ''}" data-cat="${c.id}">${icon(c.icon)}${esc(c.name)}</button>`).join('')}</div>
     <div id="spese-list">${speseList()}</div>
   </div>`;
 }
 function speseList() {
   const q = speseFilter.q.trim().toLowerCase();
-  let es = active().filter((e) => (!speseFilter.cat || e.cat === speseFilter.cat) && (!q || (e.desc || '').toLowerCase().includes(q) || (e.notes || '').toLowerCase().includes(q) || moneyPlain(e.amount).includes(q)));
+  let es = active().filter((e) => (!speseFilter.cat || e.cat === speseFilter.cat) && (!speseFilter.group || e.group === speseFilter.group) && (!q || (e.desc || '').toLowerCase().includes(q) || (e.notes || '').toLowerCase().includes(q) || moneyPlain(e.amount).includes(q)));
   es.sort((x, y) => (y.date + y.createdAt).localeCompare(x.date + x.createdAt));
-  if (!es.length) return `<section class="card">${emptyBox(q || speseFilter.cat ? 'Nessun risultato' : 'Nessuna spesa ancora', q || speseFilter.cat ? 'Prova con un\'altra parola o categoria.' : 'Le spese che aggiungete compariranno qui, mese per mese.', !(q || speseFilter.cat))}</section>`;
+  const filtered = q || speseFilter.cat || speseFilter.group;
+  if (!es.length) return `<section class="card">${emptyBox(filtered ? 'Nessun risultato' : 'Nessuna spesa ancora', filtered ? 'Prova con un\'altra parola, categoria o sezione.' : 'Le spese che aggiungete compariranno qui, mese per mese.', !filtered)}</section>`;
   const groups = []; es.forEach((e) => { const k = ym(e.date); let g = groups.find((x) => x.k === k); if (!g) { g = { k, items: [], total: 0 }; groups.push(g); } g.items.push(e); if (e.kind === 'expense') g.total += e.amount; });
   return groups.map((g) => `<div class="month-head"><span class="t">${esc(monthName(g.k))}</span><span class="money">${money(g.total)}</span></div><section class="card list-card"><div class="list stagger">${g.items.map(entryRow).join('')}</div></section>`).join('');
 }
@@ -296,6 +312,7 @@ function pageBilanci() {
       <div><span class="t">In pari</span><span class="money">${money(0)}</span>${sent.even ? icon('i-check') : '<span></span>'}</div>
     </div></section>
     <div class="section"><a class="btn" href="#/nuova?tipo=pagamento">Registra pagamento</a></div>
+    ${groups().length > 1 ? `<h2 class="sec-title section">Per sezione</h2><section class="card"><div class="dlist">${groups().map((g) => { const bg = groupBalance(g.id); const sg = balanceSentence(bg); return `<div><span class="t">${esc(g.name)}<span class="muted small" style="margin-left:6px">${sg.even ? 'in pari' : esc(sg.text)}</span></span><span class="money ${sg.even ? '' : sg.sign === '+' ? 'green' : 'red'}">${sg.even ? money(0) : sg.sign + ' ' + money(sg.amount)}</span><span></span></div>`; }).join('')}</div></section>` : ''}
     <h2 class="sec-title section">Ultimi pagamenti</h2>
     <section class="card list-card"><div class="list stagger">${(() => { const ps = active().filter((e) => e.kind === 'payment').sort((x, y) => (y.date + y.createdAt).localeCompare(x.date + x.createdAt)).slice(0, 5); return ps.length ? ps.map(entryRow).join('') : '<div class="empty small" style="padding:18px">Nessun pagamento registrato.</div>'; })()}</div></section>`;
   } else {
@@ -384,7 +401,7 @@ function pageDetail(r) {
     <div class="detail-top">
       <span class="cat-ic${isPay ? ' pay' : ''}">${icon(isPay ? 'c-pagamento' : c.icon)}</span>
       <div class="name">${esc(isPay ? `${payer.name} ha pagato ${member(parts[0]?.[0]).name}` : e.desc)}</div>
-      <div class="date">${esc(dateLong(e.date))}${!isPay && e.cat ? ' · ' + esc(c.name) : ''}${e.recurringOf || e.recurring ? ' · si ripete ogni mese' : ''}</div>
+      <div class="date">${esc(dateLong(e.date))}${!isPay && e.cat ? ' · ' + esc(c.name) : ''}${e.recurringOf || e.recurring ? ' · si ripete ogni mese' : ''}${groups().length > 1 || !groupOf(e) ? ' · ' + esc(groupName(e)) : ''}</div>
       <div class="amt">${money(e.amount)}</div>
       <div class="by ${payer.id === S.members[0].id ? 'green' : 'orange'}">${isPay ? 'Saldo aggiornato' : 'Pagato da ' + esc(payer.name)}</div>
       ${(() => { const m = myShare(e); return m.label ? `<div style="margin-top:10px"><span class="pill ${m.cls === 'green' ? 'green' : 'red'}">${esc(m.label)}</span></div>` : ''; })()}
@@ -402,8 +419,9 @@ let F = null; // stato del form
 function pageForm(r) {
   const editing = r.name === 'modifica' ? S.entries.find((x) => x.id === r.id) : null;
   if (!F || F.routeKey !== location.hash) {
-    F = editing ? { routeKey: location.hash, id: editing.id, kind: editing.kind, desc: editing.desc || '', amount: moneyPlain(editing.amount), date: editing.date, cat: editing.cat || '', paidBy: editing.paidBy, splitMethod: editing.splitMethod || 'equal', splitInput: { ...(editing.splitInput || {}) }, notes: editing.notes || '', recurring: editing.recurring === 'monthly', to: Object.keys(editing.owed || {})[0] }
-      : { routeKey: location.hash, id: null, kind: r.q.tipo === 'pagamento' ? 'payment' : 'expense', desc: '', amount: '', date: todayStr(), cat: '', paidBy: me().id, splitMethod: 'equal', splitInput: {}, notes: '', recurring: false, to: other().id };
+    F = editing ? { routeKey: location.hash, id: editing.id, kind: editing.kind, group: editing.group || null, desc: editing.desc || '', amount: moneyPlain(editing.amount), date: editing.date, cat: editing.cat || '', paidBy: editing.paidBy, splitMethod: editing.splitMethod || 'equal', splitInput: { ...(editing.splitInput || {}) }, notes: editing.notes || '', recurring: editing.recurring === 'monthly', to: Object.keys(editing.owed || {})[0] }
+      : { routeKey: location.hash, id: null, kind: r.q.tipo === 'pagamento' ? 'payment' : 'expense', desc: '', amount: '', date: todayStr(), cat: '', paidBy: me().id, splitMethod: 'equal', splitInput: {}, notes: '', recurring: false, to: other().id, group: (groups().find((g) => g.id === S.settings.lastGroup) || groups()[0] || {}).id || null };
+    if (editing && F.group === undefined) F.group = editing.group || null;
     if (F.kind === 'expense') F.splitMethod = 'equal';
     if (!editing && F.kind === 'payment') { const bal = balances(); const v = bal[me().id] || 0; if (v < 0) { F.paidBy = me().id; F.to = other().id; F.amount = moneyPlain(-v); } else if (v > 0) { F.paidBy = other().id; F.to = me().id; F.amount = moneyPlain(v); } }
   }
@@ -419,6 +437,9 @@ function pageForm(r) {
         ? `<div class="field"><div class="lbl">Pagamento</div><div class="pay-dir">${avatar(payerOf(F.paidBy))}<span class="txt"><span class="t">${esc(payerOf(F.paidBy).name)} dà a ${esc(payerOf(F.to).name)}</span><span class="d">${F.amount ? '€ ' + esc(F.amount) : 'la somma qui sopra'} · il saldo fra voi si aggiorna</span></span>${avatar(payerOf(F.to))}</div></div>`
         : `<div class="field"><div class="pay-dir soft">${avatar(payerOf(F.paidBy))}<span class="txt"><span class="t">${F.id ? 'Pagata da ' + esc(payerOf(F.paidBy).name) : 'Paghi tu, ' + esc(payerOf(F.paidBy).name)}</span><span class="d" id="half-hint">${F.amount && !isNaN(parseAmount(F.amount)) ? 'Metà a testa: ' + money(Math.round(parseAmount(F.amount) / 2)) : 'Divisa a metà con ' + esc(other().name)}</span></span></div></div>
            <div class="field"><div class="lbl">Categoria <small>(opzionale)</small></div><div class="cat-circles">${CATS.map((c) => `<button type="button" class="cat-circle${F.cat === c.id ? ' on' : ''}" data-cat="${c.id}" aria-label="${esc(c.name)}" title="${esc(c.name)}">${icon(c.icon)}</button>`).join('')}</div><div class="cat-name" id="cat-name">${F.cat ? esc(catOf(F.cat).name) : 'Nessuna categoria'}</div></div>`}
+      <div class="field"><div class="lbl">Sezione</div><div class="chips" id="form-groups">${groups().map((g) => `<button type="button" class="chip${F.group === g.id ? ' on' : ''}" data-group="${g.id}">${esc(g.name)}</button>`).join('')}<button type="button" class="chip" data-group-new>${icon('i-plus')}Nuova</button></div>
+        <div id="group-new" ${F.newGroup ? '' : 'hidden'}><div style="display:flex;gap:8px"><input class="input" id="group-name" type="text" placeholder="Nome della sezione, es. Vacanze" value="${esc(F.newGroupName || '')}" autocomplete="off"><button type="button" class="btn sm" id="group-create" style="height:50px;flex:none">Crea</button></div></div>
+        ${groups().length ? '' : '<div class="hint">Nessuna sezione: creane una per raggruppare le spese (es. Spese casa, Vacanze).</div>'}</div>
       <div class="field"><label for="date">Data</label><input id="date" type="date" value="${esc(F.date)}" max="2100-12-31"></div>
       <div class="field"><label for="notes">Note <small class="muted" style="font-weight:500">(opzionale)</small></label><textarea id="notes" placeholder="${isPay ? 'Es. bonifico, contanti…' : 'Es. Sushi Yama - Corso Buenos Aires'}">${esc(F.notes)}</textarea></div>
       ${isPay || F.id ? '' : `<div class="field"><div class="toggle"><div><div class="t">Si ripete ogni mese</div><div class="d">Per affitto, bollette, abbonamenti: la ricrea da sola ogni mese.</div></div><button type="button" class="switch" role="switch" aria-checked="${F.recurring}" id="recurring"></button></div></div>`}
@@ -452,7 +473,8 @@ function submitForm() {
   if (F.kind === 'payment' && F.paidBy === F.to) { toast('Chi paga e chi riceve devono essere diversi'); return; }
   if (!validateSplit()) { toast('Controlla la divisione'); return; }
   const owed = computeOwed();
-  const data = { kind: F.kind, desc: F.kind === 'payment' ? 'Pagamento' : F.desc.trim(), amount, date: F.date || todayStr(), cat: F.kind === 'payment' ? '' : F.cat, paidBy: F.paidBy, splitMethod: F.kind === 'payment' ? 'exact' : F.splitMethod, splitInput: F.splitMethod === 'equal' ? {} : { ...F.splitInput }, owed, notes: F.notes.trim() };
+  const data = { kind: F.kind, desc: F.kind === 'payment' ? 'Pagamento' : F.desc.trim(), amount, date: F.date || todayStr(), cat: F.kind === 'payment' ? '' : F.cat, paidBy: F.paidBy, splitMethod: F.kind === 'payment' ? 'exact' : F.splitMethod, splitInput: F.splitMethod === 'equal' ? {} : { ...F.splitInput }, owed, notes: F.notes.trim(), group: F.group || null };
+  if (F.group) { S.settings.lastGroup = F.group; }
   if (F.id) { const id = F.id; F = null; updateEntry(id, data); toast('Modifiche salvate'); go('#/spesa/' + id); return; }
   data.recurring = F.recurring ? 'monthly' : null; F = null;
   const e = addEntry(data);
@@ -465,6 +487,7 @@ function pageProfilo(r) {
   const a = me(), b = other();
   if (r.sub === 'account') return pageAccount();
   if (r.sub === 'categorie') return pageCategorie();
+  if (r.sub === 'sezioni') return pageGroups();
   if (r.sub === 'sync') return pageSync();
   if (r.sub === 'info') return pageInfo();
   if (r.sub === 'esporta') return pageExport();
@@ -474,6 +497,7 @@ function pageProfilo(r) {
     <div class="profile-head"><div class="couple-circle"><img src="img/coppia.png" alt=""></div><div class="n">${esc(S.members[0].name)} &amp; ${esc(S.members[1].name)}</div><div class="s">${together}</div></div>
     <section class="card profile-list"><div class="menu">
       <a href="#/profilo/account">${icon('i-gear')}<span>Impostazioni account</span><span class="val">Io sono ${esc(a.name)}</span>${icon('i-right', 'ic chev')}</a>
+      <a href="#/profilo/sezioni">${icon('i-list')}<span>Sezioni</span><span class="val">${groups().length}</span>${icon('i-right', 'ic chev')}</a>
       <a href="#/profilo/categorie">${icon('i-grid')}<span>Categorie</span><span></span>${icon('i-right', 'ic chev')}</a>
       <a href="#/profilo/account">${icon('i-coin')}<span>Valuta</span><span class="val">EUR (€)</span>${icon('i-right', 'ic chev')}</a>
       <a href="#/profilo/esporta">${icon('i-download')}<span>Esporta dati</span><span></span>${icon('i-right', 'ic chev')}</a>
@@ -497,6 +521,16 @@ function pageAccount() {
     <section class="card"><div class="field" style="margin:0"><label for="together">Insieme dal (anno o data)</label><input id="together" type="text" value="${esc(S.settings.together)}" placeholder="2023" inputmode="numeric"><div class="hint">Compare nel profilo. Lascia vuoto per non mostrarlo.</div></div>
     <div class="field"><div class="lbl">Valuta</div><div class="input" style="display:flex;align-items:center;color:var(--muted)">EUR (€) — per ora l'unica disponibile</div></div></section>
     <div class="section"><button class="btn" id="save-account">Salva</button></div>
+  </div>`;
+}
+function pageGroups() {
+  const counts = {}; active().forEach((e) => { const k = groupOf(e) ? e.group : ''; counts[k] = (counts[k] || 0) + 1; });
+  const orphans = counts[''] || 0;
+  return `<div class="page slide">${subHead('Sezioni')}
+    <p class="muted small" style="margin:0 2px 12px">Le sezioni raggruppano le spese, come i gruppi di Splitwise (es. Spese casa, Vacanze). Quando aggiungi una spesa resta selezionata l'ultima usata.</p>
+    <section class="card list-card"><div class="list stagger">${groups().map((g, i) => `<div class="row" style="--i:${i}"><span class="cat-ic">${icon('i-list')}</span><span class="main"><span class="title">${esc(g.name)}</span><span class="sub">${counts[g.id] || 0} ${counts[g.id] === 1 ? 'voce' : 'voci'}${S.settings.lastGroup === g.id ? ' · predefinita' : ''}</span></span><span class="right" style="flex-direction:row;gap:2px"><button type="button" class="icon-btn" data-rename="${g.id}" aria-label="Rinomina">${icon('i-edit')}</button><button type="button" class="icon-btn red" data-delete-group="${g.id}" aria-label="Elimina">${icon('i-trash')}</button></span></div>`).join('') || '<div class="empty small" style="padding:18px">Nessuna sezione.</div>'}</div></section>
+    ${orphans ? `<p class="muted small" style="margin:10px 2px">${orphans} ${orphans === 1 ? 'voce è' : 'voci sono'} senza sezione.</p>` : ''}
+    <div class="section"><div style="display:flex;gap:8px"><input class="input" id="new-group-name" type="text" placeholder="Nuova sezione, es. Vacanze" autocomplete="off"><button type="button" class="btn sm" id="new-group-create" style="height:50px;flex:none">Crea</button></div></div>
   </div>`;
 }
 function pageCategorie() {
@@ -578,8 +612,9 @@ function bind(r) {
   $$('[data-settle]').forEach((b) => b.addEventListener('click', () => { const [from, to] = b.dataset.settle.split(':'); F = null; go(`#/nuova?tipo=pagamento&da=${from}&a=${to}`); }));
 
   if (r.name === 'spese') {
-    const q = $('#q'); let t; q.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => { speseFilter.q = q.value; $('#spese-list').innerHTML = speseList(); }, 120); });
-    $('#chips').addEventListener('click', (ev) => { const c = ev.target.closest('.chip'); if (!c) return; speseFilter.cat = c.dataset.cat; $$('.chip').forEach((x) => x.classList.toggle('on', x === c)); $('#spese-list').innerHTML = speseList(); });
+    const q = $('#q'); let t; q.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => { speseFilter.q = q.value; $('#spese-list').innerHTML = speseList(); initSwipes(); }, 120); });
+    $('#chips').addEventListener('click', (ev) => { const c = ev.target.closest('.chip'); if (!c) return; speseFilter.cat = c.dataset.cat; $$('#chips .chip').forEach((x) => x.classList.toggle('on', x === c)); $('#spese-list').innerHTML = speseList(); initSwipes(); });
+    const gc = $('#group-chips'); if (gc) gc.addEventListener('click', (ev) => { const c = ev.target.closest('.chip'); if (!c) return; speseFilter.group = c.dataset.group; $$('#group-chips .chip').forEach((x) => x.classList.toggle('on', x === c)); $('#spese-list').innerHTML = speseList(); initSwipes(); });
   }
   if (r.name === 'profilo' && r.sub === 'categorie') $$('[data-filter-cat]').forEach((a) => a.addEventListener('click', () => { speseFilter = { q: '', cat: a.dataset.filterCat }; }));
   if (r.name === 'spesa') {
@@ -611,6 +646,11 @@ function bindForm(r) {
   $$('[data-share]').forEach((inp) => inp.addEventListener('input', () => { F.splitInput[inp.dataset.share] = inp.value; validateSplit(); }));
   $$('[data-cat]').forEach((b) => b.addEventListener('click', () => { F.cat = F.cat === b.dataset.cat ? '' : b.dataset.cat; $$('.cat-circle').forEach((x) => x.classList.toggle('on', x.dataset.cat === F.cat)); $('#cat-name').textContent = F.cat ? catOf(F.cat).name : 'Nessuna categoria'; }));
   const rec = $('#recurring'); if (rec) rec.addEventListener('click', () => { F.recurring = !F.recurring; rec.setAttribute('aria-checked', F.recurring); });
+  $$('#form-groups [data-group]').forEach((b) => b.addEventListener('click', () => { F.group = b.dataset.group; F.newGroup = false; $$('#form-groups .chip').forEach((x) => x.classList.toggle('on', x === b)); $('#group-new').hidden = true; }));
+  const gn = $('[data-group-new]'); if (gn) gn.addEventListener('click', () => { F.newGroup = true; $('#group-new').hidden = false; $('#group-name').focus(); });
+  const gname = $('#group-name'); if (gname) gname.addEventListener('input', () => (F.newGroupName = gname.value));
+  const gcreate = $('#group-create'); if (gcreate) gcreate.addEventListener('click', () => { const n = ($('#group-name').value || '').trim(); if (!n) { $('#group-name').focus(); return; } const g = addGroup(n); F.group = g.id; F.newGroup = false; F.newGroupName = ''; S.settings.lastGroup = g.id; save(); rerender(); toast(`Sezione "${n}" creata`); });
+  if (gname) gname.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); $('#group-create').click(); } });
   form.addEventListener('submit', (ev) => { ev.preventDefault(); submitForm(); });
   $('#save-top').addEventListener('click', submitForm);
   validateSplit();
@@ -627,6 +667,12 @@ function bindProfilo(r) {
     });
     $$('[data-color]').forEach((i) => i.addEventListener('input', () => i.style.setProperty('--c', i.value)));
     bindSeg($('[data-seg="me"]'), (v) => { S.settings.me = v; save(); });
+  }
+  if (r.sub === 'sezioni') {
+    const create = () => { const i = $('#new-group-name'); const n = (i.value || '').trim(); if (!n) { i.focus(); return; } addGroup(n); toast(`Sezione "${n}" creata`); render(); };
+    $('#new-group-create').addEventListener('click', create); $('#new-group-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); create(); } });
+    $$('[data-rename]').forEach((b) => b.addEventListener('click', () => { const g = S.groups.find((x) => x.id === b.dataset.rename); openSheet('Rinomina sezione', `<div class="field" style="margin-top:0"><input class="input" id="rn" type="text" value="${esc(g.name)}"></div><div class="btn-row" style="margin-top:14px"><button class="btn soft" data-c="no">Annulla</button><button class="btn" data-c="ok">Salva</button></div>`, (sh) => { $('[data-c="no"]', sh).addEventListener('click', () => closeSheet()); $('[data-c="ok"]', sh).addEventListener('click', () => { renameGroup(g.id, $('#rn', sh).value); closeSheet(); render(); }); setTimeout(() => $('#rn', sh).focus(), 350); }); }));
+    $$('[data-delete-group]').forEach((b) => b.addEventListener('click', () => { const g = S.groups.find((x) => x.id === b.dataset.deleteGroup); const n = active().filter((e) => e.group === g.id).length; confirmSheet(`Eliminare "${g.name}"?`, n ? `Le sue ${n} voci restano, ma senza sezione.` : 'La sezione è vuota.', 'Elimina', () => { deleteGroup(g.id); render(); toast('Sezione eliminata'); }); }));
   }
   if (r.sub === 'esporta') {
     $$('[data-export]').forEach((b) => b.addEventListener('click', () => exportData(b.dataset.export)));
@@ -653,9 +699,9 @@ async function shareOrDownload(name, text, type) {
 }
 function exportData(kind) {
   const stamp = todayStr();
-  if (kind === 'json') { const out = { app: 'pari', version: 1, exportedAt: nowISO(), members: S.members, settings: { together: S.settings.together }, entries: S.entries, activity: S.activity }; shareOrDownload(`pari-backup-${stamp}.json`, JSON.stringify(out, null, 2), 'application/json'); return; }
-  const rows = [['Data', 'Descrizione', 'Categoria', 'Tipo', 'Importo', 'Pagato da', ...S.members.map((m) => 'Quota ' + m.name), 'Note']];
-  active().sort((a, b) => a.date.localeCompare(b.date)).forEach((e) => rows.push([e.date, e.desc, e.kind === 'payment' ? 'Pagamento' : catOf(e.cat).name, e.kind === 'payment' ? 'pagamento' : 'spesa', moneyPlain(e.amount), member(e.paidBy).name, ...S.members.map((m) => moneyPlain(e.owed?.[m.id] || 0)), e.notes || '']));
+  if (kind === 'json') { const out = { app: 'pari', version: 1, exportedAt: nowISO(), members: S.members, groups: S.groups, settings: { together: S.settings.together }, entries: S.entries, activity: S.activity }; shareOrDownload(`pari-backup-${stamp}.json`, JSON.stringify(out, null, 2), 'application/json'); return; }
+  const rows = [['Data', 'Descrizione', 'Sezione', 'Categoria', 'Tipo', 'Importo', 'Pagato da', ...S.members.map((m) => 'Quota ' + m.name), 'Note']];
+  active().sort((a, b) => a.date.localeCompare(b.date)).forEach((e) => rows.push([e.date, e.desc, groupName(e), e.kind === 'payment' ? 'Pagamento' : catOf(e.cat).name, e.kind === 'payment' ? 'pagamento' : 'spesa', moneyPlain(e.amount), member(e.paidBy).name, ...S.members.map((m) => moneyPlain(e.owed?.[m.id] || 0)), e.notes || '']));
   const csv = '﻿' + rows.map((r) => r.map((c) => '"' + String(c).replace(/"/g, '""') + '"').join(';')).join('\r\n');
   shareOrDownload(`pari-spese-${stamp}.csv`, csv, 'text/csv');
 }
@@ -667,6 +713,7 @@ function importData(text) {
   (d.activity || []).forEach((a) => { if (!S.activity.some((x) => x.id === a.id)) S.activity.push(a); });
   S.activity.sort((a, b) => b.ts.localeCompare(a.ts)); S.activity = S.activity.slice(0, 300);
   if (Array.isArray(d.members) && d.members.length === 2 && !active().length) S.members = d.members;
+  (d.groups || []).forEach((g) => { const cur = S.groups.find((x) => x.id === g.id); if (!cur) S.groups.push(g); else if ((g.updatedAt || '') > (cur.updatedAt || '')) Object.assign(cur, g); });
   save(); sync.schedule(); render(); toast(`Importate ${added} voci nuove, ${updated} aggiornate`);
 }
 
@@ -684,6 +731,7 @@ const sync = {
       const since = S.settings.lastPush || '';
       const rows = S.entries.filter((e) => (e.updatedAt || '') > since).map((e) => ({ house: s.house, id: e.id, kind: 'entry', data: e, updated_at: e.updatedAt, deleted: !!e.deleted }));
       if ((S.settings.membersUpdatedAt || '') > since) rows.push({ house: s.house, id: 'members', kind: 'members', data: { members: S.members, together: S.settings.together }, updated_at: S.settings.membersUpdatedAt || nowISO(), deleted: false });
+      if ((S.settings.groupsUpdatedAt || '') > since) rows.push({ house: s.house, id: 'groups', kind: 'groups', data: { groups: S.groups }, updated_at: S.settings.groupsUpdatedAt, deleted: false });
       S.activity.filter((a) => (a.ts || '') > since).forEach((a) => rows.push({ house: s.house, id: 'act-' + a.id, kind: 'activity', data: a, updated_at: a.ts, deleted: false }));
       if (rows.length) {
         const r = await fetch(base + '?on_conflict=house,id', { method: 'POST', headers: this.headers(), body: JSON.stringify(rows) });
@@ -698,6 +746,7 @@ const sync = {
       remote.forEach((row) => {
         if (row.kind === 'entry') { const e = row.data; const cur = S.entries.find((x) => x.id === e.id); if (!cur) { S.entries.push(e); changed++; } else if ((e.updatedAt || '') > (cur.updatedAt || '')) { Object.assign(cur, e); changed++; } }
         else if (row.kind === 'members') { if ((row.updated_at || '') > (S.settings.membersUpdatedAt || '')) { const m = row.data.members; if (Array.isArray(m) && m.length >= 2) { S.members = m; } if (typeof row.data.together === 'string') S.settings.together = row.data.together; S.settings.membersUpdatedAt = row.updated_at; changed++; } }
+        else if (row.kind === 'groups') { (row.data.groups || []).forEach((g) => { const cur = S.groups.find((x) => x.id === g.id); if (!cur) { S.groups.push(g); changed++; } else if ((g.updatedAt || '') > (cur.updatedAt || '')) { Object.assign(cur, g); changed++; } }); if ((row.updated_at || '') > (S.settings.groupsUpdatedAt || '')) S.settings.groupsUpdatedAt = row.updated_at; }
         else if (row.kind === 'activity') { if (!S.activity.some((x) => x.id === row.data.id)) { S.activity.push(row.data); } }
       });
       S.activity.sort((a, b) => b.ts.localeCompare(a.ts)); S.activity = S.activity.slice(0, 300);
