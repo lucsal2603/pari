@@ -203,7 +203,7 @@ function pageHome() {
   const pa = st.total ? Math.round((va / st.total) * 100) : 0, pb = st.total ? 100 - pa : 0;
   const syncCls = !sync.enabled() ? 'off' : sync.status === 'busy' ? 'busy' : sync.status === 'err' ? 'err' : '';
   return `<div class="page">
-    <div class="head left"><div class="greet">Ciao ${esc(a.name)}! <span aria-hidden="true">👋</span></div><a class="who-chip" href="#/profilo/account"><span class="sync-dot ${syncCls}" title="Sincronizzazione"></span>${esc(b.name)} ${avatar(b)}</a></div>
+    <div class="head left"><div class="greet">Ciao ${esc(a.name)}! <span aria-hidden="true">👋</span></div><a class="who-chip" href="#/profilo"><span class="sync-dot ${syncCls}" title="Sincronizzazione"></span>${esc(a.name)} ${avatar(a)}</a></div>
     <section class="card hero${sent.even ? ' even' : ''}">
       <div class="k">Saldo totale</div>
       <div class="amt">${sent.even ? money(0) : sent.sign + ' ' + money(sent.amount)}</div>

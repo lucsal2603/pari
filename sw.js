@@ -1,5 +1,5 @@
 /* Pari — service worker: app shell offline, font in cache, sync sempre in rete */
-const VERSION = 'pari-v1.0.0';
+const VERSION = 'pari-v1.0.1';
 const SHELL = [
   './', './index.html', './style.css', './app.js', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png', './icons/favicon.png'
