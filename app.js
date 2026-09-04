@@ -5,8 +5,12 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.7.5';
+const APP_VERSION = '1.8.0';
 const KEY = 'pari:v1';
+const VAPID_PUBLIC = 'BAUQZ4UtSZAcJIDeoRF4b06elYpAl_pMJp5HzAA5nwbUB6Shslilu-bM9vjN0lnlrwTcfxgPi0ibyU3_UbAz-UI';
+const urlB64ToU8 = (b) => { const p = '='.repeat((4 - (b.length % 4)) % 4); const r = (b + p).replace(/-/g, '+').replace(/_/g, '/'); const raw = atob(r); return Uint8Array.from([...raw].map((c) => c.charCodeAt(0))); };
+const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent);
 const CATS = [
   { id: 'cibo', name: 'Cibo', icon: 'c-cibo' },
   { id: 'spesa', name: 'Spesa', icon: 'c-spesa' },
@@ -62,7 +66,7 @@ function defaultState() {
     entries: [],
     activity: [],
     groups: [{ id: 'g1', name: 'Spese casa', createdAt: '2026-09-04T00:00:00.000Z', updatedAt: '2026-09-04T00:00:00.000Z', deleted: false }],
-    settings: { me: 'm1', currency: 'EUR', together: '', sync: { url: '', key: '', house: '' }, lastPull: null, membersUpdatedAt: null, groupsUpdatedAt: null, lastGroup: 'g1' },
+    settings: { me: 'm1', currency: 'EUR', together: '', sync: { url: '', key: '', house: '' }, lastPull: null, membersUpdatedAt: null, groupsUpdatedAt: null, lastGroup: 'g1', deviceId: null, push: null, pushUpdatedAt: null, notified: [] },
     ui: { month: curYM(), statsRange: 'mese', balTab: 0, homeMode: 'paid' },
   };
 }
@@ -84,6 +88,49 @@ const groupName = (e) => { const g = groupOf(e); return g ? g.name : 'Senza sezi
 function addGroup(name) { const g = { id: 'g-' + uid(), name: name.trim(), createdAt: nowISO(), updatedAt: nowISO(), deleted: false }; S.groups.push(g); S.settings.groupsUpdatedAt = nowISO(); save(); sync.schedule(); return g; }
 function renameGroup(id, name) { const g = S.groups.find((x) => x.id === id); if (!g || !name.trim()) return; g.name = name.trim(); g.updatedAt = nowISO(); S.settings.groupsUpdatedAt = g.updatedAt; save(); sync.schedule(); }
 function deleteGroup(id) { const g = S.groups.find((x) => x.id === id); if (!g) return; g.deleted = true; g.updatedAt = nowISO(); S.settings.groupsUpdatedAt = g.updatedAt; if (S.settings.lastGroup === id) S.settings.lastGroup = (groups()[0] || {}).id || null; save(); sync.schedule(); }
+
+if (!S.settings.deviceId) { S.settings.deviceId = 'd-' + uid(); save(); }
+
+/* ---------- Notifiche ---------- */
+function notifText(e, actorName, balForMe) {
+  const line = balForMe < 0 ? `Devi ancora: ${money(-balForMe)}` : balForMe > 0 ? `${actorName} ti deve ancora: ${money(balForMe)}` : 'Siete in pari';
+  const title = e.kind === 'payment' ? `${actorName} ha registrato un pagamento` : `${actorName} ha aggiunto una spesa`;
+  return { title, body: `${e.kind === 'payment' ? 'Pagamento' : e.desc}: ${money(e.amount)}\n${line}` };
+}
+async function showLocalNotification(title, body, url) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return false;
+  try { const reg = await navigator.serviceWorker.ready; await reg.showNotification(title, { body, icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', tag: 'pari-' + Date.now(), data: { url: url || './#/home' } }); return true; } catch (e) { return false; }
+}
+/* avvisa localmente (app aperta) delle voci nuove arrivate dalla sincronizzazione e messe dall'altro */
+function notifyIncoming(newEntries) {
+  const mine = me().id; const bal = balances()[mine] || 0; const seen = new Set(S.settings.notified || []);
+  const fresh = newEntries.filter((e) => !e.deleted && e.paidBy !== mine && !seen.has(e.id) && (Date.now() - new Date(e.createdAt || 0).getTime()) < 2 * 86400000);
+  fresh.forEach((e) => seen.add(e.id)); S.settings.notified = [...seen].slice(-200);
+  fresh.slice(-3).forEach((e) => { const t = notifText(e, member(e.paidBy).name, bal); showLocalNotification(t.title, t.body, './#/spesa/' + e.id).then((ok) => { if (!ok) toast(t.title + ' · ' + t.body.split('\n')[0]); }); });
+}
+/* chiede al server (funzione Supabase "notify") di avvisare l'altro telefono delle voci appena caricate */
+async function notifyOthers(entryIds) {
+  if (!entryIds.length || !sync.enabled()) return;
+  const sconf = S.settings.sync;
+  try { await fetch(sconf.url + '/functions/v1/notify', { method: 'POST', headers: { apikey: sconf.key, Authorization: 'Bearer ' + sconf.key, 'Content-Type': 'application/json' }, body: JSON.stringify({ house: sconf.house, entryIds, actor: me().id }) }); } catch (e) { console.warn('notify', e); }
+}
+async function enablePush() {
+  if (!('Notification' in window) || !('PushManager' in window) || !('serviceWorker' in navigator)) { toast(isIOS() && !isStandalone() ? 'Su iPhone le notifiche funzionano solo con l\'app sulla schermata Home' : 'Questo browser non supporta le notifiche'); return false; }
+  const perm = await Notification.requestPermission();
+  if (perm !== 'granted') { toast('Permesso negato: abilitalo nelle Impostazioni di iOS'); return false; }
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64ToU8(VAPID_PUBLIC) });
+    S.settings.push = { sub: sub.toJSON(), member: me().id, device: S.settings.deviceId, at: nowISO(), ua: navigator.userAgent.slice(0, 80) }; S.settings.pushUpdatedAt = nowISO(); save();
+    if (sync.enabled()) await sync.run(true);
+    return true;
+  } catch (e) { console.warn('push', e); toast('Non riesco ad attivare le notifiche: ' + (e.message || e)); return false; }
+}
+async function disablePush() {
+  try { const reg = await navigator.serviceWorker.ready; const sub = await reg.pushManager.getSubscription(); if (sub) await sub.unsubscribe(); } catch (e) {}
+  S.settings.push = null; S.settings.pushUpdatedAt = nowISO(); save(); if (sync.enabled()) sync.run(true);
+}
 
 /* ---------- Logica dei conti ---------- */
 function splitEqual(amount, ids) {
@@ -501,6 +548,7 @@ function pageProfilo(r) {
   if (r.sub === 'categorie') return pageCategorie();
   if (r.sub === 'sezioni') return pageGroups();
   if (r.sub === 'sync') return pageSync();
+  if (r.sub === 'notifiche') return pageNotifiche();
   if (r.sub === 'info') return pageInfo();
   if (r.sub === 'esporta') return pageExport();
   const together = S.settings.together ? `Insieme dal ${esc(S.settings.together)} <span aria-hidden="true">❤️</span>` : 'Le nostre spese, a metà <span aria-hidden="true">❤️</span>';
@@ -513,6 +561,7 @@ function pageProfilo(r) {
       <a href="#/profilo/categorie">${icon('i-grid')}<span>Categorie</span><span></span>${icon('i-right', 'ic chev')}</a>
       <a href="#/profilo/account">${icon('i-coin')}<span>Valuta</span><span class="val">EUR (€)</span>${icon('i-right', 'ic chev')}</a>
       <a href="#/profilo/esporta">${icon('i-download')}<span>Esporta dati</span><span></span>${icon('i-right', 'ic chev')}</a>
+      <a href="#/profilo/notifiche">${icon('i-heart')}<span>Notifiche</span><span class="val">${S.settings.push && Notification?.permission === 'granted' ? 'attive' : 'non attive'}</span>${icon('i-right', 'ic chev')}</a>
       <a href="#/profilo/sync">${icon('i-cloud')}<span>Backup e sincronizzazione</span><span class="sync-dot ${syncOn ? '' : 'off'}" title="${syncOn ? 'attiva' : 'non attiva'}"></span>${icon('i-right', 'ic chev')}</a>
     </div></section>
     <section class="card"><div class="menu">
@@ -578,6 +627,21 @@ function pageSync() {
       <div class="section btn-row"><button class="btn" id="save-sync">Salva e collega</button>${on ? `<button class="btn soft" id="sync-now">Sincronizza ora</button>` : ''}</div>
       ${on ? `<div class="section"><button class="btn ghost" id="sync-off">Scollega questo telefono</button></div>` : ''}
     </section>
+  </div>`;
+}
+function pageNotifiche() {
+  const supported = 'Notification' in window && 'PushManager' in window; const perm = supported ? Notification.permission : 'unsupported';
+  const on = !!S.settings.push && perm === 'granted'; const needsHome = isIOS() && !isStandalone();
+  const st = !supported ? (needsHome ? 'Su iPhone le notifiche arrivano solo se l\'app è sulla schermata Home' : 'Questo browser non supporta le notifiche') : perm === 'denied' ? 'Permesso negato: riattivalo da Impostazioni iOS → Notifiche → Pari' : on ? 'Attive su questo telefono' : 'Non attive';
+  const sample = notifText({ kind: 'expense', desc: 'Spesa', amount: 1000 }, other().name, (balances()[me().id] || 0));
+  return `<div class="page slide">${subHead('Notifiche')}
+    <section class="card"><div class="status-line"><span class="sync-dot ${on ? '' : perm === 'denied' ? 'err' : 'off'}"></span>${esc(st)}</div>
+    <p class="small muted" style="margin:10px 0 0">Quando ${esc(other().name)} aggiunge una spesa o un pagamento ti arriva un avviso così:</p>
+    <div class="notif-preview"><img src="icons/icon-192.png" alt=""><div><div class="t">${esc(sample.title)}</div><div class="b">${esc(sample.body).replace('\n', '<br>')}</div></div></div>
+    ${!sync.enabled() ? '<p class="small muted" style="margin:10px 0 0">Serve prima la <a href="#/profilo/sync" style="color:var(--green);font-weight:700">sincronizzazione</a>: è quella che porta la spesa da un telefono all\'altro.</p>' : ''}
+    ${needsHome ? '<p class="small muted" style="margin:10px 0 0">Aggiungi Pari alla schermata Home (Condividi → Aggiungi alla schermata Home) e apri le notifiche da lì.</p>' : ''}
+    </section>
+    <div class="section btn-row">${on ? `<button class="btn soft" id="push-test">Prova una notifica</button><button class="btn ghost" id="push-off">Disattiva</button>` : `<button class="btn" id="push-on" ${supported && perm !== 'denied' ? '' : 'disabled'}>Attiva le notifiche</button>`}</div>
   </div>`;
 }
 function pageInfo() {
@@ -700,6 +764,11 @@ function bindProfilo(r) {
     const n = $('#sync-now'); if (n) n.addEventListener('click', async () => { toast('Sincronizzo…'); const ok = await sync.run(true); render(); toast(ok ? 'Aggiornato' : 'Errore: ' + (sync.lastError || '')); });
     const off = $('#sync-off'); if (off) off.addEventListener('click', () => { S.settings.sync = { url: '', key: '', house: '' }; S.settings.lastPull = null; save(); sync.status = 'idle'; render(); toast('Scollegata: i dati restano sul telefono'); });
   }
+  if (r.sub === 'notifiche') {
+    const on = $('#push-on'); if (on) on.addEventListener('click', async () => { on.disabled = true; const ok = await enablePush(); render(); if (ok) { toast('Notifiche attivate'); const t = notifText({ kind: 'expense', desc: 'Spesa', amount: 1000 }, other().name, balances()[me().id] || 0); showLocalNotification(t.title, t.body); } });
+    const test = $('#push-test'); if (test) test.addEventListener('click', async () => { const t = notifText({ kind: 'expense', desc: 'Spesa', amount: 1000 }, other().name, balances()[me().id] || 0); const ok = await showLocalNotification(t.title, t.body); toast(ok ? 'Inviata: guarda in alto' : 'Non riesco a mostrarla'); });
+    const off = $('#push-off'); if (off) off.addEventListener('click', async () => { await disablePush(); render(); toast('Notifiche disattivate'); });
+  }
   if (r.sub === 'info') $('#reload-app').addEventListener('click', () => { navigator.serviceWorker?.getRegistration().then((reg) => reg && reg.update()); location.reload(); });
 }
 
@@ -744,19 +813,22 @@ const sync = {
       const rows = S.entries.filter((e) => (e.updatedAt || '') > since).map((e) => ({ house: s.house, id: e.id, kind: 'entry', data: e, updated_at: e.updatedAt, deleted: !!e.deleted }));
       if ((S.settings.membersUpdatedAt || '') > since) rows.push({ house: s.house, id: 'members', kind: 'members', data: { members: S.members, together: S.settings.together }, updated_at: S.settings.membersUpdatedAt || nowISO(), deleted: false });
       if ((S.settings.groupsUpdatedAt || '') > since) rows.push({ house: s.house, id: 'groups', kind: 'groups', data: { groups: S.groups }, updated_at: S.settings.groupsUpdatedAt, deleted: false });
+      if ((S.settings.pushUpdatedAt || '') > since || (force && S.settings.push)) rows.push({ house: s.house, id: 'push-' + S.settings.deviceId, kind: 'push', data: S.settings.push ? { ...S.settings.push, member: me().id } : { device: S.settings.deviceId }, updated_at: S.settings.pushUpdatedAt || nowISO(), deleted: !S.settings.push });
+      const freshMine = S.entries.filter((e) => !e.deleted && (e.createdAt || '') > since && e.paidBy === me().id && !e.recurringOf).map((e) => e.id);
       S.activity.filter((a) => (a.ts || '') > since).forEach((a) => rows.push({ house: s.house, id: 'act-' + a.id, kind: 'activity', data: a, updated_at: a.ts, deleted: false }));
       if (rows.length) {
         const r = await fetch(base + '?on_conflict=house,id', { method: 'POST', headers: this.headers(), body: JSON.stringify(rows) });
         if (!r.ok) throw new Error(await errText(r));
       }
       S.settings.lastPush = nowISO();
+      if (freshMine.length && since) notifyOthers(freshMine);
       // 2) scarico tutto ciò che è cambiato dopo l'ultimo scarico
       const q = `?house=eq.${encodeURIComponent(s.house)}&order=updated_at.asc&limit=1000` + (S.settings.lastPull && !force ? `&updated_at=gt.${encodeURIComponent(S.settings.lastPull)}` : '');
       const r2 = await fetch(base + q, { headers: this.headers() });
       if (!r2.ok) throw new Error(await errText(r2));
-      const remote = await r2.json(); let changed = 0;
+      const remote = await r2.json(); let changed = 0; const arrived = [];
       remote.forEach((row) => {
-        if (row.kind === 'entry') { const e = row.data; const cur = S.entries.find((x) => x.id === e.id); if (!cur) { S.entries.push(e); changed++; } else if ((e.updatedAt || '') > (cur.updatedAt || '')) { Object.assign(cur, e); changed++; } }
+        if (row.kind === 'entry') { const e = row.data; const cur = S.entries.find((x) => x.id === e.id); if (!cur) { S.entries.push(e); arrived.push(e); changed++; } else if ((e.updatedAt || '') > (cur.updatedAt || '')) { Object.assign(cur, e); changed++; } }
         else if (row.kind === 'members') { if ((row.updated_at || '') > (S.settings.membersUpdatedAt || '')) { const m = row.data.members; if (Array.isArray(m) && m.length >= 2) { S.members = m; } if (typeof row.data.together === 'string') S.settings.together = row.data.together; S.settings.membersUpdatedAt = row.updated_at; changed++; } }
         else if (row.kind === 'groups') { (row.data.groups || []).forEach((g) => { const cur = S.groups.find((x) => x.id === g.id); if (!cur) { S.groups.push(g); changed++; } else if ((g.updatedAt || '') > (cur.updatedAt || '')) { Object.assign(cur, g); changed++; } }); if ((row.updated_at || '') > (S.settings.groupsUpdatedAt || '')) S.settings.groupsUpdatedAt = row.updated_at; }
         else if (row.kind === 'activity') { if (!S.activity.some((x) => x.id === row.data.id)) { S.activity.push(row.data); } }
@@ -764,6 +836,7 @@ const sync = {
       S.activity.sort((a, b) => b.ts.localeCompare(a.ts)); S.activity = S.activity.slice(0, 300);
       if (remote.length) S.settings.lastPull = remote[remote.length - 1].updated_at; else if (!S.settings.lastPull) S.settings.lastPull = nowISO();
       this.status = 'ok'; save();
+      if (arrived.length && S.settings.lastPull) notifyIncoming(arrived);
       if (changed) { materializeRecurring(); if (!['nuova', 'modifica'].includes((currentRoute || {}).name)) render(); }
       return true;
     } catch (e) { this.status = 'err'; this.lastError = e.message || String(e); console.warn('sync', e); return false; }

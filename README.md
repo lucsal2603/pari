@@ -35,6 +35,18 @@ Di base i dati stanno solo sul telefono. Per condividerli serve un piccolo datab
 
 In alternativa, senza database: **Profilo → Esporta dati → Backup completo** su un telefono e **Importa backup** sull'altro (non crea doppioni).
 
+## Notifiche (quando l'altro aggiunge una spesa)
+
+Con la sincronizzazione attiva, l'app avvisa già da sola quando è **aperta** e arriva una spesa dell'altro. Per ricevere l'avviso anche ad **app chiusa** (vera notifica push) serve una piccola funzione sul progetto Supabase:
+
+1. Sul Mac, una volta sola: installa la CLI (`brew install supabase/tap/supabase`) e fai `supabase login`.
+2. Dalla cartella del progetto: `supabase functions deploy notify --project-ref <REF>` (il REF è nell'URL del progetto: `https://<REF>.supabase.co`).
+3. Imposta le chiavi (quelle generate stanno in `.secrets/vapid.json`, che non va mai pubblicato):
+   `supabase secrets set VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=... VAPID_SUBJECT=mailto:tu@esempio.it --project-ref <REF>`
+4. Su ogni iPhone: app sulla schermata Home (obbligatorio per iOS) → **Profilo → Notifiche → Attiva le notifiche**.
+
+Il testo dell'avviso è ad esempio: **Martina ha aggiunto una spesa** — *Spesa: 10,00 € · Devi ancora: 457,21 €* (oppure *Martina ti deve ancora: …*).
+
 ## Sviluppo
 
 È HTML, CSS e JavaScript puro, senza build:
