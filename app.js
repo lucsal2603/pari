@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.2.1';
 const KEY = 'pari:v1';
 const CATS = [
   { id: 'cibo', name: 'Cibo', icon: 'c-cibo' },
@@ -184,7 +184,7 @@ function entryRow(e, i) {
     <span class="right"><span class="money">${money(e.amount)}</span><span class="by ${isPay ? 'green' : col}">${isPay ? 'Pagamento' : esc(payer.name) + ' ha pagato'}</span></span>
   </a>`;
 }
-function emptyBox(t, d) { return `<div class="empty">${couple('empty-couple')}<div class="t">${esc(t)}</div><div class="small">${esc(d)}</div></div>`; }
+function emptyBox(t, d, withImg) { return `<div class="empty">${withImg ? '<img class="empty-img" src="img/nessuna-spesa.jpg" alt="">' : ''}<div class="t">${esc(t)}</div><div class="small">${esc(d)}</div></div>`; }
 function monthNav(ymStr, hrefBase) {
   return `<div class="monthnav"><button class="icon-btn" data-month="-1" aria-label="Mese precedente">${icon('i-left')}</button><button class="label" data-month="0" title="Torna al mese corrente">${esc(monthName(ymStr))}</button><button class="icon-btn" data-month="1" aria-label="Mese successivo">${icon('i-right')}</button></div>`;
 }
@@ -213,7 +213,7 @@ function pageHome() {
       ${couple('hero-couple')}
     </section>
     <div class="link-row"><h2 class="sec-title">Ultime spese</h2><a href="#/spese">Vedi tutte ${icon('i-right')}</a></div>
-    <section class="card list-card"><div class="list stagger">${recent.length ? recent.map(entryRow).join('') : emptyBox('Nessuna spesa ancora', 'Aggiungi la prima con il tasto qui sotto.')}</div></section>
+    <section class="card list-card"><div class="list stagger">${recent.length ? recent.map(entryRow).join('') : emptyBox('Nessuna spesa ancora', 'Aggiungi la prima con il tasto qui sotto.', true)}</div></section>
     <div class="section"><a class="btn" href="#/nuova">${icon('i-plus')} Aggiungi spesa</a></div>
     <div class="link-row"><h2 class="sec-title">Questo mese</h2><a href="#/statistiche">Statistiche ${icon('i-right')}</a></div>
     <section class="card">
@@ -244,7 +244,7 @@ function speseList() {
   const q = speseFilter.q.trim().toLowerCase();
   let es = active().filter((e) => (!speseFilter.cat || e.cat === speseFilter.cat) && (!q || (e.desc || '').toLowerCase().includes(q) || (e.notes || '').toLowerCase().includes(q) || moneyPlain(e.amount).includes(q)));
   es.sort((x, y) => (y.date + y.createdAt).localeCompare(x.date + x.createdAt));
-  if (!es.length) return `<section class="card">${emptyBox(q || speseFilter.cat ? 'Nessun risultato' : 'Nessuna spesa ancora', q || speseFilter.cat ? 'Prova con un\'altra parola o categoria.' : 'Le spese che aggiungete compariranno qui, mese per mese.')}</section>`;
+  if (!es.length) return `<section class="card">${emptyBox(q || speseFilter.cat ? 'Nessun risultato' : 'Nessuna spesa ancora', q || speseFilter.cat ? 'Prova con un\'altra parola o categoria.' : 'Le spese che aggiungete compariranno qui, mese per mese.', !(q || speseFilter.cat))}</section>`;
   const groups = []; es.forEach((e) => { const k = ym(e.date); let g = groups.find((x) => x.k === k); if (!g) { g = { k, items: [], total: 0 }; groups.push(g); } g.items.push(e); if (e.kind === 'expense') g.total += e.amount; });
   return groups.map((g) => `<div class="month-head"><span class="t">${esc(monthName(g.k))}</span><span class="money">${money(g.total)}</span></div><section class="card list-card"><div class="list stagger">${g.items.map(entryRow).join('')}</div></section>`).join('');
 }
