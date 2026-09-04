@@ -1,6 +1,6 @@
-# Pari
+# Divvy
 
-Le spese di Luca e Martina, divise a metà. Una web app in stile Splitwise pensata per l'iPhone: si apre in Safari e si aggiunge alla schermata Home come un'app vera (funziona anche senza rete).
+Le spese di Luca e Martina, divise a metà. Divvy (prima si chiamava Pari) è una web app in stile Splitwise pensata per l'iPhone: si apre in Safari e si aggiunge alla schermata Home come un'app vera (funziona anche senza rete).
 
 **Live:** https://lucsal2603.github.io/pari/
 

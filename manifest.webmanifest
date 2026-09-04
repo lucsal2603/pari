@@ -1,6 +1,6 @@
 {
-  "name": "Pari",
-  "short_name": "Pari",
+  "name": "Divvy",
+  "short_name": "Divvy",
   "description": "Le spese di Luca e Martina, divise a metà.",
   "start_url": "./",
   "scope": "./",

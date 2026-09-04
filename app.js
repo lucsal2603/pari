@@ -1,11 +1,11 @@
 /* ==========================================================================
-   Pari — app spese di coppia. Vanilla JS, dati in localStorage,
+   Divvy — app spese di coppia. Vanilla JS, dati in localStorage,
    sincronizzazione opzionale via Supabase (REST).
    ========================================================================== */
 (() => {
 'use strict';
 
-const APP_VERSION = '1.8.0';
+const APP_VERSION = '1.8.1';
 const KEY = 'pari:v1';
 const VAPID_PUBLIC = 'BAUQZ4UtSZAcJIDeoRF4b06elYpAl_pMJp5HzAA5nwbUB6Shslilu-bM9vjN0lnlrwTcfxgPi0ibyU3_UbAz-UI';
 const urlB64ToU8 = (b) => { const p = '='.repeat((4 - (b.length % 4)) % 4); const r = (b + p).replace(/-/g, '+').replace(/_/g, '/'); const raw = atob(r); return Uint8Array.from([...raw].map((c) => c.charCodeAt(0))); };
@@ -608,7 +608,7 @@ function pageExport() {
     <section class="card"><div class="menu">
       <button type="button" data-export="json">${icon('i-share')}<span>Backup completo <span class="d">File JSON con tutto (${n} voci). Serve anche per portare i dati sull'altro telefono.</span></span><span></span>${icon('i-right', 'ic chev')}</button>
       <button type="button" data-export="csv">${icon('i-download')}<span>Foglio di calcolo <span class="d">CSV delle spese, si apre con Numbers o Excel.</span></span><span></span>${icon('i-right', 'ic chev')}</button>
-      <label class="menu-import">${icon('i-upload')}<span>Importa backup <span class="d">Unisce un file JSON esportato da Pari: niente doppioni.</span></span><span></span>${icon('i-right', 'ic chev')}<input type="file" accept="application/json,.json" id="import-file" hidden></label>
+      <label class="menu-import">${icon('i-upload')}<span>Importa backup <span class="d">Unisce un file JSON esportato da Divvy: niente doppioni.</span></span><span></span>${icon('i-right', 'ic chev')}<input type="file" accept="application/json,.json" id="import-file" hidden></label>
     </div></section>
     <h2 class="sec-title section">Zona pericolosa</h2>
     <section class="card"><div class="menu"><button type="button" class="danger" data-reset>${icon('i-trash')}<span>Cancella tutti i dati <span class="d">Solo su questo telefono. Chiede conferma.</span></span><span></span>${icon('i-right', 'ic chev')}</button></div></section>
@@ -632,14 +632,14 @@ function pageSync() {
 function pageNotifiche() {
   const supported = 'Notification' in window && 'PushManager' in window; const perm = supported ? Notification.permission : 'unsupported';
   const on = !!S.settings.push && perm === 'granted'; const needsHome = isIOS() && !isStandalone();
-  const st = !supported ? (needsHome ? 'Su iPhone le notifiche arrivano solo se l\'app è sulla schermata Home' : 'Questo browser non supporta le notifiche') : perm === 'denied' ? 'Permesso negato: riattivalo da Impostazioni iOS → Notifiche → Pari' : on ? 'Attive su questo telefono' : 'Non attive';
+  const st = !supported ? (needsHome ? 'Su iPhone le notifiche arrivano solo se l\'app è sulla schermata Home' : 'Questo browser non supporta le notifiche') : perm === 'denied' ? 'Permesso negato: riattivalo da Impostazioni iOS → Notifiche → Divvy' : on ? 'Attive su questo telefono' : 'Non attive';
   const sample = notifText({ kind: 'expense', desc: 'Spesa', amount: 1000 }, other().name, (balances()[me().id] || 0));
   return `<div class="page slide">${subHead('Notifiche')}
     <section class="card"><div class="status-line"><span class="sync-dot ${on ? '' : perm === 'denied' ? 'err' : 'off'}"></span>${esc(st)}</div>
     <p class="small muted" style="margin:10px 0 0">Quando ${esc(other().name)} aggiunge una spesa o un pagamento ti arriva un avviso così:</p>
     <div class="notif-preview"><img src="icons/icon-192.png" alt=""><div><div class="t">${esc(sample.title)}</div><div class="b">${esc(sample.body).replace('\n', '<br>')}</div></div></div>
     ${!sync.enabled() ? '<p class="small muted" style="margin:10px 0 0">Serve prima la <a href="#/profilo/sync" style="color:var(--green);font-weight:700">sincronizzazione</a>: è quella che porta la spesa da un telefono all\'altro.</p>' : ''}
-    ${needsHome ? '<p class="small muted" style="margin:10px 0 0">Aggiungi Pari alla schermata Home (Condividi → Aggiungi alla schermata Home) e apri le notifiche da lì.</p>' : ''}
+    ${needsHome ? '<p class="small muted" style="margin:10px 0 0">Aggiungi Divvy alla schermata Home (Condividi → Aggiungi alla schermata Home) e apri le notifiche da lì.</p>' : ''}
     </section>
     <div class="section btn-row">${on ? `<button class="btn soft" id="push-test">Prova una notifica</button><button class="btn ghost" id="push-off">Disattiva</button>` : `<button class="btn" id="push-on" ${supported && perm !== 'denied' ? '' : 'disabled'}>Attiva le notifiche</button>`}</div>
   </div>`;
@@ -647,7 +647,7 @@ function pageNotifiche() {
 function pageInfo() {
   const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
   return `<div class="page slide">${subHead("Informazioni sull'app")}
-    <section class="card" style="text-align:center;padding:26px 18px"><img src="icons/preview-256.png" alt="" width="72" height="72" style="border-radius:18px"><div style="font-weight:800;font-size:22px;margin-top:12px">Pari</div><div class="muted small">Versione ${APP_VERSION}${standalone ? ' · installata' : ' · nel browser'}</div>
+    <section class="card" style="text-align:center;padding:26px 18px"><img src="icons/preview-256.png" alt="" width="72" height="72" style="border-radius:18px"><div style="font-weight:800;font-size:22px;margin-top:12px">Divvy</div><div class="muted small">Versione ${APP_VERSION}${standalone ? ' · installata' : ' · nel browser'}</div>
     <p class="small" style="margin:14px 0 0;color:var(--ink-2)">Le spese di ${esc(S.members[0].name)} e ${esc(S.members[1].name)}, divise a metà. Funziona anche senza rete: i dati sono salvati sul telefono.</p></section>
     <section class="card section"><div class="kv">
       <div><span class="k">Voci salvate</span><span class="v">${active().length}</span></div>
@@ -780,15 +780,15 @@ async function shareOrDownload(name, text, type) {
 }
 function exportData(kind) {
   const stamp = todayStr();
-  if (kind === 'json') { const out = { app: 'pari', version: 1, exportedAt: nowISO(), members: S.members, groups: S.groups, settings: { together: S.settings.together }, entries: S.entries, activity: S.activity }; shareOrDownload(`pari-backup-${stamp}.json`, JSON.stringify(out, null, 2), 'application/json'); return; }
+  if (kind === 'json') { const out = { app: 'pari', version: 1, exportedAt: nowISO(), members: S.members, groups: S.groups, settings: { together: S.settings.together }, entries: S.entries, activity: S.activity }; shareOrDownload(`divvy-backup-${stamp}.json`, JSON.stringify(out, null, 2), 'application/json'); return; }
   const rows = [['Data', 'Descrizione', 'Sezione', 'Categoria', 'Tipo', 'Importo', 'Pagato da', ...S.members.map((m) => 'Quota ' + m.name), 'Note']];
   active().sort((a, b) => a.date.localeCompare(b.date)).forEach((e) => rows.push([e.date, e.desc, groupName(e), e.kind === 'payment' ? 'Pagamento' : catOf(e.cat).name, e.kind === 'payment' ? 'pagamento' : 'spesa', moneyPlain(e.amount), member(e.paidBy).name, ...S.members.map((m) => moneyPlain(e.owed?.[m.id] || 0)), e.notes || '']));
   const csv = '﻿' + rows.map((r) => r.map((c) => '"' + String(c).replace(/"/g, '""') + '"').join(';')).join('\r\n');
-  shareOrDownload(`pari-spese-${stamp}.csv`, csv, 'text/csv');
+  shareOrDownload(`divvy-spese-${stamp}.csv`, csv, 'text/csv');
 }
 function importData(text) {
-  let d; try { d = JSON.parse(text); } catch (e) { toast('Non è un backup di Pari'); return; }
-  if (!d || d.app !== 'pari' || !Array.isArray(d.entries)) { toast('Non è un backup di Pari'); return; }
+  let d; try { d = JSON.parse(text); } catch (e) { toast('Non è un backup di Divvy'); return; }
+  if (!d || d.app !== 'pari' || !Array.isArray(d.entries)) { toast('Non è un backup di Divvy'); return; }
   let added = 0, updated = 0;
   d.entries.forEach((e) => { const cur = S.entries.find((x) => x.id === e.id); if (!cur) { S.entries.push(e); added++; } else if ((e.updatedAt || '') > (cur.updatedAt || '')) { Object.assign(cur, e); updated++; } });
   (d.activity || []).forEach((a) => { if (!S.activity.some((x) => x.id === a.id)) S.activity.push(a); });
