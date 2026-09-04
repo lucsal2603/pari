@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.7.3';
+const APP_VERSION = '1.7.4';
 const KEY = 'pari:v1';
 const CATS = [
   { id: 'cibo', name: 'Cibo', icon: 'c-cibo' },
@@ -263,7 +263,7 @@ function pageHome() {
   const syncCls = !sync.enabled() ? 'off' : sync.status === 'busy' ? 'busy' : sync.status === 'err' ? 'err' : '';
   return `<div class="page">
     <div class="head left"><div class="greet">Ciao ${esc(a.name)}! <span aria-hidden="true">👋</span></div><a class="who-chip" href="#/profilo"><span class="sync-dot ${syncCls}" title="Sincronizzazione"></span>${esc(a.name)} ${avatar(a)}</a></div>
-    <section class="card hero${sent.even ? ' even' : ''}">
+    <section class="card hero${sent.even ? ' even' : sent.sign === '+' ? ' owed' : ' owe'}">
       <div class="k">Saldo totale</div>
       <div class="amt">${sent.even ? money(0) : sent.sign + ' ' + money(sent.amount)}</div>
       <div class="s">${esc(sent.text)}</div>
@@ -316,7 +316,7 @@ function pageBilanci(r) {
   const owesAB = Math.max(0, -(bal[a.id] || 0)), owesBA = Math.max(0, bal[a.id] || 0);
   let body;
   if (tab === 0) {
-    body = `<section class="card saldo${sent.even ? ' even' : ''}"><div><div class="k">Saldo attuale</div><div class="amt">${sent.even ? money(0) : sent.sign + ' ' + money(sent.amount)}</div><div class="s">${esc(sent.text)}</div></div>${coupleScene('saldo-couple')}</section>
+    body = `<section class="card saldo${sent.even ? ' even' : sent.sign === '+' ? ' owed' : ' owe'}"><div><div class="k">Saldo attuale</div><div class="amt">${sent.even ? money(0) : sent.sign + ' ' + money(sent.amount)}</div><div class="s">${esc(sent.text)}</div></div>${coupleScene('saldo-couple')}</section>
     <h2 class="sec-title section">Dettaglio</h2>
     <section class="card"><div class="dlist">
       <button type="button" data-settle="${a.id}:${b.id}"><span class="t">${esc(a.name)} deve a ${esc(b.name)}</span><span class="money ${owesAB ? 'red' : ''}">${money(owesAB)}</span>${icon('i-right')}</button>
