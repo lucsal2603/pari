@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.4.1';
+const APP_VERSION = '1.5.0';
 const KEY = 'pari:v1';
 const CATS = [
   { id: 'cibo', name: 'Cibo', icon: 'c-cibo' },
@@ -164,7 +164,7 @@ function render(r) {
   $$('.tab').forEach((t) => t.classList.toggle('on', t.dataset.tab === tabName));
   view.innerHTML = fn(r);
   window.scrollTo(0, 0);
-  bind(r);
+  bind(r); initSwipes();
   const reveal = () => { $$('.chart').forEach((c) => c.classList.add('in')); $$('[data-w]').forEach((el) => (el.style.width = el.dataset.w)); };
   requestAnimationFrame(() => requestAnimationFrame(reveal)); setTimeout(reveal, 80);
 }
@@ -180,11 +180,11 @@ function entryRow(e, i) {
   const c = catOf(e.cat); const payer = member(e.paidBy); const isPay = e.kind === 'payment';
   const to = isPay ? member(Object.keys(e.owed || {})[0]) : null;
   const mine = myShare(e);
-  return `<a class="row${isPay ? ' payment' : ''}" href="#/spesa/${e.id}" style="--i:${i}">
+  return `<div class="swipe" data-id="${e.id}" style="--i:${i}"><a class="row${isPay ? ' payment' : ''}" href="#/spesa/${e.id}">
     <span class="cat-ic${isPay ? ' pay' : ''}">${icon(isPay ? 'c-pagamento' : c.icon)}</span>
     <span class="main"><span class="title">${esc(isPay ? `${payer.name} ha pagato ${to ? to.name : ''}` : e.desc)}</span><span class="sub">${esc(relDay(e.date))}${isPay ? '' : ' · ' + esc(payer.id === me().id ? 'hai pagato tu' : payer.name + ' ha pagato')}${e.recurringOf || e.recurring ? ' · ricorrente' : ''}</span></span>
     <span class="right"><span class="money ${mine.cls}">${mine.big}</span><span class="by muted">${mine.small}</span></span>
-  </a>`;
+  </a><button type="button" class="swipe-del" aria-label="Elimina">${icon('i-trash')}Elimina</button></div>`;
 }
 /* La mia parte di una voce: quanto ricevo (ho pagato io) o quanto devo (ha pagato l'altro) */
 function myShare(e) {
@@ -711,6 +711,31 @@ const sync = {
 };
 async function errText(r) { try { const j = await r.json(); return (j.message || j.hint || j.error || r.status) + ''; } catch (e) { return 'HTTP ' + r.status; } }
 function updateSyncDot() { const d = $('.sync-dot'); if (!d) return; d.className = 'sync-dot ' + (!sync.enabled() ? 'off' : sync.status === 'busy' ? 'busy' : sync.status === 'err' ? 'err' : ''); }
+
+/* ---------- Trascina a sinistra per eliminare ---------- */
+let openSwipe = null;
+function closeSwipe(w) { if (!w) return; w.classList.remove('open'); const r = $('.row', w); if (r) r.style.transform = ''; if (openSwipe === w) openSwipe = null; }
+function initSwipes() {
+  const W = 96;
+  $$('.swipe').forEach((w) => {
+    const row = $('.row', w); if (!row) return;
+    let down = false, drag = false, moved = false, x0 = 0, y0 = 0, x = 0;
+    const setX = (v) => { row.style.transform = v ? `translateX(${v}px)` : ''; };
+    row.addEventListener('pointerdown', (e) => { if (e.pointerType === 'mouse' && e.button !== 0) return; down = true; drag = false; x0 = e.clientX; y0 = e.clientY; });
+    row.addEventListener('pointermove', (e) => {
+      if (!down) return; const ddx = e.clientX - x0, ddy = e.clientY - y0;
+      if (!drag) { if (Math.abs(ddx) > 8 && Math.abs(ddx) > Math.abs(ddy) * 1.2) { drag = true; moved = true; w.classList.add('dragging'); try { row.setPointerCapture(e.pointerId); } catch (_) {} if (openSwipe && openSwipe !== w) closeSwipe(openSwipe); } else return; }
+      const base = w.classList.contains('open') ? -W : 0; x = base + ddx;
+      if (x > 0) x = x / 4; if (x < -W) x = -W + (x + W) / 3; // attrito oltre i limiti
+      setX(x);
+    });
+    const end = () => { if (!down) return; down = false; if (!drag) return; drag = false; w.classList.remove('dragging'); if (x < -W / 2) { w.classList.add('open'); openSwipe = w; setX(-W); } else closeSwipe(w); setTimeout(() => (moved = false), 60); };
+    row.addEventListener('pointerup', end); row.addEventListener('pointercancel', end);
+    row.addEventListener('click', (e) => { if (moved) { e.preventDefault(); e.stopPropagation(); return; } if (w.classList.contains('open')) { e.preventDefault(); e.stopPropagation(); closeSwipe(w); } }, true);
+    $('.swipe-del', w).addEventListener('click', (e) => { e.stopPropagation(); const id = w.dataset.id; closeSwipe(w); deleteEntry(id); toast('Eliminata', { label: 'Annulla', fn: () => restoreEntry(id) }); });
+  });
+}
+document.addEventListener('pointerdown', (e) => { if (openSwipe && !openSwipe.contains(e.target)) closeSwipe(openSwipe); }, true);
 
 /* ---------- Sheet, conferme, toast ---------- */
 function openSheet(title, bodyHTML, onOpen) {
