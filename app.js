@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.7.0';
+const APP_VERSION = '1.7.1';
 const KEY = 'pari:v1';
 const CATS = [
   { id: 'cibo', name: 'Cibo', icon: 'c-cibo' },
@@ -793,6 +793,27 @@ function initSwipes() {
   });
 }
 document.addEventListener('pointerdown', (e) => { if (openSwipe && !openSwipe.contains(e.target)) closeSwipe(openSwipe); }, true);
+
+/* ---------- Tira giù per ricaricare (su qualsiasi pagina) ---------- */
+(function pullToRefresh() {
+  const app = $('#app'); const el = document.createElement('div'); el.className = 'ptr'; el.innerHTML = `<span class="ptr-ic">${icon('i-undo')}</span><span class="ptr-t">Tira per aggiornare</span>`; document.body.appendChild(el);
+  const T = document.querySelector('.ptr-t'), MAX = 110, TRIG = 72; let y0 = 0, pulling = false, dy = 0, busy = false;
+  const canPull = () => window.scrollY <= 0 && !$('#sheet-root').firstChild && !busy;
+  document.addEventListener('touchstart', (e) => { if (e.touches.length !== 1 || !canPull()) { pulling = false; return; } y0 = e.touches[0].clientY; pulling = true; dy = 0; }, { passive: true });
+  document.addEventListener('touchmove', (e) => {
+    if (!pulling) return; const d = e.touches[0].clientY - y0;
+    if (d <= 0 || window.scrollY > 0) { if (dy > 0) { dy = 0; app.style.transform = ''; el.classList.remove('show', 'ready'); } return; }
+    if (e.cancelable) e.preventDefault();
+    dy = Math.min(MAX, d * 0.55); app.style.transition = 'none'; app.style.transform = `translateY(${dy}px)`;
+    el.classList.add('show'); el.classList.toggle('ready', dy >= TRIG); el.style.setProperty('--p', Math.min(1, dy / TRIG)); T.textContent = dy >= TRIG ? 'Rilascia per ricaricare' : 'Tira per aggiornare';
+  }, { passive: false });
+  const end = async () => {
+    if (!pulling) return; pulling = false; app.style.transition = 'transform .3s var(--ease-out)';
+    if (dy >= TRIG) { busy = true; el.classList.add('loading'); T.textContent = 'Aggiorno…'; app.style.transform = `translateY(${TRIG}px)`; try { if (sync.enabled()) await Promise.race([sync.run(true), new Promise((r) => setTimeout(r, 4000))]); } catch (_) {} navigator.serviceWorker?.getRegistration().then((reg) => reg && reg.update()).catch(() => {}); setTimeout(() => location.reload(), 150); return; }
+    app.style.transform = ''; el.classList.remove('show', 'ready'); dy = 0;
+  };
+  document.addEventListener('touchend', end); document.addEventListener('touchcancel', end);
+})();
 
 /* ---------- Sheet, conferme, toast ---------- */
 function openSheet(title, bodyHTML, onOpen) {
