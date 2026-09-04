@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.7.2';
+const APP_VERSION = '1.7.3';
 const KEY = 'pari:v1';
 const CATS = [
   { id: 'cibo', name: 'Cibo', icon: 'c-cibo' },
@@ -178,8 +178,7 @@ function render(r) {
   r = r || currentRoute || { name: 'home', id: '', q: {} }; currentRoute = r;
   const pages = { home: pageHome, spese: pageSpese, bilanci: pageBilanci, profilo: pageProfilo, nuova: pageForm, modifica: pageForm, spesa: pageDetail, statistiche: pageStats, attivita: pageActivity };
   const fn = pages[r.name] || pageHome;
-  const noTab = ['nuova', 'modifica', 'spesa'].includes(r.name);
-  tabbar.classList.toggle('hide', noTab); view.classList.toggle('no-tabbar', noTab);
+  tabbar.classList.remove('hide'); view.classList.remove('no-tabbar');
   const tabName = r.name === 'profilo' ? 'profilo' : r.name === 'statistiche' ? 'bilanci' : r.name;
   $$('.tab').forEach((t) => t.classList.toggle('on', t.dataset.tab === tabName));
   view.innerHTML = fn(r);
@@ -801,7 +800,7 @@ document.addEventListener('pointerdown', (e) => { if (openSwipe && !openSwipe.co
 
 /* ---------- Tira giù per ricaricare (su qualsiasi pagina) ---------- */
 (function pullToRefresh() {
-  const app = $('#app'); const el = document.createElement('div'); el.className = 'ptr'; el.innerHTML = `<span class="ptr-ic">${icon('i-undo')}</span><span class="ptr-t">Tira per aggiornare</span>`; document.body.appendChild(el);
+  const app = $('#view'); const el = document.createElement('div'); el.className = 'ptr'; el.innerHTML = `<span class="ptr-ic">${icon('i-undo')}</span><span class="ptr-t">Tira per aggiornare</span>`; document.body.appendChild(el);
   const T = document.querySelector('.ptr-t'), MAX = 110, TRIG = 72; let y0 = 0, pulling = false, dy = 0, busy = false;
   const canPull = () => window.scrollY <= 0 && !$('#sheet-root').firstChild && !busy;
   document.addEventListener('touchstart', (e) => { if (e.touches.length !== 1 || !canPull()) { pulling = false; return; } y0 = e.touches[0].clientY; pulling = true; dy = 0; }, { passive: true });
