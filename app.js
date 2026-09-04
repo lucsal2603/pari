@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.7.4';
+const APP_VERSION = '1.7.5';
 const KEY = 'pari:v1';
 const CATS = [
   { id: 'cibo', name: 'Cibo', icon: 'c-cibo' },
