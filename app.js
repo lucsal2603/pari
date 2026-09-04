@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.2.2';
+const APP_VERSION = '1.3.0';
 const KEY = 'pari:v1';
 const CATS = [
   { id: 'cibo', name: 'Cibo', icon: 'c-cibo' },
@@ -180,11 +180,32 @@ function entryRow(e, i) {
   const col = payer.id === S.members[0].id ? 'green' : 'orange';
   return `<a class="row${isPay ? ' payment' : ''}" href="#/spesa/${e.id}" style="--i:${i}">
     <span class="cat-ic${isPay ? ' pay' : ''}">${icon(isPay ? 'c-pagamento' : c.icon)}</span>
-    <span class="main"><span class="title">${esc(isPay ? `${payer.name} ha pagato ${to ? to.name : ''}` : e.desc)}</span><span class="sub">${esc(relDay(e.date))}${!isPay && e.cat ? ' · ' + esc(c.name) : ''}${e.recurringOf || e.recurring ? ' · ricorrente' : ''}</span></span>
+    <span class="main"><span class="title">${esc(isPay ? `${payer.name} ha pagato ${to ? to.name : ''}` : e.desc)}</span><span class="sub">${esc(relDay(e.date))}${!isPay && e.cat ? ' · ' + esc(c.name) : ''}${e.recurringOf || e.recurring ? ' · ricorrente' : ''}${e.demo ? ' · esempio' : ''}</span></span>
     <span class="right"><span class="money">${money(e.amount)}</span><span class="by ${isPay ? 'green' : col}">${isPay ? 'Pagamento' : esc(payer.name) + ' ha pagato'}</span></span>
   </a>`;
 }
-function emptyBox(t, d, withImg) { return `<div class="empty">${withImg ? '<img class="empty-img" src="img/nessuna-spesa.png" alt="">' : ''}<div class="t">${esc(t)}</div><div class="small">${esc(d)}</div></div>`; }
+function emptyBox(t, d, withImg) { return `<div class="empty">${withImg ? '<img class="empty-img" src="img/nessuna-spesa.png" alt="">' : ''}<div class="t">${esc(t)}</div><div class="small">${esc(d)}</div>${withImg ? '<button type="button" class="btn soft sm" data-demo-seed style="margin-top:14px">Prova con spese di esempio</button>' : ''}</div>`; }
+/* Spese di esempio: si caricano dallo stato vuoto e si tolgono con un tocco da Profilo → Esporta dati */
+function seedDemo() {
+  const d = (off) => { const x = new Date(); x.setDate(x.getDate() - off); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); };
+  const a = S.members[0].id, b = S.members[1].id; const half = (v) => ({ [a]: Math.ceil(v / 2), [b]: Math.floor(v / 2) });
+  const list = [
+    ['Cena sushi', 5500, 'cibo', a, 1, 'Sushi Yama'], ['Spesa supermercato', 4830, 'spesa', b, 2, ''], ['Cinema', 2100, 'tempo-libero', a, 5, ''],
+    ['Bolletta luce', 8920, 'bollette', b, 9, 'Bimestre'], ['Benzina', 6000, 'trasporti', b, 12, ''], ['Pizza da asporto', 2650, 'cibo', a, 14, ''],
+    ['Spesa Esselunga', 7210, 'spesa', b, 18, ''], ['Aperitivo', 1800, 'tempo-libero', a, 21, ''], ['Farmacia', 1890, 'salute', b, 26, ''],
+    ['Weekend a Verona', 24000, 'viaggi', a, 33, 'Hotel + treno'], ['Spesa', 5120, 'spesa', b, 40, ''], ['Bolletta gas', 6450, 'bollette', a, 44, ''],
+    ['Regalo compleanno mamma', 4500, 'regali', b, 52, ''], ['Ristorante', 7800, 'cibo', a, 58, 'Anniversario'], ['Crocchette gatto', 3200, 'animali', b, 63, ''],
+    ['Spesa', 6400, 'spesa', a, 75, ''], ['Bolletta acqua', 3900, 'bollette', b, 88, ''], ['Concerto', 9000, 'tempo-libero', a, 97, ''],
+  ];
+  list.forEach(([desc, amount, cat, paidBy, off, notes]) => S.entries.push({ id: 'demo-' + uid(), kind: 'expense', desc, amount, date: d(off), cat, paidBy, splitMethod: 'equal', splitInput: {}, owed: half(amount), notes, demo: true, createdAt: nowISO(), updatedAt: nowISO(), deleted: false }));
+  // affitto ricorrente e un pagamento già fatto
+  S.entries.push({ id: 'demo-' + uid(), kind: 'expense', desc: 'Affitto', amount: 65000, date: d(95).slice(0, 8) + '01', cat: 'casa', paidBy: a, splitMethod: 'equal', splitInput: {}, owed: half(65000), notes: '', demo: true, recurring: 'monthly', createdAt: nowISO(), updatedAt: nowISO(), deleted: false });
+  S.entries.push({ id: 'demo-' + uid(), kind: 'payment', desc: 'Pagamento', amount: 30000, date: d(30), cat: '', paidBy: b, splitMethod: 'exact', splitInput: {}, owed: { [a]: 30000 }, notes: 'Bonifico', demo: true, createdAt: nowISO(), updatedAt: nowISO(), deleted: false });
+  save(); materializeRecurring(); S.entries.filter((e) => e.recurringOf && String(e.recurringOf).startsWith('demo-')).forEach((e) => (e.demo = true)); save(); sync.schedule(); render();
+  toast('Spese di esempio caricate: le togli da Profilo → Esporta dati');
+}
+function removeDemo() { const t = nowISO(); S.entries.forEach((e) => { if (e.demo && !e.deleted) { e.deleted = true; e.updatedAt = t; } }); save(); sync.schedule(); render(); toast('Spese di esempio rimosse'); }
+const hasDemo = () => S.entries.some((e) => e.demo && !e.deleted);
 function monthNav(ymStr, hrefBase) {
   return `<div class="monthnav"><button class="icon-btn" data-month="-1" aria-label="Mese precedente">${icon('i-left')}</button><button class="label" data-month="0" title="Torna al mese corrente">${esc(monthName(ymStr))}</button><button class="icon-btn" data-month="1" aria-label="Mese successivo">${icon('i-right')}</button></div>`;
 }
@@ -482,7 +503,7 @@ function pageExport() {
       <label class="menu-import">${icon('i-upload')}<span>Importa backup <span class="d">Unisce un file JSON esportato da Pari: niente doppioni.</span></span><span></span>${icon('i-right', 'ic chev')}<input type="file" accept="application/json,.json" id="import-file" hidden></label>
     </div></section>
     <h2 class="sec-title section">Zona pericolosa</h2>
-    <section class="card"><div class="menu"><button type="button" class="danger" data-reset>${icon('i-trash')}<span>Cancella tutti i dati <span class="d">Solo su questo telefono. Chiede conferma.</span></span><span></span>${icon('i-right', 'ic chev')}</button></div></section>
+    <section class="card"><div class="menu">${hasDemo() ? `<button type="button" data-demo-remove>${icon('i-undo')}<span>Rimuovi le spese di esempio <span class="d">Toglie solo le voci segnate "esempio".</span></span><span></span>${icon('i-right', 'ic chev')}</button>` : ''}<button type="button" class="danger" data-reset>${icon('i-trash')}<span>Cancella tutti i dati <span class="d">Solo su questo telefono. Chiede conferma.</span></span><span></span>${icon('i-right', 'ic chev')}</button></div></section>
   </div>`;
 }
 function pageSync() {
@@ -536,6 +557,8 @@ function bind(r) {
   $$('[data-back]').forEach((b) => b.addEventListener('click', () => { if (r.name === 'nuova' || r.name === 'modifica') F = null; back(b.dataset.back); }));
   $$('[data-month]').forEach((b) => b.addEventListener('click', () => { const d = +b.dataset.month; S.ui.month = d === 0 ? curYM() : shiftYM(S.ui.month, d); save(); render(); const l = $('.monthnav .label'); if (l) l.classList.add('swap'); }));
   $$('[data-year]').forEach((b) => b.addEventListener('click', () => { S.ui.month = String(+S.ui.month.slice(0, 4) + +b.dataset.year) + S.ui.month.slice(4); save(); render(); }));
+  $$('[data-demo-seed]').forEach((b) => b.addEventListener('click', seedDemo));
+  $$('[data-demo-remove]').forEach((b) => b.addEventListener('click', () => confirmSheet('Rimuovere le spese di esempio?', 'Le spese vere, se ne avete già aggiunte, restano.', 'Rimuovi', removeDemo)));
   $$('[data-install-hide]').forEach((b) => b.addEventListener('click', () => { sessionStorage.setItem('pari:install-hide', '1'); b.closest('.install').remove(); }));
   bindSeg($('[data-seg="homeMode"]'), (v) => { S.ui.homeMode = v; save(); render(); });
   bindSeg($('[data-seg="balTab"]'), (v) => { S.ui.balTab = +v; save(); render(); });
