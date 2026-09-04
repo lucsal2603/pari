@@ -116,7 +116,25 @@ svg.ic { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-wid
 .money { font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .pd { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--c, var(--ink)); flex: none; }
 
-/* Segnaposto bianchi: illustrazioni e avatar da inserire */
+/* Illustrazioni: Luca a sinistra, Martina a destra */
+img.avatar { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex: none; background: var(--white); border: 1.5px solid var(--line); display: inline-block; }
+img.avatar.lg { width: 44px; height: 44px; }
+.couple { display: flex; align-items: flex-end; justify-content: center; pointer-events: none; }
+.couple img { height: 100%; width: auto; display: block; }
+.couple img + img { margin-left: -9%; }
+.hero-couple { height: 176px; margin: 10px 0 -16px; }
+.saldo-couple { height: 96px; margin-right: -6px; }
+.saldo-couple img + img { margin-left: -16%; }
+.couple-circle { width: 124px; height: 124px; border-radius: 50%; background: var(--bg); overflow: hidden; margin: 0 auto; box-shadow: 0 0 0 4px rgba(255,255,255,.14); }
+.couple-circle .couple { height: 100%; padding-top: 12px; }
+.couple-circle .couple img { height: 92%; }
+.empty-couple { height: 118px; margin-bottom: 12px; }
+.avatar-pair { display: inline-flex; flex: none; }
+.avatar-pair img.avatar { width: 28px; height: 28px; border: 2px solid var(--card); }
+.avatar-pair img.avatar + img.avatar { margin-left: -10px; }
+.people img.avatar { width: 36px; height: 36px; }
+
+/* Segnaposto bianchi (riserva) */
 .ph { background: var(--white); border: 1.5px dashed #D3CBBE; border-radius: var(--r); display: inline-flex; align-items: center; justify-content: center; color: #B7AFA2; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; text-align: center; padding: 6px; }
 .ph.avatar { width: 36px; height: 36px; border-radius: 50%; padding: 0; font-size: 9px; letter-spacing: 0; flex: none; }
 .ph.avatar.lg { width: 44px; height: 44px; }
@@ -220,10 +238,10 @@ svg.ic { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-wid
 .money-input.err input { border-color: var(--red); animation: shake .3s ease; }
 @keyframes shake { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
 .opts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.opt { display: flex; align-items: center; gap: 10px; padding: 12px 12px 12px 14px; min-height: 66px; border-radius: 14px; background: var(--card); border: 1.5px solid var(--line); text-align: left; transition: background-color .2s ease, border-color .2s ease, transform .16s var(--ease-out); }
+.opt { display: flex; align-items: center; gap: 9px; padding: 12px 10px 12px 12px; min-height: 66px; border-radius: 14px; background: var(--card); border: 1.5px solid var(--line); text-align: left; transition: background-color .2s ease, border-color .2s ease, transform .16s var(--ease-out); }
 .opt:active { transform: scale(.97); }
-.opt > span:not(.ph) { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.opt .t { font-weight: 700; font-size: 14.5px; line-height: 1.25; }
+.opt > span:not(.ph):not(.avatar-pair):not(.cat-ic) { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.opt .t { font-weight: 700; font-size: 14.5px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .opt .d { font-size: 12px; color: var(--muted); font-weight: 500; }
 .opt .ic { width: 18px; height: 18px; color: var(--muted); flex: none; }
 .opt.on { border-color: var(--green); background: var(--green-soft); }
@@ -272,9 +290,9 @@ svg.ic { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-wid
 .kv .v { font-weight: 700; text-align: right; display: flex; align-items: center; gap: 8px; }
 
 /* ---------- Bilanci ---------- */
-.saldo { padding: 18px; display: grid; grid-template-columns: 1fr 110px; gap: 12px; align-items: center; }
+.saldo { padding: 18px; display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; overflow: hidden; }
 .saldo .k { font-size: 13px; color: var(--muted); font-weight: 600; }
-.saldo .amt { font-size: 32px; font-weight: 800; letter-spacing: -.03em; line-height: 1.1; margin: 4px 0 2px; }
+.saldo .amt { font-size: 28px; font-weight: 800; letter-spacing: -.03em; line-height: 1.1; margin: 4px 0 2px; }
 .saldo .s { font-size: 13.5px; color: var(--ink-2); font-weight: 600; }
 .saldo .ph { width: 110px; height: 100px; font-size: 10px; }
 .saldo.even .amt { color: var(--green); }

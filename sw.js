@@ -1,8 +1,9 @@
 /* Pari — service worker: app shell offline, font in cache, sync sempre in rete */
-const VERSION = 'pari-v1.0.1';
+const VERSION = 'pari-v1.1.0';
 const SHELL = [
   './', './index.html', './style.css', './app.js', './manifest.webmanifest',
-  './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png', './icons/favicon.png'
+  './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png', './icons/favicon.png',
+  './img/luca.png', './img/martina.png', './img/luca-head.png', './img/martina-head.png'
 ];
 
 self.addEventListener('install', (e) => {

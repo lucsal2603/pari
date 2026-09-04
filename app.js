@@ -171,7 +171,9 @@ function render(r) {
 
 /* ---------- Componenti condivisi ---------- */
 const ph = (label, cls = '') => `<span class="ph ${cls}">${esc(label)}</span>`;
-const avatar = (m, lg = false) => `<span class="ph avatar${lg ? ' lg' : ''}" title="${esc(m.name)}" aria-label="avatar di ${esc(m.name)}">${esc(m.name.slice(0, 1))}</span>`;
+const imgKey = (m) => (m.id === 'm1' ? 'luca' : m.id === 'm2' ? 'martina' : '');
+const avatar = (m, lg = false) => imgKey(m) ? `<img class="avatar${lg ? ' lg' : ''}" src="img/${imgKey(m)}-head.png" alt="" title="${esc(m.name)}">` : `<span class="ph avatar${lg ? ' lg' : ''}" title="${esc(m.name)}">${esc(m.name.slice(0, 1))}</span>`;
+const couple = (cls = '') => `<div class="couple ${cls}" aria-hidden="true"><img src="img/luca.png" alt=""><img src="img/martina.png" alt=""></div>`;
 function entryRow(e, i) {
   const c = catOf(e.cat); const payer = member(e.paidBy); const isPay = e.kind === 'payment';
   const to = isPay ? member(Object.keys(e.owed || {})[0]) : null;
@@ -182,7 +184,7 @@ function entryRow(e, i) {
     <span class="right"><span class="money">${money(e.amount)}</span><span class="by ${isPay ? 'green' : col}">${isPay ? 'Pagamento' : esc(payer.name) + ' ha pagato'}</span></span>
   </a>`;
 }
-function emptyBox(t, d) { return `<div class="empty">${ph('Illustrazione', 'illu')}<div class="t">${esc(t)}</div><div class="small">${esc(d)}</div></div>`; }
+function emptyBox(t, d) { return `<div class="empty">${couple('empty-couple')}<div class="t">${esc(t)}</div><div class="small">${esc(d)}</div></div>`; }
 function monthNav(ymStr, hrefBase) {
   return `<div class="monthnav"><button class="icon-btn" data-month="-1" aria-label="Mese precedente">${icon('i-left')}</button><button class="label" data-month="0" title="Torna al mese corrente">${esc(monthName(ymStr))}</button><button class="icon-btn" data-month="1" aria-label="Mese successivo">${icon('i-right')}</button></div>`;
 }
@@ -208,7 +210,7 @@ function pageHome() {
       <div class="k">Saldo totale</div>
       <div class="amt">${sent.even ? money(0) : sent.sign + ' ' + money(sent.amount)}</div>
       <div class="s">${esc(sent.text)}</div>
-      ${ph('Illustrazione coppia', 'illu')}
+      ${couple('hero-couple')}
     </section>
     <div class="link-row"><h2 class="sec-title">Ultime spese</h2><a href="#/spese">Vedi tutte ${icon('i-right')}</a></div>
     <section class="card list-card"><div class="list stagger">${recent.length ? recent.map(entryRow).join('') : emptyBox('Nessuna spesa ancora', 'Aggiungi la prima con il tasto qui sotto.')}</div></section>
@@ -253,7 +255,7 @@ function pageBilanci() {
   const owesAB = Math.max(0, -(bal[a.id] || 0)), owesBA = Math.max(0, bal[a.id] || 0);
   let body;
   if (tab === 0) {
-    body = `<section class="card saldo${sent.even ? ' even' : ''}"><div><div class="k">Saldo attuale</div><div class="amt">${sent.even ? money(0) : sent.sign + ' ' + money(sent.amount)}</div><div class="s">${esc(sent.text)}</div></div>${ph('Illustrazione', 'round')}</section>
+    body = `<section class="card saldo${sent.even ? ' even' : ''}"><div><div class="k">Saldo attuale</div><div class="amt">${sent.even ? money(0) : sent.sign + ' ' + money(sent.amount)}</div><div class="s">${esc(sent.text)}</div></div>${couple('saldo-couple')}</section>
     <h2 class="sec-title section">Dettaglio</h2>
     <section class="card"><div class="dlist">
       <button type="button" data-settle="${a.id}:${b.id}"><span class="t">${esc(a.name)} deve a ${esc(b.name)}</span><span class="money ${owesAB ? 'red' : ''}">${money(owesAB)}</span>${icon('i-right')}</button>
@@ -384,8 +386,8 @@ function pageForm(r) {
            <div class="field"><div class="lbl">A chi?</div><div class="opts">${S.members.map((m) => optCard(m, F.to === m.id, 'to')).join('')}</div><div class="hint">${esc(payerOf(F.paidBy).name)} dà ${F.amount ? '€ ' + esc(F.amount) : 'questa somma'} a ${esc(payerOf(F.to).name)}: il saldo fra voi si aggiorna.</div></div>`
         : `<div class="field"><div class="lbl">Chi ha pagato?</div><div class="opts">${S.members.map((m) => optCard(m, F.paidBy === m.id, 'payer')).join('')}</div></div>
            <div class="field"><div class="lbl">Per chi è?</div><div class="opts">
-             <button type="button" class="opt on" data-soon="no"><span class="ph avatar">2</span><span><span class="t">Solo noi</span><span class="d">${esc(a.name)} e ${esc(b.name)}</span></span>${icon('i-right')}</button>
-             <button type="button" class="opt" data-soon="friends"><span class="ph avatar">+</span><span><span class="t">Altro</span><span class="d">Dividi con amici</span></span>${icon('i-right')}</button>
+             <button type="button" class="opt on" data-soon="no"><span class="avatar-pair">${avatar(S.members[0])}${avatar(S.members[1])}</span><span><span class="t">Solo noi</span><span class="d">${esc(a.name)} e ${esc(b.name)}</span></span>${icon('i-right')}</button>
+             <button type="button" class="opt" data-soon="friends"><span class="cat-ic" style="width:34px;height:34px">${icon('i-users')}</span><span><span class="t">Altro</span><span class="d">Dividi con amici</span></span>${icon('i-right')}</button>
            </div></div>
            <div class="field"><div class="lbl">Come dividere?</div><div class="opts">
              <button type="button" class="opt${F.splitMethod === 'equal' ? ' on' : ''}" data-split="equal"><span><span class="t">Metà e metà</span><span class="d">${F.amount && !isNaN(parseAmount(F.amount)) ? money(Math.round(parseAmount(F.amount) / 2)) + ' a testa' : 'In parti uguali'}</span></span>${icon('i-right')}</button>
@@ -449,7 +451,7 @@ function pageProfilo(r) {
   const together = S.settings.together ? `Insieme dal ${esc(S.settings.together)} <span aria-hidden="true">❤️</span>` : 'Le nostre spese, a metà <span aria-hidden="true">❤️</span>';
   const syncOn = sync.enabled();
   return `<div class="page">
-    <div class="profile-head">${ph('Illustrazione coppia', 'round')}<div class="n">${esc(S.members[0].name)} &amp; ${esc(S.members[1].name)}</div><div class="s">${together}</div></div>
+    <div class="profile-head"><div class="couple-circle">${couple()}</div><div class="n">${esc(S.members[0].name)} &amp; ${esc(S.members[1].name)}</div><div class="s">${together}</div></div>
     <section class="card profile-list"><div class="menu">
       <a href="#/profilo/account">${icon('i-gear')}<span>Impostazioni account</span><span class="val">Io sono ${esc(a.name)}</span>${icon('i-right', 'ic chev')}</a>
       <a href="#/profilo/categorie">${icon('i-grid')}<span>Categorie</span><span></span>${icon('i-right', 'ic chev')}</a>
