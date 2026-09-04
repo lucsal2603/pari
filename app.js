@@ -5,8 +5,11 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.8.2';
+const APP_VERSION = '1.9.0';
 const KEY = 'pari:v1';
+/* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
+const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
+const SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9kdmJ3cnJwYmt1cWNjb3BycnJjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg1MTIxMDgsImV4cCI6MjEwNDA4ODEwOH0.0z4B9bOU8_LN5P7GC7rryCQ_hrC9EJASXf6rcMDrcV8';
 const VAPID_PUBLIC = 'BAUQZ4UtSZAcJIDeoRF4b06elYpAl_pMJp5HzAA5nwbUB6Shslilu-bM9vjN0lnlrwTcfxgPi0ibyU3_UbAz-UI';
 const urlB64ToU8 = (b) => { const p = '='.repeat((4 - (b.length % 4)) % 4); const r = (b + p).replace(/-/g, '+').replace(/_/g, '/'); const raw = atob(r); return Uint8Array.from([...raw].map((c) => c.charCodeAt(0))); };
 const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
@@ -66,7 +69,7 @@ function defaultState() {
     entries: [],
     activity: [],
     groups: [{ id: 'g1', name: 'Spese casa', createdAt: '2026-09-04T00:00:00.000Z', updatedAt: '2026-09-04T00:00:00.000Z', deleted: false }],
-    settings: { me: 'm1', currency: 'EUR', together: '', sync: { url: '', key: '', house: '' }, lastPull: null, membersUpdatedAt: null, groupsUpdatedAt: null, lastGroup: 'g1', deviceId: null, push: null, pushUpdatedAt: null, notified: [] },
+    settings: { me: 'm1', currency: 'EUR', together: '', sync: { url: SUPA_URL, key: SUPA_ANON, house: '' }, lastPull: null, membersUpdatedAt: null, groupsUpdatedAt: null, lastGroup: 'g1', deviceId: null, push: null, pushUpdatedAt: null, notified: [] },
     ui: { month: curYM(), statsRange: 'mese', balTab: 0, homeMode: 'paid' },
   };
 }
@@ -74,6 +77,7 @@ let S = load();
 function load() {
   try { const raw = localStorage.getItem(KEY); if (raw) { const s = JSON.parse(raw); const d = defaultState(); const st = { ...d, ...s, settings: { ...d.settings, ...(s.settings || {}), sync: { ...d.settings.sync, ...((s.settings || {}).sync || {}) } }, ui: { ...d.ui, ...(s.ui || {}), month: curYM() } };
     if (!Array.isArray(s.groups)) { st.groups = d.groups; st.entries.forEach((e) => { if (!e.group) e.group = 'g1'; }); st.settings.lastGroup = 'g1'; }
+    if (!st.settings.sync.url) { st.settings.sync.url = SUPA_URL; st.settings.sync.key = SUPA_ANON; }
     return st; } } catch (e) { console.warn('stato corrotto', e); }
   return defaultState();
 }
@@ -621,7 +625,7 @@ function pageSync() {
   const st = sync.status === 'busy' ? 'Sincronizzazione in corso…' : sync.status === 'err' ? 'Errore: ' + (sync.lastError || 'controlla URL e chiave') : on ? (S.settings.lastPull ? 'Ultimo aggiornamento ' + new Date(S.settings.lastPull).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' }) : 'Collegata, mai sincronizzata') : 'Non attiva: i dati restano solo su questo telefono';
   return `<div class="page slide">${subHead('Backup e sincronizzazione')}
     <section class="card"><div class="status-line"><span class="sync-dot ${!on ? 'off' : sync.status === 'busy' ? 'busy' : sync.status === 'err' ? 'err' : ''}"></span>${esc(st)}</div>
-    <p class="small muted" style="margin:10px 0 0">Per vedere le stesse spese su due telefoni serve un piccolo database gratuito su <b>Supabase</b>. Si crea in cinque minuti: le istruzioni sono nel file <code class="mono">README.md</code> del progetto. Poi incolla qui i tre valori, uguali su entrambi i telefoni.</p></section>
+    <p class="small muted" style="margin:10px 0 0">Il database condiviso è già impostato. Per collegare i due telefoni basta scrivere lo stesso <b>codice casa</b> su entrambi e premere "Salva e collega".</p></section>
     <section class="card section">
       <div class="field" style="margin-top:0"><label for="s-url">URL del progetto</label><input id="s-url" type="url" placeholder="https://xxxx.supabase.co" value="${esc(s.url)}" autocapitalize="off" autocorrect="off"></div>
       <div class="field"><label for="s-key">Chiave pubblica (anon key)</label><input id="s-key" type="password" placeholder="eyJhbGciOi…" value="${esc(s.key)}" autocapitalize="off" autocorrect="off"></div>
@@ -764,7 +768,7 @@ function bindProfilo(r) {
       toast('Collego…'); const ok = await sync.run(true); render(); toast(ok ? 'Collegata: dati sincronizzati' : 'Non riesco a collegarmi: ' + (sync.lastError || 'controlla i valori'));
     });
     const n = $('#sync-now'); if (n) n.addEventListener('click', async () => { toast('Sincronizzo…'); const ok = await sync.run(true); render(); toast(ok ? 'Aggiornato' : 'Errore: ' + (sync.lastError || '')); });
-    const off = $('#sync-off'); if (off) off.addEventListener('click', () => { S.settings.sync = { url: '', key: '', house: '' }; S.settings.lastPull = null; save(); sync.status = 'idle'; render(); toast('Scollegata: i dati restano sul telefono'); });
+    const off = $('#sync-off'); if (off) off.addEventListener('click', () => { S.settings.sync = { url: SUPA_URL, key: SUPA_ANON, house: '' }; S.settings.lastPull = null; save(); sync.status = 'idle'; render(); toast('Scollegata: i dati restano sul telefono'); });
   }
   if (r.sub === 'notifiche') {
     const on = $('#push-on'); if (on) on.addEventListener('click', async () => { on.disabled = true; const ok = await enablePush(); render(); if (ok) { toast('Notifiche attivate'); const t = notifText({ kind: 'expense', desc: 'Spesa', amount: 1000 }, other().name, balances()[me().id] || 0); showLocalNotification(t.title, t.body); } });
