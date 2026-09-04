@@ -319,7 +319,7 @@ img.avatar.lg { width: 44px; height: 44px; }
 .saldo.even .amt { color: var(--green); }
 .dlist { display: flex; flex-direction: column; }
 .dlist > button, .dlist > div { display: grid; grid-template-columns: 1fr auto 18px; align-items: center; gap: 10px; padding: 14px 0; border-top: 1px solid var(--line); text-align: left; font-weight: 600; font-size: 14.5px; width: 100%; }
-.dlist > :first-child { border-top: 0; }
+.dlist > :first-child { border-top: 0 !important; }
 .dlist .money { font-size: 15px; }
 .dlist .ic { width: 18px; height: 18px; color: var(--muted); }
 .dlist .t { display: flex; align-items: center; gap: 10px; }

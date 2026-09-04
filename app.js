@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.6.1';
+const APP_VERSION = '1.7.0';
 const KEY = 'pari:v1';
 const CATS = [
   { id: 'cibo', name: 'Cibo', icon: 'c-cibo' },
@@ -161,6 +161,7 @@ function route() {
   const [path, qs] = hash.slice(2).split('?');
   const parts = path.split('/'); const q = Object.fromEntries(new URLSearchParams(qs || ''));
   const r = { name: parts[0] || 'home', id: parts[1] || '', sub: parts[1] || '', q };
+  if (r.name === 'spese' && q.sezione !== undefined) { speseFilter.group = q.sezione; speseFilter.q = ''; speseFilter.cat = ''; }
   render(r);
 }
 window.addEventListener('hashchange', route);
@@ -207,6 +208,11 @@ function myShare(e) {
   if (e.paidBy === my) { const v = e.amount - owedByMe; return { big: '+ ' + money(v), cls: 'green', small: 'tot. ' + money(e.amount), label: 'Ricevi ' + money(v) }; }
   if (owedByMe > 0) return { big: '− ' + money(owedByMe), cls: 'red', small: 'tot. ' + money(e.amount), label: 'Devi ' + money(owedByMe) };
   return { big: money(e.amount), cls: 'muted', small: 'non ti riguarda', label: '' };
+}
+function groupRow(g, i) {
+  const es = active().filter((e) => e.group === g.id); const tot = es.filter((e) => e.kind === 'expense').reduce((a, e) => a + e.amount, 0);
+  const sg = balanceSentence(groupBalance(g.id));
+  return `<a class="row" href="#/spese?sezione=${g.id}" style="--i:${i}"><span class="cat-ic">${icon('i-list')}</span><span class="main"><span class="title">${esc(g.name)}</span><span class="sub">${es.length} ${es.length === 1 ? 'voce' : 'voci'} · tot. ${money(tot)}</span></span><span class="right"><span class="money ${sg.even ? 'muted' : sg.sign === '+' ? 'green' : 'red'}">${sg.even ? 'in pari' : sg.sign + ' ' + money(sg.amount)}</span><span class="by muted">${sg.even ? '' : esc(sg.sign === '+' ? 'ti deve' : 'gli devi').replace('gli devi', 'devi a ' + other().name)}</span></span></a>`;
 }
 function emptyBox(t, d, withImg) { return `<div class="empty">${withImg ? '<img class="empty-img" src="img/nessuna-spesa.png" alt="">' : ''}<div class="t">${esc(t)}</div><div class="small">${esc(d)}</div></div>`; }
 /* Spese vere riportate da Splitwise (screenshot del 4/9/2026), caricate una volta sola su ogni telefono.
@@ -259,6 +265,8 @@ function pageHome() {
       <div class="s">${esc(sent.text)}</div>
       ${coupleScene('hero-couple')}
     </section>
+    <div class="link-row"><h2 class="sec-title">Sezioni</h2><a href="#/profilo/sezioni">Gestisci ${icon('i-right')}</a></div>
+    <section class="card list-card"><div class="list stagger">${groups().map((g, i) => groupRow(g, i)).join('') || '<div class="empty small" style="padding:18px">Nessuna sezione: creane una da Gestisci.</div>'}</div></section>
     <div class="link-row"><h2 class="sec-title">Ultime spese</h2><a href="#/spese">Vedi tutte ${icon('i-right')}</a></div>
     <section class="card list-card"><div class="list stagger">${recent.length ? recent.map(entryRow).join('') : emptyBox('Nessuna spesa ancora', 'Aggiungi la prima con il tasto qui sotto.', true)}</div></section>
     <div class="section"><a class="btn" href="#/nuova">${icon('i-plus')} Aggiungi spesa</a></div>
@@ -281,9 +289,9 @@ function pageHome() {
 let speseFilter = { q: '', cat: '', group: '' };
 function pageSpese() {
   return `<div class="page">
-    <div class="head left"><div class="title">Spese</div><a class="icon-btn" href="#/attivita" aria-label="Attività">${icon('i-repeat')}</a></div>
+    <div class="head left"><div class="title">${speseFilter.group && groups().find((g) => g.id === speseFilter.group) ? esc(groups().find((g) => g.id === speseFilter.group).name) : 'Spese'}</div><a class="icon-btn" href="#/attivita" aria-label="Attività">${icon('i-repeat')}</a></div>
     <label class="search">${icon('i-search')}<input id="q" type="search" placeholder="Cerca una spesa…" value="${esc(speseFilter.q)}" autocomplete="off"></label>
-    ${groups().length > 1 ? `<div class="chips" id="group-chips"><button class="chip${!speseFilter.group ? ' on' : ''}" data-group="">Tutte le sezioni</button>${groups().map((g) => `<button class="chip${speseFilter.group === g.id ? ' on' : ''}" data-group="${g.id}">${esc(g.name)}</button>`).join('')}</div>` : ''}
+    ${groups().length ? `<div class="chips" id="group-chips"><button class="chip${!speseFilter.group ? ' on' : ''}" data-group="">Tutte le sezioni</button>${groups().map((g) => `<button class="chip${speseFilter.group === g.id ? ' on' : ''}" data-group="${g.id}">${esc(g.name)}</button>`).join('')}</div>` : ''}
     <div class="chips" id="chips"><button class="chip${!speseFilter.cat ? ' on' : ''}" data-cat="">Tutte</button>${CATS.map((c) => `<button class="chip${speseFilter.cat === c.id ? ' on' : ''}" data-cat="${c.id}">${icon(c.icon)}${esc(c.name)}</button>`).join('')}</div>
     <div id="spese-list">${speseList()}</div>
   </div>`;
@@ -312,7 +320,7 @@ function pageBilanci() {
       <div><span class="t">In pari</span><span class="money">${money(0)}</span>${sent.even ? icon('i-check') : '<span></span>'}</div>
     </div></section>
     <div class="section"><a class="btn" href="#/nuova?tipo=pagamento">Registra pagamento</a></div>
-    ${groups().length > 1 ? `<h2 class="sec-title section">Per sezione</h2><section class="card"><div class="dlist">${groups().map((g) => { const bg = groupBalance(g.id); const sg = balanceSentence(bg); return `<div><span class="t">${esc(g.name)}<span class="muted small" style="margin-left:6px">${sg.even ? 'in pari' : esc(sg.text)}</span></span><span class="money ${sg.even ? '' : sg.sign === '+' ? 'green' : 'red'}">${sg.even ? money(0) : sg.sign + ' ' + money(sg.amount)}</span><span></span></div>`; }).join('')}</div></section>` : ''}
+    ${groups().length ? `<h2 class="sec-title section">Per sezione</h2><section class="card"><div class="dlist">${groups().map((g) => { const bg = groupBalance(g.id); const sg = balanceSentence(bg); return `<a href="#/spese?sezione=${g.id}" style="display:grid;grid-template-columns:1fr auto 18px;align-items:center;gap:10px;padding:14px 0;border-top:1px solid var(--line);font-weight:600;font-size:14.5px"><span class="t">${esc(g.name)}<span class="muted small" style="margin-left:6px">${sg.even ? 'in pari' : esc(sg.text)}</span></span><span class="money ${sg.even ? '' : sg.sign === '+' ? 'green' : 'red'}">${sg.even ? money(0) : sg.sign + ' ' + money(sg.amount)}</span>${icon('i-right')}</a>`; }).join('')}</div></section>` : ''}
     <h2 class="sec-title section">Ultimi pagamenti</h2>
     <section class="card list-card"><div class="list stagger">${(() => { const ps = active().filter((e) => e.kind === 'payment').sort((x, y) => (y.date + y.createdAt).localeCompare(x.date + x.createdAt)).slice(0, 5); return ps.length ? ps.map(entryRow).join('') : '<div class="empty small" style="padding:18px">Nessun pagamento registrato.</div>'; })()}</div></section>`;
   } else {
@@ -614,7 +622,7 @@ function bind(r) {
   if (r.name === 'spese') {
     const q = $('#q'); let t; q.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => { speseFilter.q = q.value; $('#spese-list').innerHTML = speseList(); initSwipes(); }, 120); });
     $('#chips').addEventListener('click', (ev) => { const c = ev.target.closest('.chip'); if (!c) return; speseFilter.cat = c.dataset.cat; $$('#chips .chip').forEach((x) => x.classList.toggle('on', x === c)); $('#spese-list').innerHTML = speseList(); initSwipes(); });
-    const gc = $('#group-chips'); if (gc) gc.addEventListener('click', (ev) => { const c = ev.target.closest('.chip'); if (!c) return; speseFilter.group = c.dataset.group; $$('#group-chips .chip').forEach((x) => x.classList.toggle('on', x === c)); $('#spese-list').innerHTML = speseList(); initSwipes(); });
+    const gc = $('#group-chips'); if (gc) gc.addEventListener('click', (ev) => { const c = ev.target.closest('.chip'); if (!c) return; speseFilter.group = c.dataset.group; $$('#group-chips .chip').forEach((x) => x.classList.toggle('on', x === c)); const g = groups().find((x) => x.id === speseFilter.group); $('.head .title').textContent = g ? g.name : 'Spese'; $('#spese-list').innerHTML = speseList(); initSwipes(); });
   }
   if (r.name === 'profilo' && r.sub === 'categorie') $$('[data-filter-cat]').forEach((a) => a.addEventListener('click', () => { speseFilter = { q: '', cat: a.dataset.filterCat }; }));
   if (r.name === 'spesa') {
