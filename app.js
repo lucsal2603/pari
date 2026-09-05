@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.14.3';
+const APP_VERSION = '1.15.0';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -316,12 +316,12 @@ function render(r, toTop) {
   // toTop solo quando cambia pagina: i ridisegni per un cambio di stato (Pagato/Quota, mese, tab) tengono la posizione
   const keep = toTop ? 0 : window.scrollY;
   r = r || currentRoute || { name: 'home', id: '', q: {} }; currentRoute = r;
-  const publicPages = ['accedi', 'registrati', 'recupero', 'legale'];
+  const publicPages = ['accedi', 'registrati', 'recupero', 'legale', 'conferma'];
   if (!auth.user() && !publicPages.includes(r.name)) { r = { name: 'accedi', id: '', sub: '', q: {}, back: null }; currentRoute = r; }
-  const pages = { home: pageHome, spese: pageSpese, bilanci: pageBilanci, profilo: pageProfilo, nuova: pageForm, modifica: pageForm, spesa: pageDetail, statistiche: pageStats, attivita: pageActivity, benvenuto: pageWelcome, accedi: pageLogin, registrati: pageRegister, recupero: pageRecovery, legale: pageLegal };
+  const pages = { home: pageHome, spese: pageSpese, bilanci: pageBilanci, profilo: pageProfilo, nuova: pageForm, modifica: pageForm, spesa: pageDetail, statistiche: pageStats, attivita: pageActivity, benvenuto: pageWelcome, accedi: pageLogin, registrati: pageRegister, recupero: pageRecovery, legale: pageLegal, conferma: pageConfirm };
   const fn = pages[r.name] || pageHome;
-  const onb = ['benvenuto', 'accedi', 'registrati', 'recupero'].includes(r.name) || (r.name === 'legale' && !auth.user());
-  document.body.classList.toggle('fixed-screen', ['accedi', 'registrati', 'recupero'].includes(r.name));
+  const onb = ['benvenuto', 'accedi', 'registrati', 'recupero', 'conferma'].includes(r.name) || (r.name === 'legale' && !auth.user());
+  document.body.classList.toggle('fixed-screen', ['accedi', 'registrati', 'recupero', 'conferma'].includes(r.name));
   tabbar.classList.toggle('hide', onb); view.classList.toggle('no-tabbar', onb);
   const tabName = r.name === 'profilo' ? 'profilo' : r.name === 'statistiche' ? 'bilanci' : r.name;
   $$('.tab').forEach((t) => t.classList.toggle('on', t.dataset.tab === tabName));
@@ -779,7 +779,6 @@ function pageLogin() {
     <img class="onb-logo" src="img/logo.png" alt="Divvy">
     <h1 class="onb-h">${reg ? 'Crea il tuo account' : 'Benvenuto in Divvy!'}</h1><p class="onb-p">${reg ? 'Bastano un\'email e una password: poi ti presentiamo l\'app.' : 'L\'app per condividere le spese in modo semplice e trasparente.'}</p>
     <div class="onb-art"><img src="img/benvenuto-4.png" alt=""></div>
-    ${LG.sent ? `<div class="login-note">Ti abbiamo mandato un'email a <b>${esc(LG.sent)}</b>: apri il link per confermare, poi accedi da qui.</div>` : ''}
     <form class="onb-form" data-login-form>
       <label class="onb-field">${icon('i-mail')}<input id="lg-email" type="email" placeholder="Email" value="${esc(LG.email)}" autocomplete="email" autocapitalize="off" inputmode="email" enterkeyhint="next"></label>
       <label class="onb-field">${icon('i-lock')}<input id="lg-pass" type="${LG.show ? 'text' : 'password'}" placeholder="Password" autocomplete="${reg ? 'new-password' : 'current-password'}" enterkeyhint="go"><button type="button" class="login-eye" data-eye aria-label="Mostra password">${icon(LG.show ? 'i-eye-off' : 'i-eye')}</button></label>
@@ -792,7 +791,7 @@ function pageLogin() {
     <p class="login-foot">Non hai un account? <a class="login-link u" href="#/registrati">Registrati</a></p>
   </div>`;
 }
-function afterLogin() { OB = { step: 1, name: '', partner: '', house: '', avatar: 0, split: 'equal', pct: 50 }; go(S.settings.onboarded ? '#/home' : '#/benvenuto'); if (sync.enabled()) sync.run(); }
+function afterLogin() { try { localStorage.removeItem(PENDING_KEY); } catch (_) {} OB = { step: 1, name: '', partner: '', house: '', avatar: 0, split: 'equal', pct: 50 }; go(S.settings.onboarded ? '#/home' : '#/benvenuto'); if (sync.enabled()) sync.run(); }
 function bindLogin() {
   const form = $('[data-login-form]');
   $('#lg-email').addEventListener('input', (e) => (LG.email = e.target.value.trim()));
@@ -841,7 +840,7 @@ function bindRegister() {
     if (p1 !== p2) { $('#rg-pass2').focus(); toast('Le due password non coincidono'); return; }
     if (!RG.terms) { const c = $('#rg-terms').closest('.reg-check'); c.classList.remove('shake'); void c.offsetWidth; c.classList.add('shake'); toast('Accetta i Termini di servizio per continuare'); return; }
     RG.busy = true; $('.login-main').disabled = true;
-    try { const res = await auth.signUp(em, p1, { newsletter: RG.news, terms_accepted_at: nowISO() }); RG.busy = false; if (res === 'confirm') { LG.sent = em; LG.email = em; go('#/accedi'); } else afterLogin(); }
+    try { const res = await auth.signUp(em, p1, { newsletter: RG.news, terms_accepted_at: nowISO() }); RG.busy = false; if (res === 'confirm') { LG.email = em; try { localStorage.setItem(PENDING_KEY, em); } catch (_) {} go('#/conferma'); } else afterLogin(); }
     catch (err) { RG.busy = false; render(); toast(err.message); }
   });
   if (!isNative()) setTimeout(() => { const i = $('#rg-email'); if (i && !i.value) i.focus({ preventScroll: true }); }, 400);
@@ -852,6 +851,30 @@ function pageLegal(r) {
     <section class="card legal">${privacy
       ? `<h2 class="sec-title">Informativa sulla privacy</h2><p><b>Bozza da rivedere prima della pubblicazione.</b></p><p>Divvy salva le spese, i pagamenti e i nomi che inserisci per mostrarli a te e alla persona con cui condividi la casa. I dati stanno sul telefono e, se attivi la sincronizzazione, su un database Supabase in Europa.</p><p>Per l'accesso usiamo la tua email e una password (o l'account Google/Apple). L'email serve solo per farti entrare e per le email di conferma e recupero password.</p><p>Se attivi le notifiche, salviamo l'indirizzo tecnico del tuo telefono per poterle inviare. Non vendiamo né cediamo dati a terzi. Puoi cancellare tutto dal Profilo o scrivendo a lukesalvemini@gmail.com.</p>`
       : `<h2 class="sec-title">Termini di servizio</h2><p><b>Bozza da rivedere prima della pubblicazione.</b></p><p>Divvy è un'app per tenere il conto delle spese condivise. Il servizio è offerto così com'è, gratuitamente, in fase di prova.</p><p>Sei responsabile di ciò che inserisci e di custodire la tua password. Non usare l'app per scopi illeciti o per dati di altre persone senza il loro consenso.</p><p>Possiamo modificare o sospendere il servizio in qualsiasi momento. Per domande: lukesalvemini@gmail.com.</p>`}</section></div>`;
+}
+const PENDING_KEY = 'pari:pending-email';
+function pageConfirm() {
+  const em = localStorage.getItem(PENDING_KEY) || LG.email || '';
+  return `<div class="page onb login conf">
+    <img class="onb-logo" src="img/logo.png" alt="Divvy">
+    <h1 class="onb-h">Controlla la tua email</h1>
+    <p class="onb-p">Ti abbiamo inviato un link di conferma a<br><b class="conf-mail">${esc(em)}</b>.</p>
+    <p class="onb-p conf-p2">Aprilo per verificare il tuo account<br>e iniziare a usare Divvy.</p>
+    <div class="onb-art"><img src="img/conferma.png" alt=""></div>
+    <div class="conf-box"><span class="conf-i">${icon('i-info')}</span><div><b>Non trovi l'email?</b><span>Controlla anche nella cartella spam o promozioni.</span></div></div>
+    <div class="onb-form"><a class="btn onb-btn" href="#/accedi" data-confirmed>Ho confermato l'email ${arrowIc}</a></div>
+    <p class="login-foot conf-foot">Non hai ricevuto l'email?<br><button type="button" class="login-link u" data-resend>Invia di nuovo</button></p>
+    <div class="auth-hills" aria-hidden="true"><svg viewBox="0 0 390 120" preserveAspectRatio="none"><ellipse cx="60" cy="150" rx="230" ry="110" fill="#CFE3D5"/><ellipse cx="360" cy="160" rx="240" ry="120" fill="#B9D6C2"/><ellipse cx="180" cy="190" rx="260" ry="110" fill="#9FC7AB"/></svg></div>
+  </div>`;
+}
+function bindConfirm() {
+  const em = localStorage.getItem(PENDING_KEY) || LG.email || '';
+  $('[data-confirmed]').addEventListener('click', () => { LG.email = em; LG.sent = ''; });
+  $('[data-resend]').addEventListener('click', async (e) => {
+    if (!em) { go('#/registrati'); return; } e.target.disabled = true;
+    try { const r = await fetch(SUPA_URL + '/auth/v1/resend', { method: 'POST', headers: auth.h(), body: JSON.stringify({ type: 'signup', email: em, options: { emailRedirectTo: appUrl() } }) }); if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(authMsg(j)); } toast('Email inviata di nuovo a ' + em); }
+    catch (err) { toast(err.message); } finally { setTimeout(() => (e.target.disabled = false), 15000); }
+  });
 }
 function pageRecovery() {
   return `<div class="page onb login"><img class="onb-logo" src="img/logo.png" alt="Divvy">
@@ -970,6 +993,7 @@ function bind(r) {
   if (r.name === 'benvenuto') bindWelcome();
   if (r.name === 'accedi') bindLogin();
   if (r.name === 'registrati') bindRegister();
+  if (r.name === 'conferma') bindConfirm();
   if (r.name === 'recupero') bindRecovery();
   if (r.name === 'profilo') bindProfilo(r);
 }
@@ -1203,7 +1227,7 @@ materializeRecurring();
 (async () => {
   await auth.handleRedirect();
   if (auth.recovery) history.replaceState(null, '', '#/recupero');
-  else if (!auth.user()) { if (!/^#\/(accedi|registrati|legale)/.test(location.hash)) history.replaceState(null, '', '#/accedi'); }
+  else if (!auth.user()) { if (!/^#\/(accedi|registrati|legale|conferma)/.test(location.hash)) history.replaceState(null, '', '#/accedi'); }
   else if (!S.settings.onboarded) history.replaceState(null, '', '#/benvenuto');
   if (auth.user()) showDailyLove();
   route();

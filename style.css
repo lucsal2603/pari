@@ -563,6 +563,23 @@ body.fixed-screen .view { height: 100dvh; overflow: hidden; padding-bottom: calc
 .reg .login-foot { margin-top: clamp(4px, .8vh, 8px); }
 .login .login-foot { margin-bottom: 2px; }
 
+/* conferma email */
+.conf { position: relative; overflow: hidden; }
+.conf .onb-h { font-size: clamp(24px, 3.8vh, 34px); }
+.conf .onb-p { font-size: clamp(14px, 2vh, 17px); line-height: 1.35; max-width: 360px; }
+.conf .conf-mail { color: var(--green); font-weight: 800; }
+.conf .conf-p2 { margin-top: clamp(6px, 1.2vh, 14px); }
+.conf .onb-art { max-height: 34vh; }
+.conf-box { width: 100%; display: grid; grid-template-columns: 40px 1fr; gap: 12px; align-items: center; text-align: left; background: #E6F0E9; border-radius: 16px; padding: clamp(10px, 1.6vh, 16px) 16px; margin-bottom: clamp(8px, 1.4vh, 16px); }
+.conf-box .conf-i { width: 40px; height: 40px; border-radius: 50%; background: var(--green); color: var(--white); display: inline-flex; align-items: center; justify-content: center; }
+.conf-box .conf-i .ic { width: 22px; height: 22px; }
+.conf-box b { display: block; font-size: clamp(14px, 1.9vh, 16px); font-weight: 700; }
+.conf-box span { font-size: clamp(12.5px, 1.7vh, 14.5px); color: var(--ink-2); }
+.conf .conf-foot { line-height: 1.5; }
+.conf .conf-foot .login-link { font-size: clamp(14px, 1.9vh, 16px); }
+.auth-hills { position: absolute; left: -18px; right: -18px; bottom: -4px; height: 110px; pointer-events: none; z-index: -1; }
+.auth-hills svg { width: 100%; height: 100%; display: block; }
+
 /* registrazione */
 .reg { position: relative; overflow: hidden; }
 .reg .onb-top { margin-bottom: -6px; }
