@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.14.1';
+const APP_VERSION = '1.14.2';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -828,7 +828,6 @@ function pageRegister() {
     <div class="login-or"><span>Oppure</span></div>
     <button type="button" class="btn ghost login-oauth" data-oauth="google">${icon('i-google')} Continua con Google</button>
     <p class="login-foot">Hai già un account? <a class="login-link" href="#/accedi">Accedi</a></p>
-    <div class="reg-hills" aria-hidden="true"><svg viewBox="0 0 390 120" preserveAspectRatio="none"><ellipse cx="60" cy="150" rx="230" ry="110" fill="#CFE3D5"/><ellipse cx="360" cy="160" rx="240" ry="120" fill="#B9D6C2"/><ellipse cx="180" cy="190" rx="260" ry="110" fill="#9FC7AB"/></svg></div>
   </div>`;
 }
 function bindRegister() {
