@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.21.2';
+const APP_VERSION = '1.21.3';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -781,6 +781,7 @@ let LG = { mode: 'login', email: '', busy: false, show: false, sent: '' };
 function pageLogin() {
   const reg = LG.mode === 'register';
   return `<div class="page onb login">
+    <div class="onb-top"><span></span><span></span></div>
     <img class="onb-logo" src="img/logo.png" alt="Divvy">
     <h1 class="onb-h">${reg ? 'Crea il tuo account' : 'Benvenuto in Divvy!'}</h1><p class="onb-p">${reg ? 'Bastano un\'email e una password: poi ti presentiamo l\'app.' : 'L\'app per condividere le spese in modo semplice e trasparente.'}</p>
     <div class="onb-art"><img src="img/benvenuto-4.png" alt=""></div>
@@ -870,6 +871,7 @@ const PENDING_KEY = 'pari:pending-email';
 function pageConfirm() {
   const em = localStorage.getItem(PENDING_KEY) || LG.email || '';
   return `<div class="page onb login conf">
+    <div class="onb-top"><span></span><span></span></div>
     <img class="onb-logo" src="img/logo.png" alt="Divvy">
     <h1 class="onb-h">Controlla la tua email</h1>
     <p class="onb-p">Ti abbiamo inviato un link di conferma a<br><b class="conf-mail">${esc(em)}</b>.</p>
