@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.14.0';
+const APP_VERSION = '1.14.1';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -321,6 +321,7 @@ function render(r, toTop) {
   const pages = { home: pageHome, spese: pageSpese, bilanci: pageBilanci, profilo: pageProfilo, nuova: pageForm, modifica: pageForm, spesa: pageDetail, statistiche: pageStats, attivita: pageActivity, benvenuto: pageWelcome, accedi: pageLogin, registrati: pageRegister, recupero: pageRecovery, legale: pageLegal };
   const fn = pages[r.name] || pageHome;
   const onb = ['benvenuto', 'accedi', 'registrati', 'recupero'].includes(r.name) || (r.name === 'legale' && !auth.user());
+  document.body.classList.toggle('fixed-screen', ['accedi', 'registrati', 'recupero'].includes(r.name));
   tabbar.classList.toggle('hide', onb); view.classList.toggle('no-tabbar', onb);
   const tabName = r.name === 'profilo' ? 'profilo' : r.name === 'statistiche' ? 'bilanci' : r.name;
   $$('.tab').forEach((t) => t.classList.toggle('on', t.dataset.tab === tabName));
@@ -1145,7 +1146,7 @@ document.addEventListener('pointerdown', (e) => { if (openSwipe && !openSwipe.co
 (function pullToRefresh() {
   const app = $('#view'); const el = document.createElement('div'); el.className = 'ptr'; el.innerHTML = `<span class="ptr-ic">${icon('i-undo')}</span><span class="ptr-t">Tira per aggiornare</span>`; document.body.appendChild(el);
   const T = document.querySelector('.ptr-t'), MAX = 110, TRIG = 72; let y0 = 0, pulling = false, dy = 0, busy = false;
-  const canPull = () => window.scrollY <= 0 && !$('#sheet-root').firstChild && !busy;
+  const canPull = () => window.scrollY <= 0 && !$('#sheet-root').firstChild && !busy && !document.body.classList.contains('fixed-screen');
   document.addEventListener('touchstart', (e) => { if (e.touches.length !== 1 || !canPull()) { pulling = false; return; } y0 = e.touches[0].clientY; pulling = true; dy = 0; }, { passive: true });
   document.addEventListener('touchmove', (e) => {
     if (!pulling) return; const d = e.touches[0].clientY - y0;
