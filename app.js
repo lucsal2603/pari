@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.17.1';
+const APP_VERSION = '1.17.2';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -794,7 +794,13 @@ function pageLogin() {
 }
 /* la presentazione si vede una sola volta per account (segnata sia sul telefono sia nei metadati dell'utente) */
 const onboardingDone = () => { const u = auth.user(); if (!u) return true; return !!((u.user_metadata || {}).onboarded) || S.settings.onboardedFor === u.id; };
-function afterLogin() { try { localStorage.removeItem(PENDING_KEY); } catch (_) {} OB = { step: 1, name: '', partner: '', house: '', avatar: 0, split: 'equal', pct: 50 }; go(onboardingDone() ? '#/home' : '#/benvenuto'); if (sync.enabled()) sync.run(); }
+const INTRO_AT_EVERY_LOGIN = true; // richiesta di Lucas (5/9): a ogni accesso ripartono le 4 pagine dalla prima
+function afterLogin() {
+  try { localStorage.removeItem(PENDING_KEY); } catch (_) {}
+  const done = onboardingDone();
+  OB = { step: 1, name: done ? me().name : '', partner: '', house: '', avatar: 0, split: (S.settings.split || {}).mode === 'custom' ? 'custom' : 'equal', pct: ((S.settings.split || {}).pct || {})[me().id] || 50 };
+  go(done && !INTRO_AT_EVERY_LOGIN ? '#/home' : '#/benvenuto'); if (sync.enabled()) sync.run();
+}
 function bindLogin() {
   const form = $('[data-login-form]');
   $('#lg-email').addEventListener('input', (e) => (LG.email = e.target.value.trim()));
