@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.16.0';
+const APP_VERSION = '1.17.0';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -322,7 +322,7 @@ function render(r, toTop) {
   const pages = { home: pageHome, spese: pageSpese, bilanci: pageBilanci, profilo: pageProfilo, nuova: pageForm, modifica: pageForm, spesa: pageDetail, statistiche: pageStats, attivita: pageActivity, benvenuto: pageWelcome, accedi: pageLogin, registrati: pageRegister, recupero: pageRecovery, legale: pageLegal, conferma: pageConfirm };
   const fn = pages[r.name] || pageHome;
   const onb = ['benvenuto', 'accedi', 'registrati', 'recupero', 'conferma'].includes(r.name) || (r.name === 'legale' && !auth.user());
-  document.body.classList.toggle('fixed-screen', ['accedi', 'registrati', 'recupero', 'conferma'].includes(r.name));
+  document.body.classList.toggle('fixed-screen', ['accedi', 'registrati', 'recupero', 'conferma', 'benvenuto'].includes(r.name));
   tabbar.classList.toggle('hide', onb); view.classList.toggle('no-tabbar', onb);
   const tabName = r.name === 'profilo' ? 'profilo' : r.name === 'statistiche' ? 'bilanci' : r.name;
   $$('.tab').forEach((t) => t.classList.toggle('on', t.dataset.tab === tabName));
@@ -893,7 +893,7 @@ let OB = { step: 1, name: '', partner: '', house: '', avatar: 0, split: 'equal',
 const AVATARS = [{ bg: '#2C4A3B', fg: '#F8F4EE' }, { bg: '#F8D9D2', fg: '#D7563C' }, { bg: '#D3E7F5', fg: '#4E8FBF' }, { bg: '#E0DBF3', fg: '#7B68B8' }, { bg: '#D3E6D8', fg: '#4C8A66' }, { bg: '#F7E7C3', fg: '#C99A2E' }];
 const arrowIc = '<svg class="ic"><path d="M5 12h14M13 5l7 7-7 7"/></svg>';
 function pageWelcome() {
-  const st = OB.step; const dots = `<div class="onb-dots">${[1, 2, 3, 4].map((i) => `<i class="${i === st ? 'on' : ''}"></i>`).join('')}</div>`;
+  const st = OB.step; const dots = `<div class="onb-dots" style="view-transition-name:onb-dots">${[1, 2, 3, 4].map((i) => `<i class="${i === st ? 'on' : ''}"></i>`).join('')}</div>`;
   const top = `<div class="onb-top">${st > 1 ? `<button type="button" class="icon-btn onb-back" data-ob-back aria-label="Indietro">${icon('i-back')}</button>` : '<span></span>'}<button type="button" class="onb-skip" data-ob-skip>Salta</button></div>`;
   let body = '';
   if (st === 1) body = `<img class="onb-logo" src="img/logo.png" alt="Divvy">
@@ -925,7 +925,12 @@ function pageWelcome() {
       <div class="onb-kv">${icon('i-balance')}<span>Divisione predefinita</span><b>${pm}% / ${100 - pm}%</b></div>
       <div class="onb-kv">${icon('i-coins')}<span>Valuta</span><b>Euro (€)</b></div></div>
     <div class="onb-form"><button type="button" class="btn onb-btn" data-ob-finish>Inizia con Divvy ${arrowIc}</button></div>`; }
-  return `<div class="page onb">${top}${body}${dots}</div>`;
+  return `<div class="page onb steps" style="view-transition-name:onb-stage">${top}${body}${dots}</div>`;
+}
+function obGo(step, dir) {
+  OB.step = step; const doRender = () => render();
+  if (document.startViewTransition) { document.documentElement.dataset.obDir = dir || 'next'; const t = document.startViewTransition(doRender); t.finished.catch(() => {}).finally(() => { delete document.documentElement.dataset.obDir; }); if (t.ready) t.ready.catch(() => {}); }
+  else doRender();
 }
 function obFinish() {
   S.settings.onboarded = true; const u = auth.user(); if (u) { S.settings.onboardedFor = u.id; auth.updateMeta({ onboarded: true }); } save(); const nm = me().name; OB = { step: 1, name: '', partner: '', house: '', avatar: 0, split: 'equal', pct: 50 }; go('#/home');
@@ -939,17 +944,17 @@ function bindWelcome() {
     if (OB.step === 1) { const n = ($('#ob-name').value || '').trim(); if (!n) { $('#ob-name').focus(); return; } OB.name = n;
       const found = S.members.find((m) => m.name.trim().toLowerCase() === n.toLowerCase());
       if (found) S.settings.me = found.id; else { S.members[0].name = n; S.settings.me = 'm1'; S.settings.membersUpdatedAt = nowISO(); }
-      OB.partner = OB.partner || other().name; OB.step = 2; save(); render(); return; }
+      OB.partner = OB.partner || other().name; save(); obGo(2); return; }
     if (OB.step === 2) { const n = ($('#ob-partner').value || '').trim(); if (!n) { $('#ob-partner').focus(); return; } OB.partner = n;
       const o = other(); if (o.name !== n) { o.name = n; S.settings.membersUpdatedAt = nowISO(); }
       o.avatar = AVATARS[OB.avatar] || AVATARS[0];
-      OB.step = 3; save(); render(); return; }
-    if (OB.step === 3) { const a = me(), b = other(); S.settings.split = OB.split === 'custom' ? { mode: 'custom', pct: { [a.id]: OB.pct, [b.id]: 100 - OB.pct } } : { mode: 'equal' }; save(); OB.step = 4; render(); return; }
+      save(); obGo(3); return; }
+    if (OB.step === 3) { const a = me(), b = other(); S.settings.split = OB.split === 'custom' ? { mode: 'custom', pct: { [a.id]: OB.pct, [b.id]: 100 - OB.pct } } : { mode: 'equal' }; save(); obGo(4); return; }
   });
   $$('[data-ob-split]').forEach((b) => b.addEventListener('click', () => { OB.split = b.dataset.obSplit; $$('.onb-opt').forEach((x) => x.classList.toggle('on', x === b)); $('#onb-pct').hidden = OB.split !== 'custom'; }));
   const rng = $('#pct-range'); if (rng) rng.addEventListener('input', () => { OB.pct = +rng.value; $('#pct-me').textContent = OB.pct + '%'; $('#pct-other').textContent = (100 - OB.pct) + '%'; });
-  $$('[data-ob-edit]').forEach((b) => b.addEventListener('click', () => { OB.step = 1; render(); }));
-  $$('[data-ob-back]').forEach((b) => b.addEventListener('click', () => { OB.step = Math.max(1, OB.step - 1); render(); }));
+  $$('[data-ob-edit]').forEach((b) => b.addEventListener('click', () => obGo(1, 'back')));
+  $$('[data-ob-back]').forEach((b) => b.addEventListener('click', () => obGo(Math.max(1, OB.step - 1), 'back')));
   $$('[data-ob-av]').forEach((b) => b.addEventListener('click', () => { OB.avatar = +b.dataset.obAv; $$('.onb-av').forEach((x) => x.classList.toggle('on', x === b)); }));
   $$('[data-ob-finish]').forEach((b) => b.addEventListener('click', obFinish));
   $$('[data-ob-push]').forEach((b) => b.addEventListener('click', async () => { b.disabled = true; await enablePush(); obFinish(); }));

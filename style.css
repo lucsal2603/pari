@@ -510,6 +510,53 @@ code.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-si
 .onb-kv .ic { width: 24px; height: 24px; color: var(--green); }
 .onb-kv span { color: var(--muted); font-weight: 500; }
 .onb-kv b { font-weight: 700; }
+/* presentazione in 4 passi: schermo fisso, illustrazioni della stessa altezza, transizione animata */
+.page.onb.steps { animation: none; min-height: 0; height: auto; flex: 1 1 auto; justify-content: flex-start; }
+.steps .onb-top { min-height: 36px; margin-bottom: -6px; view-transition-name: onb-top; }
+.steps .onb-logo { width: clamp(110px, 18vh, 180px); margin: clamp(2px, 1vh, 14px) 0 clamp(6px, 1.4vh, 16px); view-transition-name: onb-logo; }
+.steps .onb-h { font-size: clamp(22px, 3.3vh, 30px); }
+.steps .onb-h2 { font-size: clamp(22px, 3.3vh, 30px); }
+.steps .onb-p { font-size: clamp(13px, 1.75vh, 16px); line-height: 1.3; margin-top: clamp(4px, .8vh, 10px); }
+.steps .onb-art { flex: none; height: clamp(130px, 23vh, 220px); min-height: 0; margin: clamp(6px, 1.2vh, 14px) 0; view-transition-name: onb-art; }
+.steps .onb-art > img { height: 100%; width: auto; max-width: 100%; max-height: 100%; object-fit: contain; }
+.steps .onb-form { margin-top: auto; }
+.steps .onb-lbl { font-size: clamp(13px, 1.7vh, 14.5px); margin-bottom: clamp(4px, .8vh, 8px); }
+.steps .onb-field { height: clamp(44px, 6vh, 56px); border-radius: 16px; }
+.steps .onb-field input { font-size: clamp(15px, 1.9vh, 17px); }
+.steps .onb-field + .onb-lbl { margin-top: clamp(8px, 1.4vh, 16px); }
+.steps .onb-avatars { margin-bottom: 2px; }
+.steps .onb-av { width: clamp(40px, 5.6vh, 50px); height: clamp(40px, 5.6vh, 50px); }
+.steps .onb-opt { padding: clamp(10px, 1.6vh, 16px) 16px; margin-bottom: clamp(6px, 1vh, 10px); }
+.steps .onb-opt .txt b { font-size: clamp(15px, 2vh, 17px); }
+.steps .onb-opt .txt small { font-size: clamp(12px, 1.6vh, 14px); }
+.steps .onb-pct { padding: 8px 14px 4px; margin-bottom: 8px; font-size: 13.5px; }
+.steps .onb-pct input[type=range] { margin: 8px 0 4px; }
+.steps .onb-btn { height: clamp(46px, 6.2vh, 58px); margin-top: clamp(6px, 1.2vh, 14px); font-size: clamp(15px, 1.9vh, 17px); }
+.steps .onb-summary { padding: clamp(10px, 1.6vh, 16px) 18px; margin-bottom: 0; margin-top: auto; }
+.steps .onb-sum-t { font-size: clamp(16px, 2.1vh, 18px); }
+.steps .onb-people { padding: clamp(8px, 1.3vh, 14px) 0; }
+.steps .onb-people img.avatar { width: clamp(34px, 4.8vh, 44px); height: clamp(34px, 4.8vh, 44px); }
+.steps .onb-kv { padding: clamp(7px, 1.2vh, 12px) 0; font-size: clamp(13.5px, 1.8vh, 15px); }
+.steps .onb-dots { margin: clamp(10px, 1.8vh, 24px) 0 4px; }
+/* passaggio fra i passi */
+::view-transition-group(onb-stage) { animation-duration: .38s; }
+::view-transition-old(onb-stage) { animation: obOut .3s cubic-bezier(.4, 0, 1, 1) both; }
+::view-transition-new(onb-stage) { animation: obIn .42s cubic-bezier(.23, 1, .32, 1) both; }
+html[data-ob-dir="back"] ::view-transition-old(onb-stage) { animation-name: obOutBack; }
+html[data-ob-dir="back"] ::view-transition-new(onb-stage) { animation-name: obInBack; }
+@keyframes obOut { to { opacity: 0; transform: translateX(-48px); } }
+@keyframes obIn { from { opacity: 0; transform: translateX(72px); } }
+@keyframes obOutBack { to { opacity: 0; transform: translateX(48px); } }
+@keyframes obInBack { from { opacity: 0; transform: translateX(-72px); } }
+::view-transition-old(onb-art) { animation: artOut .28s ease both; }
+::view-transition-new(onb-art) { animation: artIn .55s cubic-bezier(.23, 1, .32, 1) both; }
+@keyframes artOut { to { opacity: 0; transform: scale(.92); } }
+@keyframes artIn { from { opacity: 0; transform: scale(.86) translateY(10px); } 60% { transform: scale(1.03) translateY(-2px); } }
+::view-transition-old(onb-logo), ::view-transition-new(onb-logo), ::view-transition-old(onb-top), ::view-transition-new(onb-top) { animation: none; }
+::view-transition-group(onb-dots) { animation-duration: .3s; }
+@media (prefers-reduced-motion: reduce) { ::view-transition-old(onb-stage), ::view-transition-new(onb-stage), ::view-transition-old(onb-art), ::view-transition-new(onb-art) { animation: crossfadeOnly .2s ease both; } }
+@keyframes crossfadeOnly { from { opacity: 0; } }
+
 /* accesso */
 .login .onb-logo { margin-top: 40px; }
 .login .onb-art { min-height: 170px; }
