@@ -549,12 +549,18 @@ body.fixed-screen .view { height: 100dvh; overflow: hidden; padding-bottom: calc
 .reg .reg-check .box { width: 21px; height: 21px; }
 .reg .reg-check input:checked + .box::after { left: 7px; top: 2px; width: 5px; height: 11px; }
 .reg { padding-bottom: 0; }
-.reg .onb-logo { width: clamp(110px, 19vh, 190px); margin: 0 0 clamp(6px, 1.4vh, 16px); }
-.reg .onb-h { font-size: clamp(21px, 3.4vh, 31px); }
-.reg .onb-field { height: clamp(42px, 6vh, 58px); margin-bottom: clamp(6px, 1.2vh, 12px); }
-.reg .onb-art { margin: clamp(4px, 1.2vh, 14px) 0; }
-.reg .reg-check { margin: 2px 0 clamp(4px, 1vh, 10px); }
-.reg .onb-btn { margin-top: clamp(4px, 1vh, 10px); }
+/* registrazione: stessi ingombri dell'accesso per il disegno, il resto più compatto */
+.login .onb-art { max-height: 30vh; }
+.reg .onb-logo { width: clamp(100px, 16vh, 150px); margin: 0 0 clamp(4px, 1vh, 10px); }
+.reg .onb-h { font-size: clamp(20px, 3.1vh, 28px); }
+.reg .onb-p { margin-top: 4px; }
+.reg .onb-art { margin: clamp(4px, 1vh, 10px) 0; }
+.reg .onb-field { height: clamp(40px, 5.4vh, 50px); margin-bottom: clamp(5px, 1vh, 8px); }
+.reg .reg-check { margin: 0 0 clamp(3px, .8vh, 6px); font-size: clamp(12px, 1.5vh, 13.5px); }
+.reg .onb-btn { height: clamp(44px, 5.8vh, 52px); margin-top: 4px; }
+.reg .login-or { margin: clamp(5px, 1vh, 10px) 0 clamp(4px, .8vh, 8px); }
+.reg .login-oauth { height: clamp(40px, 5.2vh, 48px); margin-bottom: 4px; }
+.reg .login-foot { margin-top: clamp(4px, .8vh, 8px); }
 .login .login-foot { margin-bottom: 2px; }
 
 /* registrazione */
