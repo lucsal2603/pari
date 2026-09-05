@@ -204,7 +204,7 @@ img.avatar.lg { width: 44px; height: 44px; }
 .swipe.dragging .row { transition: background-color .2s ease; }
 .swipe.open .row { background: var(--card); }
 .swipe-del { position: absolute; top: 6px; right: 0; bottom: 6px; width: 0; border-radius: 12px; background: var(--red); color: #fff; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: flex-start; gap: 8px; padding-left: 0; overflow: hidden; white-space: nowrap; transition: width .3s var(--ease-out), background-color .2s ease; }
-.swipe-del .ic { width: 20px; height: 20px; stroke-width: 2; flex: none; margin-left: 34px; transition: margin .2s ease; }
+.swipe-del .ic { width: 20px; height: 20px; stroke-width: 2; flex: none; margin-left: 30px; transition: margin .2s ease; }
 .swipe-del.wide .ic { margin-left: 40px; }
 .swipe-del span { display: none; }
 .swipe.dragging .swipe-del { transition: none; }

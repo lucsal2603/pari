@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.22.2';
+const APP_VERSION = '1.22.3';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -1320,7 +1320,8 @@ function initSwipes() {
     const row = $('.row', w); if (!row) return; const del = $('.swipe-del', w);
     let down = false, drag = false, moved = false, x0 = 0, y0 = 0, x = 0;
     // la zona rossa copre tutto lo spazio fra il bordo trascinato e il bordo destro fermo
-    const setX = (v) => { row.style.transform = v ? `translateX(${v}px)` : ''; if (del) { del.style.width = Math.max(0, -v) + 'px'; del.classList.toggle('wide', -v > 150); } };
+    const GAP = 8; // spazio fra il bordo della riga trascinata e il rosso
+    const setX = (v) => { row.style.transform = v ? `translateX(${v}px)` : ''; if (del) { del.style.width = Math.max(0, -v - GAP) + 'px'; del.classList.toggle('wide', -v > 150); } };
     row.addEventListener('pointerdown', (e) => { if (e.pointerType === 'mouse' && e.button !== 0) return; down = true; drag = false; x0 = e.clientX; y0 = e.clientY; });
     row.addEventListener('pointermove', (e) => {
       if (!down) return; const ddx = e.clientX - x0, ddy = e.clientY - y0;
