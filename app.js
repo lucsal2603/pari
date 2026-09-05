@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.18.3';
+const APP_VERSION = '1.19.0';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -337,7 +337,7 @@ function render(r, toTop) {
 /* ---------- Componenti condivisi ---------- */
 const ph = (label, cls = '') => `<span class="ph ${cls}">${esc(label)}</span>`;
 const imgKey = (m) => (m.id === 'm1' ? 'luca' : m.id === 'm2' ? 'martina' : '');
-const avatar = (m, lg = false) => imgKey(m) ? `<img class="avatar${lg ? ' lg' : ''}" src="img/${imgKey(m)}-avatar.png" alt="" title="${esc(m.name)}">` : `<span class="avatar-col${lg ? ' lg' : ''}" style="--bg:${(m.avatar || {}).bg || '#2C4A3B'};--fg:${(m.avatar || {}).fg || '#F8F4EE'}" title="${esc(m.name)}">${icon('i-user')}</span>`;
+const avatar = (m, lg = false) => (m.avatar && m.avatar.img) ? `<img class="avatar${lg ? ' lg' : ''}" src="img/${esc(m.avatar.img)}" alt="" title="${esc(m.name)}">` : imgKey(m) ? `<img class="avatar${lg ? ' lg' : ''}" src="img/${imgKey(m)}-avatar.png" alt="" title="${esc(m.name)}">` : `<span class="avatar-col${lg ? ' lg' : ''}" style="--bg:${(m.avatar || {}).bg || '#2C4A3B'};--fg:${(m.avatar || {}).fg || '#F8F4EE'}" title="${esc(m.name)}">${icon('i-user')}</span>`;
 const couple = (cls = '') => `<div class="couple ${cls}" aria-hidden="true"><img src="img/luca.png" alt=""><img src="img/martina.png" alt=""></div>`;
 /* Scena in base al saldo: Luca deve → portafoglio vuoto; Martina deve → lei gli passa la banconota; pari → i due che si guardano */
 const coupleScene = (cls = '') => { const v = balances()[S.members[0].id] || 0; if (Math.abs(v) < 1) return couple(cls); return `<div class="couple scene ${cls}" aria-hidden="true"><img src="img/${v < 0 ? 'luca-deve' : 'martina-deve'}.png" alt=""></div>`; };
@@ -680,7 +680,7 @@ function subHead(title, backTo = '#/profilo') { return `<div class="head"><butto
 function pageAccount() {
   return `<div class="page slide">${subHead('Impostazioni account')}
     <h2 class="sec-title">Chi siamo</h2>
-    <section class="card">${S.members.map((m, i) => `<div class="member-row"><input class="swatch" type="color" value="${m.color}" data-color="${m.id}" style="--c:${m.color}" aria-label="Colore di ${esc(m.name)}"><div class="field" style="margin:0"><input type="text" value="${esc(m.name)}" data-name="${m.id}" aria-label="Nome" placeholder="Nome"></div></div>`).join('')}
+    <section class="card">${S.members.map((m, i) => `<div class="member-row"><input class="swatch" type="color" value="${m.color}" data-color="${m.id}" style="--c:${m.color}" aria-label="Colore di ${esc(m.name)}"><div class="field" style="margin:0"><input type="text" value="${esc(m.name)}" data-name="${m.id}" aria-label="Nome" placeholder="Nome"></div></div><div class="field" style="margin-top:8px"><div class="lbl" style="text-transform:none;letter-spacing:0">Avatar di ${esc(m.name)}</div>${avatarPicker(AVATAR_IMGS.indexOf(((m.avatar || {}).img) || ''), 'data-av-' + m.id)}</div>`).join('')}
     <div class="field"><div class="lbl">Su questo telefono io sono</div>${segHTML(S.members.map((m) => ({ v: m.id, t: m.name })), S.members.findIndex((m) => m.id === S.settings.me), '', 'me')}<div class="hint">Sul telefono di ${esc(other().name)} va scelto l'altro nome: così "Ciao" e i saldi sono dal suo punto di vista.</div></div>
     </section>
     <h2 class="sec-title section">Coppia</h2>
@@ -800,7 +800,7 @@ function afterLogin() {
   try { localStorage.removeItem(PENDING_KEY); } catch (_) {}
   applyPendingJoin();
   const done = onboardingDone();
-  OB = { step: 1, name: done ? me().name : '', partner: '', house: '', avatar: 0, split: (S.settings.split || {}).mode === 'custom' ? 'custom' : 'equal', pct: ((S.settings.split || {}).pct || {})[me().id] || 50 };
+  OB = { step: 1, name: done ? me().name : '', partner: '', house: '', avatar: AVATAR_IMGS.indexOf(((me().avatar || {}).img) || ''), split: (S.settings.split || {}).mode === 'custom' ? 'custom' : 'equal', pct: ((S.settings.split || {}).pct || {})[me().id] || 50 };
   go(done && !INTRO_AT_EVERY_LOGIN ? '#/home' : '#/benvenuto'); if (sync.enabled()) sync.run();
 }
 function bindLogin() {
@@ -897,7 +897,7 @@ function bindRecovery() {
 }
 
 /* ---------- Presentazione per chi apre l'app la prima volta ---------- */
-let OB = { step: 1, name: '', partner: '', house: '', avatar: 0, split: 'equal', pct: 50 };
+let OB = { step: 1, name: '', partner: '', house: '', avatar: -1, split: 'equal', pct: 50 };
 const JOIN_KEY = 'pari:join';
 const newHouseCode = () => { const A = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let c = ''; const r = crypto.getRandomValues(new Uint8Array(6)); for (let i = 0; i < 6; i++) c += A[r[i] % A.length]; return c; };
 function ensureHouse() { if (!S.settings.sync.house) { S.settings.sync.house = newHouseCode(); save(); if (sync.enabled()) sync.run(true); } return S.settings.sync.house; }
@@ -910,6 +910,8 @@ function applyJoin(code) {
   S.settings.sync.house = code; S.settings.joinedVia = code; save(); if (sync.enabled()) sync.run(true); return true;
 }
 function applyPendingJoin() { let code = ''; try { code = localStorage.getItem(JOIN_KEY) || ''; localStorage.removeItem(JOIN_KEY); } catch (_) {} if (code && applyJoin(code)) toast('Sei nel gruppo: le spese si sincronizzano'); }
+const AVATAR_IMGS = ['avatar-1.png', 'avatar-2.png', 'avatar-3.png', 'avatar-4.png', 'avatar-5.png'];
+const avatarPicker = (sel, attr) => `<div class="onb-avatars">${AVATAR_IMGS.map((f, i) => `<button type="button" class="onb-av img${sel === i ? ' on' : ''}" ${attr}="${i}" aria-label="Avatar ${i + 1}"><img src="img/${f}" alt=""></button>`).join('')}</div>`;
 const AVATARS = [{ bg: '#2C4A3B', fg: '#F8F4EE' }, { bg: '#F8D9D2', fg: '#D7563C' }, { bg: '#D3E7F5', fg: '#4E8FBF' }, { bg: '#E0DBF3', fg: '#7B68B8' }, { bg: '#D3E6D8', fg: '#4C8A66' }, { bg: '#F7E7C3', fg: '#C99A2E' }];
 const arrowIc = '<svg class="ic"><path d="M5 12h14M13 5l7 7-7 7"/></svg>';
 function pageWelcome() {
@@ -920,6 +922,7 @@ function pageWelcome() {
     <h1 class="onb-h">Ciao!<br>Come possiamo chiamarti?</h1><p class="onb-p">È il primo passo per iniziare a condividere le spese insieme.</p>
     <div class="onb-art"><img src="img/benvenuto.png" alt=""></div>
     <form class="onb-form" data-ob-form><label class="onb-field">${icon('i-user')}<input id="ob-name" type="text" placeholder="Il tuo nome" value="${esc(OB.name)}" autocomplete="given-name" autocapitalize="words" enterkeyhint="next"></label>
+    <div class="onb-lbl">Scegli un avatar <small>(opzionale)</small></div>${avatarPicker(OB.avatar, 'data-ob-av')}
     <button class="btn onb-btn" type="submit">Continua ${arrowIc}</button></form>`;
   else if (st === 2) { const link = inviteLink(); const shown = link.replace(/^https?:\/\//, '');
     body = `<img class="onb-logo" src="img/logo.png" alt="Divvy">
@@ -964,7 +967,7 @@ function obGo(step, dir) {
   else doRender();
 }
 function obFinish() {
-  S.settings.onboarded = true; const u = auth.user(); if (u) { S.settings.onboardedFor = u.id; auth.updateMeta({ onboarded: true }); } save(); const nm = me().name; OB = { step: 1, name: '', partner: '', house: '', avatar: 0, split: 'equal', pct: 50 }; go('#/home');
+  S.settings.onboarded = true; const u = auth.user(); if (u) { S.settings.onboardedFor = u.id; auth.updateMeta({ onboarded: true }); } save(); const nm = me().name; OB = { step: 1, name: '', partner: '', house: '', avatar: -1, split: 'equal', pct: 50 }; go('#/home');
   if (!sync.enabled()) toast(`Per condividere con ${other().name}: Profilo → Backup e sincronizzazione`); else if (!S.settings.push) toast('Attiva gli avvisi da Profilo → Notifiche'); else toast(`Divvy è pronta, ${nm}`);
 }
 function bindWelcome() {
@@ -975,6 +978,7 @@ function bindWelcome() {
     if (OB.step === 1) { const n = ($('#ob-name').value || '').trim(); if (!n) { $('#ob-name').focus(); return; } OB.name = n;
       const found = S.members.find((m) => m.name.trim().toLowerCase() === n.toLowerCase());
       if (found) S.settings.me = found.id; else { const slot = S.settings.joinedVia ? S.members[1] : S.members[0]; slot.name = n; S.settings.me = slot.id; S.settings.membersUpdatedAt = nowISO(); }
+      if (OB.avatar >= 0 && AVATAR_IMGS[OB.avatar]) { me().avatar = { img: AVATAR_IMGS[OB.avatar] }; S.settings.membersUpdatedAt = nowISO(); }
       OB.partner = OB.partner || other().name; save(); obGo(2); return; }
     if (OB.step === 2) { obGo(3); return; }
     if (OB.step === 3) { const a = me(), b = other(); S.settings.split = OB.split === 'custom' ? { mode: 'custom', pct: { [a.id]: OB.pct, [b.id]: 100 - OB.pct } } : { mode: 'equal' }; save(); obGo(4); return; }
@@ -982,6 +986,7 @@ function bindWelcome() {
   $$('[data-ob-split]').forEach((b) => b.addEventListener('click', () => { OB.split = b.dataset.obSplit; $$('.onb-opt').forEach((x) => x.classList.toggle('on', x === b)); $('#onb-pct').hidden = OB.split !== 'custom'; }));
   const rng = $('#pct-range'); if (rng) rng.addEventListener('input', () => { OB.pct = +rng.value; $('#pct-me').textContent = OB.pct + '%'; $('#pct-other').textContent = (100 - OB.pct) + '%'; });
   $$('[data-ob-edit]').forEach((b) => b.addEventListener('click', () => obGo(1, 'back')));
+  $$('[data-ob-av]').forEach((b) => b.addEventListener('click', () => { const i = +b.dataset.obAv; OB.avatar = OB.avatar === i ? -1 : i; $$('.onb-av').forEach((x) => x.classList.toggle('on', x === b && OB.avatar === i)); }));
   $$('[data-ob-back]').forEach((b) => b.addEventListener('click', () => obGo(Math.max(1, OB.step - 1), 'back')));
   const cp = $('[data-copy-link]'); if (cp) { let t; cp.addEventListener('click', async () => {
     try { await navigator.clipboard.writeText(inviteLink()); } catch (_) { toast('Non riesco a copiare: tieni premuto sul link'); return; }
@@ -1081,6 +1086,7 @@ function bindProfilo(r) {
       save(); sync.schedule(); toast('Impostazioni salvate'); go('#/profilo');
     });
     $$('[data-color]').forEach((i) => i.addEventListener('input', () => i.style.setProperty('--c', i.value)));
+    S.members.forEach((m) => $$(`[data-av-${m.id}]`).forEach((b) => b.addEventListener('click', () => { const i = +b.getAttribute('data-av-' + m.id); const cur = AVATAR_IMGS.indexOf(((m.avatar || {}).img) || ''); m.avatar = cur === i ? null : { img: AVATAR_IMGS[i] }; S.settings.membersUpdatedAt = nowISO(); save(); sync.schedule(); $$(`[data-av-${m.id}]`).forEach((x) => x.classList.toggle('on', x === b && cur !== i)); })));
     bindSeg($('[data-seg="me"]'), (v) => { S.settings.me = v; save(); });
   }
   if (r.sub === 'sezioni') {
@@ -1108,7 +1114,7 @@ function bindProfilo(r) {
     const test = $('#push-test'); if (test) test.addEventListener('click', async () => { const t = notifText({ kind: 'expense', desc: 'Spesa', amount: 1000 }, other().name, balances()[me().id] || 0); const ok = await showLocalNotification(t.title, t.body); toast(ok ? 'Inviata: guarda in alto' : 'Non riesco a mostrarla'); });
     const off = $('#push-off'); if (off) off.addEventListener('click', async () => { await disablePush(); render(); toast('Notifiche disattivate'); });
   }
-  if (r.sub === 'info') { $('#replay-onb').addEventListener('click', () => { OB = { step: 1, name: '', partner: '', house: '', avatar: 0, split: (S.settings.split || {}).mode === 'custom' ? 'custom' : 'equal', pct: ((S.settings.split || {}).pct || {})[me().id] || 50 }; go('#/benvenuto'); }); }
+  if (r.sub === 'info') { $('#replay-onb').addEventListener('click', () => { OB = { step: 1, name: '', partner: '', house: '', avatar: AVATAR_IMGS.indexOf(((me().avatar || {}).img) || ''), split: (S.settings.split || {}).mode === 'custom' ? 'custom' : 'equal', pct: ((S.settings.split || {}).pct || {})[me().id] || 50 }; go('#/benvenuto'); }); }
   if (r.sub === 'info') $('#reload-app').addEventListener('click', () => { navigator.serviceWorker?.getRegistration().then((reg) => reg && reg.update()); location.reload(); });
 }
 
