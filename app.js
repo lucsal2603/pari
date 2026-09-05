@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.17.2';
+const APP_VERSION = '1.18.0';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -301,8 +301,9 @@ function route() {
   const hash = location.hash || '#/home';
   const [path, qs] = hash.slice(2).split('?');
   const parts = path.split('/'); const q = Object.fromEntries(new URLSearchParams(qs || ''));
-  const r = { name: parts[0] || 'home', id: parts[1] || '', sub: parts[1] || '', q };
+  let r = { name: parts[0] || 'home', id: parts[1] || '', sub: parts[1] || '', q };
   if (r.name === 'spese' && q.sezione !== undefined) { speseFilter.group = q.sezione; speseFilter.q = ''; speseFilter.cat = ''; }
+  if (r.name === 'join') { const code = decodeURIComponent(r.id || ''); if (auth.user()) { if (applyJoin(code)) toast('Sei nel gruppo: le spese si sincronizzano'); history.replaceState(null, '', onboardingDone() ? '#/home' : '#/benvenuto'); r = { name: onboardingDone() ? 'home' : 'benvenuto', id: '', sub: '', q: {} }; } else { try { localStorage.setItem(JOIN_KEY, code); } catch (_) {} history.replaceState(null, '', '#/accedi'); r = { name: 'accedi', id: '', sub: '', q: {} }; } }
   // arrivati da un link (non dalla barra in basso) e da un'altra area: mostro il tasto indietro
   const fromLink = !viaTab && prevHash && prevHash !== curHash && !/^#\/(nuova|modifica)/.test(prevHash);
   r.back = fromLink && tabOf(prevHash) !== tabOf(curHash) ? prevHash : null; viaTab = false;
@@ -797,6 +798,7 @@ const onboardingDone = () => { const u = auth.user(); if (!u) return true; retur
 const INTRO_AT_EVERY_LOGIN = true; // richiesta di Lucas (5/9): a ogni accesso ripartono le 4 pagine dalla prima
 function afterLogin() {
   try { localStorage.removeItem(PENDING_KEY); } catch (_) {}
+  applyPendingJoin();
   const done = onboardingDone();
   OB = { step: 1, name: done ? me().name : '', partner: '', house: '', avatar: 0, split: (S.settings.split || {}).mode === 'custom' ? 'custom' : 'equal', pct: ((S.settings.split || {}).pct || {})[me().id] || 50 };
   go(done && !INTRO_AT_EVERY_LOGIN ? '#/home' : '#/benvenuto'); if (sync.enabled()) sync.run();
@@ -896,6 +898,18 @@ function bindRecovery() {
 
 /* ---------- Presentazione per chi apre l'app la prima volta ---------- */
 let OB = { step: 1, name: '', partner: '', house: '', avatar: 0, split: 'equal', pct: 50 };
+const JOIN_KEY = 'pari:join';
+const newHouseCode = () => { const A = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let c = ''; const r = crypto.getRandomValues(new Uint8Array(6)); for (let i = 0; i < 6; i++) c += A[r[i] % A.length]; return c; };
+function ensureHouse() { if (!S.settings.sync.house) { S.settings.sync.house = newHouseCode(); save(); if (sync.enabled()) sync.run(true); } return S.settings.sync.house; }
+const inviteLink = () => appUrl() + '#/join/' + encodeURIComponent(ensureHouse());
+const inviteText = () => `Unisciti al mio gruppo su Divvy per dividere le spese: ${inviteLink()}`;
+/* chi apre un link di invito: il codice del gruppo viene salvato e applicato dopo l'accesso */
+function applyJoin(code) {
+  if (!code) return false; const cur = S.settings.sync.house;
+  if (cur && cur !== code && active().length) { toast('Sei già in un gruppo: cambialo da Profilo → Backup e sincronizzazione'); return false; }
+  S.settings.sync.house = code; S.settings.joinedVia = code; save(); if (sync.enabled()) sync.run(true); return true;
+}
+function applyPendingJoin() { let code = ''; try { code = localStorage.getItem(JOIN_KEY) || ''; localStorage.removeItem(JOIN_KEY); } catch (_) {} if (code && applyJoin(code)) toast('Sei nel gruppo: le spese si sincronizzano'); }
 const AVATARS = [{ bg: '#2C4A3B', fg: '#F8F4EE' }, { bg: '#F8D9D2', fg: '#D7563C' }, { bg: '#D3E7F5', fg: '#4E8FBF' }, { bg: '#E0DBF3', fg: '#7B68B8' }, { bg: '#D3E6D8', fg: '#4C8A66' }, { bg: '#F7E7C3', fg: '#C99A2E' }];
 const arrowIc = '<svg class="ic"><path d="M5 12h14M13 5l7 7-7 7"/></svg>';
 function pageWelcome() {
@@ -907,12 +921,23 @@ function pageWelcome() {
     <div class="onb-art"><img src="img/benvenuto.png" alt=""></div>
     <form class="onb-form" data-ob-form><label class="onb-field">${icon('i-user')}<input id="ob-name" type="text" placeholder="Il tuo nome" value="${esc(OB.name)}" autocomplete="given-name" autocapitalize="words" enterkeyhint="next"></label>
     <button class="btn onb-btn" type="submit">Continua ${arrowIc}</button></form>`;
-  else if (st === 2) body = `<img class="onb-logo" src="img/logo.png" alt="Divvy">
-    <h1 class="onb-h">Perfetto, ${esc(OB.name || me().name)}! <span aria-hidden="true">👋</span><br><span class="onb-h2">Con chi condividi<br>le spese?</span></h1><p class="onb-p">Aggiungi la persona con cui inizierai a condividere le spese. Potrai aggiungerne altre in seguito.</p>
-    <div class="onb-art"><img src="img/benvenuto-2.png" alt=""></div>
-    <form class="onb-form" data-ob-form><div class="onb-lbl">Nome della persona</div><label class="onb-field">${icon('i-user')}<input id="ob-partner" type="text" placeholder="Es. Martina" value="${esc(OB.partner)}" autocapitalize="words" enterkeyhint="next"></label>
-    <div class="onb-lbl">Scegli un avatar <small>(opzionale)</small></div><div class="onb-avatars">${AVATARS.map((a, i) => `<button type="button" class="onb-av${OB.avatar === i ? ' on' : ''}" data-ob-av="${i}" style="--bg:${a.bg};--fg:${a.fg}" aria-label="Avatar ${i + 1}">${icon('i-user')}</button>`).join('')}</div>
-    <button class="btn onb-btn" type="submit">Continua ${arrowIc}</button></form>`;
+  else if (st === 2) { const link = inviteLink(); const shown = link.replace(/^https?:\/\//, '');
+    body = `<img class="onb-logo" src="img/logo.png" alt="Divvy">
+    <h1 class="onb-h">Condividi il link<br>del tuo gruppo</h1><p class="onb-p">Invita le persone con cui vuoi dividere le spese. Basta che clicchino sul link per unirsi al gruppo!</p>
+    <div class="onb-art"><img src="img/invito.png" alt=""></div>
+    <div class="inv-card">
+      <div class="inv-head"><span class="inv-ic">${icon('i-link')}</span><div><b>Il tuo link di invito</b><span>Condividi questo link con chi vuoi far unire al gruppo. Quando lo aprirà verrà aggiunto automaticamente.</span></div></div>
+      <div class="inv-link"><span class="inv-url">${esc(shown)}</span><button type="button" class="inv-copy" data-copy-link>Copia ${icon('i-copy')}</button></div>
+      <div class="inv-share">
+        <button type="button" data-share="whatsapp"><span class="inv-circle wa">${icon('i-whatsapp')}</span>WhatsApp</button>
+        <button type="button" data-share="telegram"><span class="inv-circle tg">${icon('i-telegram')}</span>Telegram</button>
+        <button type="button" data-share="share"><span class="inv-circle">${icon('i-share')}</span>Condividi</button>
+        <button type="button" data-share="more"><span class="inv-circle">${icon('i-more')}</span>Altro</button>
+      </div>
+    </div>
+    <div class="onb-info"><span class="inv-ic">${icon('i-users')}</span><div><b>Unirsi è semplice</b><span>Chiunque abbia il link potrà unirsi al gruppo in un solo clic, senza bisogno di un account.</span></div></div>
+    <div class="onb-info"><span class="inv-ic">${icon('i-shield')}</span><div><b>Link sicuro</b><span>Puoi sempre disattivare il link o generarne uno nuovo dalle impostazioni del gruppo.</span></div></div>
+    <form class="onb-form" data-ob-form><button class="btn onb-btn" type="submit">Continua ${arrowIc}</button></form>`; }
   else if (st === 3) { const pm = OB.pct, po = 100 - OB.pct;
     body = `<img class="onb-logo" src="img/logo.png" alt="Divvy">
     <h1 class="onb-h onb-dark">Come vuoi<br>dividere le spese?</h1><p class="onb-p">Imposta una modalità predefinita. Potrai cambiarla per ogni singola spesa.</p>
@@ -949,19 +974,23 @@ function bindWelcome() {
     e.preventDefault();
     if (OB.step === 1) { const n = ($('#ob-name').value || '').trim(); if (!n) { $('#ob-name').focus(); return; } OB.name = n;
       const found = S.members.find((m) => m.name.trim().toLowerCase() === n.toLowerCase());
-      if (found) S.settings.me = found.id; else { S.members[0].name = n; S.settings.me = 'm1'; S.settings.membersUpdatedAt = nowISO(); }
+      if (found) S.settings.me = found.id; else { const slot = S.settings.joinedVia ? S.members[1] : S.members[0]; slot.name = n; S.settings.me = slot.id; S.settings.membersUpdatedAt = nowISO(); }
       OB.partner = OB.partner || other().name; save(); obGo(2); return; }
-    if (OB.step === 2) { const n = ($('#ob-partner').value || '').trim(); if (!n) { $('#ob-partner').focus(); return; } OB.partner = n;
-      const o = other(); if (o.name !== n) { o.name = n; S.settings.membersUpdatedAt = nowISO(); }
-      o.avatar = AVATARS[OB.avatar] || AVATARS[0];
-      save(); obGo(3); return; }
+    if (OB.step === 2) { obGo(3); return; }
     if (OB.step === 3) { const a = me(), b = other(); S.settings.split = OB.split === 'custom' ? { mode: 'custom', pct: { [a.id]: OB.pct, [b.id]: 100 - OB.pct } } : { mode: 'equal' }; save(); obGo(4); return; }
   });
   $$('[data-ob-split]').forEach((b) => b.addEventListener('click', () => { OB.split = b.dataset.obSplit; $$('.onb-opt').forEach((x) => x.classList.toggle('on', x === b)); $('#onb-pct').hidden = OB.split !== 'custom'; }));
   const rng = $('#pct-range'); if (rng) rng.addEventListener('input', () => { OB.pct = +rng.value; $('#pct-me').textContent = OB.pct + '%'; $('#pct-other').textContent = (100 - OB.pct) + '%'; });
   $$('[data-ob-edit]').forEach((b) => b.addEventListener('click', () => obGo(1, 'back')));
   $$('[data-ob-back]').forEach((b) => b.addEventListener('click', () => obGo(Math.max(1, OB.step - 1), 'back')));
-  $$('[data-ob-av]').forEach((b) => b.addEventListener('click', () => { OB.avatar = +b.dataset.obAv; $$('.onb-av').forEach((x) => x.classList.toggle('on', x === b)); }));
+  const cp = $('[data-copy-link]'); if (cp) cp.addEventListener('click', async () => { try { await navigator.clipboard.writeText(inviteLink()); toast('Link copiato'); } catch (_) { toast('Non riesco a copiare: tieni premuto sul link'); } });
+  $$('[data-share]').forEach((b) => b.addEventListener('click', async () => {
+    const k = b.dataset.share, link = inviteLink(), text = inviteText();
+    if (k === 'whatsapp') window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
+    else if (k === 'telegram') window.open('https://t.me/share/url?url=' + encodeURIComponent(link) + '&text=' + encodeURIComponent('Unisciti al mio gruppo su Divvy per dividere le spese'), '_blank');
+    else if (navigator.share) { try { await navigator.share({ title: 'Divvy', text: 'Unisciti al mio gruppo su Divvy per dividere le spese', url: link }); } catch (_) {} }
+    else { try { await navigator.clipboard.writeText(link); toast('Link copiato'); } catch (_) {} }
+  }));
   $$('[data-ob-finish]').forEach((b) => b.addEventListener('click', obFinish));
   $$('[data-ob-push]').forEach((b) => b.addEventListener('click', async () => { b.disabled = true; await enablePush(); obFinish(); }));
   const first = $('.onb-field input'); if (first && !first.value) setTimeout(() => first.focus({ preventScroll: true }), 400);
@@ -1240,9 +1269,9 @@ materializeRecurring();
 (async () => {
   await auth.handleRedirect();
   if (auth.recovery) history.replaceState(null, '', '#/recupero');
-  else if (!auth.user()) { if (!/^#\/(accedi|registrati|legale|conferma)/.test(location.hash)) history.replaceState(null, '', '#/accedi'); }
+  else if (!auth.user()) { if (!/^#\/(accedi|registrati|legale|conferma|join)/.test(location.hash)) history.replaceState(null, '', '#/accedi'); }
   else if (!onboardingDone()) history.replaceState(null, '', '#/benvenuto');
-  if (auth.user()) showDailyLove();
+  if (auth.user()) { applyPendingJoin(); showDailyLove(); }
   route();
   auth.refreshIfNeeded().then(() => { if (!auth.user() && currentRoute && currentRoute.name !== 'accedi') render(); });
 })();

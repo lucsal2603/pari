@@ -1,11 +1,11 @@
 /* Divvy — service worker.
    Shell (html/js/css): prima la rete, cache solo se offline → gli aggiornamenti si vedono subito.
    Immagini, icone, font: prima la cache. Supabase: mai toccato. */
-const VERSION = 'pari-v1.17.2';
+const VERSION = 'pari-v1.18.0';
 const SHELL = [
   './', './index.html', './style.css', './app.js', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png', './icons/favicon.png',
-  './img/luca.png', './img/martina.png', './img/luca-avatar.png', './img/martina-avatar.png', './img/coppia.png', './img/nessuna-spesa.png', './img/luca-deve.png', './img/martina-deve.png', './img/logo.png', './img/benvenuto.png', './img/benvenuto-2.png', './img/benvenuto-3.png', './img/benvenuto-4.png', './img/registrati.png', './img/conferma.png'
+  './img/luca.png', './img/martina.png', './img/luca-avatar.png', './img/martina-avatar.png', './img/coppia.png', './img/nessuna-spesa.png', './img/luca-deve.png', './img/martina-deve.png', './img/logo.png', './img/benvenuto.png', './img/benvenuto-2.png', './img/benvenuto-3.png', './img/benvenuto-4.png', './img/registrati.png', './img/conferma.png', './img/invito.png'
 ];
 
 self.addEventListener('install', (e) => {
