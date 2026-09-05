@@ -47,6 +47,16 @@ Con la sincronizzazione attiva, l'app avvisa già da sola quando è **aperta** e
 
 Il testo dell'avviso è ad esempio: **Martina ha aggiunto una spesa** — *Spesa: 10,00 € · Devi ancora: 457,21 €* (oppure *Martina ti deve ancora: …*).
 
+## App nativa iOS (Capacitor)
+
+In `native/` c'è l'involucro nativo: la stessa web app dentro un'app iOS vera, pronta per Xcode.
+
+1. Installa **Xcode** dall'App Store (gratuito) e aprilo una volta per completare l'installazione dei componenti iOS.
+2. Dalla cartella `native/`: `npm install`, poi `npm run sync` (copia i file della web app in `www/` e aggiorna il progetto iOS) e `npm run open` (apre Xcode).
+3. In Xcode scegli un simulatore o il tuo iPhone e premi **Run**. Per il telefono serve accedere con il tuo Apple ID in Xcode → Settings → Accounts (con un account gratuito l'app resta valida 7 giorni; con l'Apple Developer Program, TestFlight e App Store).
+
+Dopo ogni modifica alla web app: `npm run sync` e di nuovo Run. Nell'app nativa le notifiche web di Safari non esistono: si passa alle notifiche Apple (APNs) con il plugin push di Capacitor, quando ci sarà l'account Developer.
+
 ## Sviluppo
 
 È HTML, CSS e JavaScript puro, senza build:

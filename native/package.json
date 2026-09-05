@@ -1,0 +1,16 @@
+{
+  "name": "divvy-native",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Divvy — involucro nativo iOS (Capacitor) della web app in ../",
+  "scripts": {
+    "www": "bash build-www.sh",
+    "sync": "npm run www && npx cap sync ios",
+    "open": "npx cap open ios"
+  },
+  "dependencies": {
+    "@capacitor/cli": "^8.5.1",
+    "@capacitor/core": "^8.5.1",
+    "@capacitor/ios": "^8.5.1"
+  }
+}

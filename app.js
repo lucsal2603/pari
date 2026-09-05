@@ -12,7 +12,8 @@ const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
 const SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9kdmJ3cnJwYmt1cWNjb3BycnJjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg1MTIxMDgsImV4cCI6MjEwNDA4ODEwOH0.0z4B9bOU8_LN5P7GC7rryCQ_hrC9EJASXf6rcMDrcV8';
 const VAPID_PUBLIC = 'BAUQZ4UtSZAcJIDeoRF4b06elYpAl_pMJp5HzAA5nwbUB6Shslilu-bM9vjN0lnlrwTcfxgPi0ibyU3_UbAz-UI';
 const urlB64ToU8 = (b) => { const p = '='.repeat((4 - (b.length % 4)) % 4); const r = (b + p).replace(/-/g, '+').replace(/_/g, '/'); const raw = atob(r); return Uint8Array.from([...raw].map((c) => c.charCodeAt(0))); };
-const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const isNative = () => !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+const isStandalone = () => isNative() || window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent);
 const CATS = [
   { id: 'cibo', name: 'Cibo', icon: 'c-cibo' },

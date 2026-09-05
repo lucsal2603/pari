@@ -1,0 +1,12 @@
+{
+  "appId": "it.lucasalvemini.divvy",
+  "appName": "Divvy",
+  "webDir": "www",
+  "ios": {
+    "contentInset": "automatic",
+    "backgroundColor": "#F8F4EE"
+  },
+  "server": {
+    "iosScheme": "capacitor"
+  }
+}
