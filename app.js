@@ -844,7 +844,7 @@ function bindRegister() {
     try { const res = await auth.signUp(em, p1, { newsletter: RG.news, terms_accepted_at: nowISO() }); RG.busy = false; if (res === 'confirm') { LG.sent = em; LG.email = em; go('#/accedi'); } else afterLogin(); }
     catch (err) { RG.busy = false; render(); toast(err.message); }
   });
-  setTimeout(() => { const i = $('#rg-email'); if (i && !i.value) i.focus({ preventScroll: true }); }, 400);
+  if (!isNative()) setTimeout(() => { const i = $('#rg-email'); if (i && !i.value) i.focus({ preventScroll: true }); }, 400);
 }
 function pageLegal(r) {
   const privacy = r.sub === 'privacy';
