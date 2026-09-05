@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.21.0';
+const APP_VERSION = '1.21.1';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -331,6 +331,8 @@ function render(r, toTop) {
   window.scrollTo(0, keep);
   bind(r); initSwipes();
   const reveal = () => { $$('.chart').forEach((c) => c.classList.add('in')); $$('[data-w]').forEach((el) => (el.style.width = el.dataset.w)); };
+  // finita l'animazione d'ingresso, tolgo il transform così la barra del titolo può restare fissa in alto
+  $$('.page').forEach((pg) => pg.addEventListener('animationend', () => pg.classList.add('settled'), { once: true }));
   requestAnimationFrame(() => requestAnimationFrame(reveal)); setTimeout(reveal, 80);
 }
 
@@ -1310,6 +1312,8 @@ function initSwipes() {
   });
 }
 document.addEventListener('pointerdown', (e) => { if (openSwipe && !openSwipe.contains(e.target)) closeSwipe(openSwipe); }, true);
+/* riga sottile sotto la barra del titolo solo quando c'è contenuto che le scorre sotto */
+window.addEventListener('scroll', () => { const h = document.querySelector('.page > .head'); if (h) h.classList.toggle('stuck', window.scrollY > 4); }, { passive: true });
 
 /* ---------- Tira giù per ricaricare (su qualsiasi pagina) ---------- */
 (function pullToRefresh() {
