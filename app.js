@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.23.1';
+const APP_VERSION = '1.24.0';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -41,9 +41,20 @@ const nowISO = () => new Date().toISOString();
 const todayStr = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
 const ym = (dateStr) => dateStr.slice(0, 7);
 const curYM = () => todayStr().slice(0, 7);
-const fmtEUR = new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' });
-const money = (cents) => fmtEUR.format((cents || 0) / 100);
-const moneyPlain = (cents) => new Intl.NumberFormat('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format((cents || 0) / 100);
+const CURRENCIES = [
+  ['EUR', 'Euro'], ['USD', 'Dollaro statunitense'], ['GBP', 'Sterlina britannica'], ['CHF', 'Franco svizzero'], ['JPY', 'Yen giapponese'], ['CAD', 'Dollaro canadese'], ['AUD', 'Dollaro australiano'], ['NZD', 'Dollaro neozelandese'],
+  ['SEK', 'Corona svedese'], ['NOK', 'Corona norvegese'], ['DKK', 'Corona danese'], ['ISK', 'Corona islandese'], ['PLN', 'Złoty polacco'], ['CZK', 'Corona ceca'], ['HUF', 'Fiorino ungherese'], ['RON', 'Leu rumeno'], ['BGN', 'Lev bulgaro'], ['RSD', 'Dinaro serbo'],
+  ['TRY', 'Lira turca'], ['ILS', 'Shekel israeliano'], ['AED', 'Dirham degli Emirati'], ['SAR', 'Riyal saudita'], ['EGP', 'Sterlina egiziana'], ['MAD', 'Dirham marocchino'], ['ZAR', 'Rand sudafricano'],
+  ['BRL', 'Real brasiliano'], ['MXN', 'Peso messicano'], ['ARS', 'Peso argentino'], ['CLP', 'Peso cileno'], ['COP', 'Peso colombiano'],
+  ['INR', 'Rupia indiana'], ['CNY', 'Yuan cinese'], ['HKD', 'Dollaro di Hong Kong'], ['SGD', 'Dollaro di Singapore'], ['KRW', 'Won sudcoreano'], ['THB', 'Baht thailandese'], ['IDR', 'Rupia indonesiana'], ['MYR', 'Ringgit malese'], ['PHP', 'Peso filippino'], ['VND', 'Dong vietnamita'],
+];
+const currencyName = (code) => (CURRENCIES.find((c) => c[0] === code) || [code, code])[1];
+const fmtCache = {};
+const curFmt = () => { const c = (window.__S && window.__S.settings.currency) || 'EUR'; if (!fmtCache[c]) { try { fmtCache[c] = new Intl.NumberFormat('it-IT', { style: 'currency', currency: c, currencyDisplay: 'narrowSymbol' }); } catch (_) { try { fmtCache[c] = new Intl.NumberFormat('it-IT', { style: 'currency', currency: c }); } catch (__) { fmtCache[c] = new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }); } } } return fmtCache[c]; };
+const curSymbol = () => { try { return curFmt().formatToParts(0).find((p) => p.type === 'currency').value; } catch (_) { return '€'; } };
+const curDigits = () => { try { return curFmt().resolvedOptions().maximumFractionDigits; } catch (_) { return 2; } };
+const money = (cents) => curFmt().format((cents || 0) / 100);
+const moneyPlain = (cents) => new Intl.NumberFormat('it-IT', { minimumFractionDigits: curDigits(), maximumFractionDigits: curDigits() }).format((cents || 0) / 100);
 const monthName = (ymStr) => { const [y, m] = ymStr.split('-').map(Number); return new Date(y, m - 1, 1).toLocaleDateString('it-IT', { month: 'long', year: 'numeric' }); };
 const monthShort = (ymStr) => { const [y, m] = ymStr.split('-').map(Number); return new Date(y, m - 1, 1).toLocaleDateString('it-IT', { month: 'short' }).replace('.', ''); };
 const dateLong = (d) => { const [y, m, dd] = d.split('-').map(Number); return new Date(y, m - 1, dd).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' }); };
@@ -74,7 +85,7 @@ function defaultState() {
     ui: { month: curYM(), statsRange: 'mese', balTab: 0, homeMode: 'paid' },
   };
 }
-let S = load();
+let S = load(); window.__S = S;
 function load() {
   try { const raw = localStorage.getItem(KEY); if (raw) { const s = JSON.parse(raw); const d = defaultState(); const st = { ...d, ...s, settings: { ...d.settings, ...(s.settings || {}), sync: { ...d.settings.sync, ...((s.settings || {}).sync || {}) } }, ui: { ...d.ui, ...(s.ui || {}), month: curYM() } };
     if (!Array.isArray(s.groups)) { st.groups = d.groups; st.entries.forEach((e) => { if (!e.group) e.group = 'g1'; }); st.settings.lastGroup = 'g1'; }
@@ -593,7 +604,7 @@ function pageForm(r) {
     <form id="f" novalidate>
       ${isPay ? '' : `<div class="scan-row"><label class="btn soft scan-btn">${icon('i-camera')} Fotografa lo scontrino<input type="file" accept="image/*" capture="environment" id="scan-cam" hidden></label><label class="scan-gallery">${icon('i-image')} dalla galleria<input type="file" accept="image/*" id="scan-gal" hidden></label></div>`}
       ${isPay ? '' : `<div class="field"><label for="desc">Descrizione</label><input id="desc" type="text" placeholder="Cena pizza" value="${esc(F.desc)}" autocomplete="off" enterkeyhint="next"></div>`}
-      <div class="field"><label for="amount">Importo</label><div class="money-input"><span class="cur">€</span><input id="amount" type="text" inputmode="decimal" placeholder="0,00" value="${esc(F.amount)}" autocomplete="off"></div><div class="hint err" id="amount-err" hidden>Inserisci un importo valido.</div></div>
+      <div class="field"><label for="amount">Importo</label><div class="money-input"><span class="cur">${esc(curSymbol())}</span><input id="amount" type="text" inputmode="decimal" placeholder="0,00" value="${esc(F.amount)}" autocomplete="off"></div><div class="hint err" id="amount-err" hidden>Inserisci un importo valido.</div></div>
       ${isPay
         ? `<div class="field"><div class="lbl">Pagamento</div><div class="pay-dir">${avatar(payerOf(F.paidBy))}<span class="txt"><span class="t">${esc(payerOf(F.paidBy).name)} dà a ${esc(payerOf(F.to).name)}</span><span class="d">${F.amount ? '€ ' + esc(F.amount) : 'la somma qui sopra'} · il saldo fra voi si aggiorna</span></span>${avatar(payerOf(F.to))}</div></div>`
         : `<div class="field"><div class="pay-dir soft">${avatar(payerOf(F.paidBy))}<span class="txt"><span class="t">${F.id ? 'Pagata da ' + esc(payerOf(F.paidBy).name) : 'Paghi tu, ' + esc(payerOf(F.paidBy).name)}</span><span class="d" id="half-hint">${halfHint()}</span></span></div></div>
@@ -656,6 +667,7 @@ function pageProfilo(r) {
   if (r.sub === 'sezioni') return pageGroups();
   if (r.sub === 'sync') return pageSync();
   if (r.sub === 'notifiche') return pageNotifiche();
+  if (r.sub === 'valuta') return pageValuta();
   if (r.sub === 'info') return pageInfo();
   if (r.sub === 'esporta') return pageExport();
   const together = S.settings.together ? `Insieme dal ${esc(S.settings.together)} <span aria-hidden="true">❤️</span>` : 'Le nostre spese, a metà <span aria-hidden="true">❤️</span>';
@@ -666,7 +678,7 @@ function pageProfilo(r) {
       <a href="#/profilo/account">${icon('i-gear')}<span>Impostazioni account</span><span class="val">Io sono ${esc(a.name)}</span>${icon('i-right', 'ic chev')}</a>
       <a href="#/profilo/sezioni">${icon('i-list')}<span>Sezioni</span><span class="val">${groups().length}</span>${icon('i-right', 'ic chev')}</a>
       <a href="#/profilo/categorie">${icon('i-grid')}<span>Categorie</span><span></span>${icon('i-right', 'ic chev')}</a>
-      <a href="#/profilo/account">${icon('i-coin')}<span>Valuta</span><span class="val">EUR (€)</span>${icon('i-right', 'ic chev')}</a>
+      <a href="#/profilo/valuta">${icon('i-coin')}<span>Valuta</span><span class="val">${esc(S.settings.currency || 'EUR')} (${esc(curSymbol())})</span>${icon('i-right', 'ic chev')}</a>
       <a href="#/profilo/esporta">${icon('i-download')}<span>Esporta dati</span><span></span>${icon('i-right', 'ic chev')}</a>
       <a href="#/profilo/notifiche">${icon('i-heart')}<span>Notifiche</span><span class="val">${S.settings.push && Notification?.permission === 'granted' ? 'attive' : 'non attive'}</span>${icon('i-right', 'ic chev')}</a>
       <a href="#/profilo/sync">${icon('i-cloud')}<span>Backup e sincronizzazione</span><span class="sync-dot ${syncOn ? '' : 'off'}" title="${syncOn ? 'attiva' : 'non attiva'}"></span>${icon('i-right', 'ic chev')}</a>
@@ -688,7 +700,7 @@ function pageAccount() {
     </section>
     <h2 class="sec-title section">Coppia</h2>
     <section class="card"><div class="field" style="margin:0"><label for="together">Insieme dal (anno o data)</label><input id="together" type="text" value="${esc(S.settings.together)}" placeholder="2023" inputmode="numeric"><div class="hint">Compare nel profilo. Lascia vuoto per non mostrarlo.</div></div>
-    <div class="field"><div class="lbl">Valuta</div><div class="input" style="display:flex;align-items:center;color:var(--muted)">EUR (€) — per ora l'unica disponibile</div></div></section>
+    <div class="field"><div class="lbl">Valuta</div><a class="input" href="#/profilo/valuta" style="display:flex;align-items:center;justify-content:space-between">${esc(currencyName(S.settings.currency || 'EUR'))} (${esc(curSymbol())}) ${icon('i-right', 'ic muted')}</a></div></section>
     <div class="section"><button class="btn" id="save-account">Salva</button></div>
   </div>`;
 }
@@ -750,6 +762,14 @@ function pageNotifiche() {
     ${needsHome ? '<p class="small muted" style="margin:10px 0 0">Aggiungi Divvy alla schermata Home (Condividi → Aggiungi alla schermata Home) e apri le notifiche da lì.</p>' : ''}
     </section>
     <div class="section btn-row">${on ? `<button class="btn soft" id="push-test">Prova una notifica</button><button class="btn ghost" id="push-off">Disattiva</button>` : `<button class="btn" id="push-on" ${supported && perm !== 'denied' ? '' : 'disabled'}>Attiva le notifiche</button>`}</div>
+  </div>`;
+}
+function pageValuta() {
+  const cur = S.settings.currency || 'EUR';
+  return `<div class="page slide">${subHead('Valuta')}
+    <p class="muted small" style="margin:0 2px 12px">La valuta vale per tutte le spese del gruppo, su entrambi i telefoni. Gli importi già inseriti restano gli stessi numeri: cambiano solo simbolo e formato.</p>
+    <label class="search">${icon('i-search')}<input id="cur-q" type="search" placeholder="Cerca una valuta…" autocomplete="off"></label>
+    <section class="card list-card"><div class="list" id="cur-list">${CURRENCIES.map(([code, name]) => { let sym = code; try { sym = new Intl.NumberFormat('it-IT', { style: 'currency', currency: code, currencyDisplay: 'narrowSymbol' }).formatToParts(0).find((p) => p.type === 'currency').value; } catch (_) {} return `<button type="button" class="row" data-cur="${code}" data-name="${esc(name.toLowerCase())}"><span class="cat-ic" style="font-weight:800;font-size:14px">${esc(sym.length > 3 ? code.slice(0, 3) : sym)}</span><span class="main"><span class="title">${esc(name)}</span><span class="sub">${code}</span></span><span class="right">${cur === code ? icon('i-check', 'ic green') : ''}</span></button>`; }).join('')}</div></section>
   </div>`;
 }
 function pageInfo() {
@@ -1002,7 +1022,7 @@ function pageDone(r) {
     <div class="done-art"><img src="img/fatto.png" alt=""></div>
     <h1 class="done-h">${isPay ? 'Pagamento registrato!' : 'Pagamento aggiunto!'}<svg class="done-line" viewBox="0 0 220 12" preserveAspectRatio="none"><path d="M3 8 C 60 2, 150 2, 217 7" fill="none" stroke="#A9D3B6" stroke-width="5" stroke-linecap="round"/></svg></h1>
     <p class="done-p">Tutto ok, l'abbiamo salvato.</p>
-    <div class="done-card"><span class="cat-ic${isPay ? ' pay' : ''}">${icon(isPay ? 'c-pagamento' : c.icon)}</span><div class="done-txt"><b>${esc(isPay ? 'Pagamento' : e.desc)}</b><span>${sub}</span><span>${esc(dateShort(e.date))} ${esc(String(e.date).slice(0, 4))} • ${esc(payer.name)}</span></div><span class="done-amt">€ ${esc(moneyPlain(e.amount))}</span></div>
+    <div class="done-card"><span class="cat-ic${isPay ? ' pay' : ''}">${icon(isPay ? 'c-pagamento' : c.icon)}</span><div class="done-txt"><b>${esc(isPay ? 'Pagamento' : e.desc)}</b><span>${sub}</span><span>${esc(dateShort(e.date))} ${esc(String(e.date).slice(0, 4))} • ${esc(payer.name)}</span></div><span class="done-amt">${esc(curSymbol())} ${esc(moneyPlain(e.amount))}</span></div>
     <div class="done-actions"><a class="btn onb-btn" href="#/home">Perfetto!</a><a class="done-link" href="#/nuova${isPay ? '?tipo=pagamento' : ''}">${isPay ? 'Registra un altro pagamento' : 'Aggiungi un altro pagamento'}</a></div>
     <svg class="done-sq l" viewBox="0 0 120 90" aria-hidden="true"><path d="M8 70 C 25 20, 45 25, 40 55 C 36 80, 60 85, 75 35" fill="none" stroke="#B9D9C4" stroke-width="7" stroke-linecap="round"/></svg>
     <svg class="done-sq r" viewBox="0 0 120 90" aria-hidden="true"><path d="M10 60 C 30 20, 50 35, 55 60 C 60 85, 85 80, 110 30" fill="none" stroke="#B9D9C4" stroke-width="7" stroke-linecap="round"/></svg>
@@ -1072,7 +1092,7 @@ function pageWelcome() {
     <div class="onb-summary"><div class="row-between"><b class="onb-sum-t">Il tuo riepilogo</b><button type="button" class="onb-edit" data-ob-edit>Modifica</button></div>
       <div class="onb-people"><span>${avatar(a, true)}${esc(a.name)}</span><span>${avatar(b, true)}${esc(b.name)}</span></div>
       <div class="onb-kv">${icon('i-balance')}<span>Divisione predefinita</span><b>${pm}% / ${100 - pm}%</b></div>
-      <div class="onb-kv">${icon('i-coins')}<span>Valuta</span><b>Euro (€)</b></div></div>
+      <div class="onb-kv">${icon('i-coins')}<span>Valuta</span><b>${esc(currencyName(S.settings.currency || 'EUR'))} (${esc(curSymbol())})</b></div></div>
     <div class="onb-form"><button type="button" class="btn onb-btn" data-ob-finish>Inizia con Divvy ${arrowIc}</button></div>`; }
   return `<div class="page onb steps" style="view-transition-name:onb-stage">${top}${body}${dots}</div>`;
 }
@@ -1217,7 +1237,7 @@ function bindProfilo(r) {
   if (r.sub === 'esporta') {
     $$('[data-export]').forEach((b) => b.addEventListener('click', () => exportData(b.dataset.export)));
     $('#import-file').addEventListener('change', (ev) => { const f = ev.target.files[0]; if (!f) return; f.text().then((t) => importData(t)).catch(() => toast('File non leggibile')); ev.target.value = ''; });
-    const rs = $('[data-reset]'); if (rs) rs.addEventListener('click', () => confirmSheet('Cancellare tutto?', 'Spese, pagamenti e impostazioni di questo telefono verranno eliminati. Se la sincronizzazione è attiva, i dati sul database restano.', 'Cancella tutto', () => { const keepSync = S.settings.sync; S = defaultState(); S.settings.sync = keepSync; save(); toast('Dati cancellati'); go('#/home'); }));
+    const rs = $('[data-reset]'); if (rs) rs.addEventListener('click', () => confirmSheet('Cancellare tutto?', 'Spese, pagamenti e impostazioni di questo telefono verranno eliminati. Se la sincronizzazione è attiva, i dati sul database restano.', 'Cancella tutto', () => { const keepSync = S.settings.sync; S = defaultState(); window.__S = S; S.settings.sync = keepSync; save(); toast('Dati cancellati'); go('#/home'); }));
   }
   if (r.sub === 'sync') {
     $('#save-sync').addEventListener('click', async () => {
@@ -1227,6 +1247,10 @@ function bindProfilo(r) {
     });
     const n = $('#sync-now'); if (n) n.addEventListener('click', async () => { toast('Sincronizzo…'); const ok = await sync.run(true); render(); toast(ok ? 'Aggiornato' : 'Errore: ' + (sync.lastError || '')); });
     const off = $('#sync-off'); if (off) off.addEventListener('click', () => { S.settings.sync = { url: SUPA_URL, key: SUPA_ANON, house: '' }; S.settings.lastPull = null; save(); sync.status = 'idle'; render(); toast('Scollegata: i dati restano sul telefono'); });
+  }
+  if (r.sub === 'valuta') {
+    $$('[data-cur]').forEach((b) => b.addEventListener('click', () => { S.settings.currency = b.dataset.cur; S.settings.membersUpdatedAt = nowISO(); save(); sync.schedule(); toast(`Valuta: ${currencyName(b.dataset.cur)}`); render(); }));
+    const q = $('#cur-q'); q.addEventListener('input', () => { const v = q.value.trim().toLowerCase(); $$('[data-cur]').forEach((b) => { b.hidden = !!v && !(b.dataset.name.includes(v) || b.dataset.cur.toLowerCase().includes(v)); }); });
   }
   if (r.sub === 'notifiche') {
     const on = $('#push-on'); if (on) on.addEventListener('click', async () => { on.disabled = true; const ok = await enablePush(); render(); if (ok) { toast('Notifiche attivate'); const t = notifText({ kind: 'expense', desc: 'Spesa', amount: 1000 }, other().name, balances()[me().id] || 0); showLocalNotification(t.title, t.body); } });
@@ -1276,7 +1300,7 @@ const sync = {
       // 1) spingo le righe locali cambiate dopo l'ultimo invio
       const since = force ? '' : (S.settings.lastPush || '');
       const rows = S.entries.filter((e) => (e.updatedAt || '') > since).map((e) => ({ house: s.house, id: e.id, kind: 'entry', data: e, updated_at: e.updatedAt, deleted: !!e.deleted }));
-      if ((S.settings.membersUpdatedAt || '') > since && S.settings.membersUpdatedAt) rows.push({ house: s.house, id: 'members', kind: 'members', data: { members: S.members, together: S.settings.together }, updated_at: S.settings.membersUpdatedAt || nowISO(), deleted: false });
+      if ((S.settings.membersUpdatedAt || '') > since && S.settings.membersUpdatedAt) rows.push({ house: s.house, id: 'members', kind: 'members', data: { members: S.members, together: S.settings.together, currency: S.settings.currency || 'EUR' }, updated_at: S.settings.membersUpdatedAt || nowISO(), deleted: false });
       if ((S.settings.groupsUpdatedAt || '') > since && S.settings.groupsUpdatedAt) rows.push({ house: s.house, id: 'groups', kind: 'groups', data: { groups: S.groups }, updated_at: S.settings.groupsUpdatedAt, deleted: false });
       if ((S.settings.pushUpdatedAt || '') > since || (force && S.settings.push)) rows.push({ house: s.house, id: 'push-' + S.settings.deviceId, kind: 'push', data: S.settings.push ? { ...S.settings.push, member: me().id } : { device: S.settings.deviceId }, updated_at: S.settings.pushUpdatedAt || nowISO(), deleted: !S.settings.push });
       const freshMine = S.entries.filter((e) => !e.deleted && (e.createdAt || '') > since && e.paidBy === me().id && !e.recurringOf).map((e) => e.id);
@@ -1294,7 +1318,7 @@ const sync = {
       const remote = await r2.json(); let changed = 0; const arrived = [];
       remote.forEach((row) => {
         if (row.kind === 'entry') { const e = row.data; const cur = S.entries.find((x) => x.id === e.id); if (!cur) { S.entries.push(e); arrived.push(e); changed++; } else if ((e.updatedAt || '') > (cur.updatedAt || '')) { Object.assign(cur, e); changed++; } }
-        else if (row.kind === 'members') { if ((row.updated_at || '') > (S.settings.membersUpdatedAt || '')) { const m = row.data.members; if (Array.isArray(m) && m.length >= 2) { S.members = m; } if (typeof row.data.together === 'string') S.settings.together = row.data.together; S.settings.membersUpdatedAt = row.updated_at; changed++; } }
+        else if (row.kind === 'members') { if ((row.updated_at || '') > (S.settings.membersUpdatedAt || '')) { const m = row.data.members; if (Array.isArray(m) && m.length >= 2) { S.members = m; } if (typeof row.data.together === 'string') S.settings.together = row.data.together; if (row.data.currency) S.settings.currency = row.data.currency; S.settings.membersUpdatedAt = row.updated_at; changed++; } }
         else if (row.kind === 'groups') { (row.data.groups || []).forEach((g) => { const cur = S.groups.find((x) => x.id === g.id); if (!cur) { S.groups.push(g); changed++; } else if ((g.updatedAt || '') > (cur.updatedAt || '')) { Object.assign(cur, g); changed++; } }); if ((row.updated_at || '') > (S.settings.groupsUpdatedAt || '')) S.settings.groupsUpdatedAt = row.updated_at; }
         else if (row.kind === 'activity') { if (!S.activity.some((x) => x.id === row.data.id)) { S.activity.push(row.data); } }
       });

@@ -8,7 +8,8 @@ const cors = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
-const fmt = (c: number) => new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" }).format((c || 0) / 100);
+let CUR = "EUR";
+const fmt = (c: number) => { try { return new Intl.NumberFormat("it-IT", { style: "currency", currency: CUR }).format((c || 0) / 100); } catch (_) { return new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" }).format((c || 0) / 100); } };
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -21,6 +22,7 @@ Deno.serve(async (req) => {
 
     const entries = rows.filter((r: any) => r.kind === "entry" && !r.deleted && r.data && !r.data.deleted).map((r: any) => r.data);
     const members = rows.find((r: any) => r.kind === "members")?.data?.members || [{ id: "m1", name: "Luca" }, { id: "m2", name: "Martina" }];
+    CUR = rows.find((r: any) => r.kind === "members")?.data?.currency || "EUR";
     const subs = rows.filter((r: any) => r.kind === "push" && !r.deleted && r.data?.sub && r.data.member !== actor);
     const actorName = members.find((m: any) => m.id === actor)?.name || "L'altro";
 
