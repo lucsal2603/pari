@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.18.1';
+const APP_VERSION = '1.18.2';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -931,7 +931,7 @@ function pageWelcome() {
       <div class="inv-share">
         <button type="button" data-share="whatsapp"><span class="inv-circle wa">${icon('i-whatsapp')}</span>WhatsApp</button>
         <button type="button" data-share="telegram"><span class="inv-circle tg">${icon('i-telegram')}</span>Telegram</button>
-        <button type="button" data-share="share"><span class="inv-circle">${icon('i-share')}</span>Condividi</button>
+        <button type="button" data-share="sms"><span class="inv-circle sms">${icon('i-sms')}</span>SMS</button>
         <button type="button" data-share="more"><span class="inv-circle">${icon('i-more')}</span>Altro</button>
       </div>
     </div>
@@ -991,6 +991,7 @@ function bindWelcome() {
     const k = b.dataset.share, link = inviteLink(), text = inviteText();
     if (k === 'whatsapp') window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
     else if (k === 'telegram') window.open('https://t.me/share/url?url=' + encodeURIComponent(link) + '&text=' + encodeURIComponent('Unisciti al mio gruppo su Divvy per dividere le spese'), '_blank');
+    else if (k === 'sms') location.href = 'sms:?&body=' + encodeURIComponent(text);
     else if (navigator.share) { try { await navigator.share({ title: 'Divvy', text: 'Unisciti al mio gruppo su Divvy per dividere le spese', url: link }); } catch (_) {} }
     else { try { await navigator.clipboard.writeText(link); toast('Link copiato'); } catch (_) {} }
   }));

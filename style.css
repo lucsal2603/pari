@@ -569,6 +569,7 @@ code.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-si
 .inv-circle .ic { width: 20px; height: 20px; }
 .inv-circle.wa { background: #25D366; color: #fff; } .inv-circle.wa .ic { width: 24px; height: 24px; }
 .inv-circle.tg { background: #2AABEE; color: #fff; }
+.inv-circle.sms { background: #34C759; color: #fff; }
 .onb-info { width: 100%; display: grid; grid-template-columns: 40px 1fr; gap: 12px; align-items: center; background: #E6F0E9; border-radius: 16px; padding: clamp(8px, 1.3vh, 14px) 14px; margin-top: clamp(6px, 1vh, 10px); text-align: left; }
 @media (max-height: 1049px) { .steps .onb-info { display: none; } }
 @media (max-height: 760px) { .steps .inv-head span { display: none; } }
