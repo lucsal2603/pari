@@ -33,7 +33,7 @@
       <div class="sp-txt">Si parte…</div>
     </div>
   </div>
-  <script>window.__t0 = Date.now(); (function () { var go = function () { var s = document.getElementById('splash'); if (s) s.classList.add('go'); }; requestAnimationFrame(function () { requestAnimationFrame(go); }); setTimeout(go, 60); })();</script>
+  <script>window.__t0 = Date.now(); (function () { try { if (sessionStorage.getItem('pari:nosplash')) { sessionStorage.removeItem('pari:nosplash'); var sp = document.getElementById('splash'); if (sp) sp.remove(); return; } } catch (e) {} var go = function () { var s = document.getElementById('splash'); if (s) s.classList.add('go'); }; requestAnimationFrame(function () { requestAnimationFrame(go); }); setTimeout(go, 60); })();</script>
   <div class="app" id="app">
     <main id="view" class="view"></main>
     <nav class="tabbar" id="tabbar" aria-label="Sezioni">

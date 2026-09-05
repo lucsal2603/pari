@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.23.0';
+const APP_VERSION = '1.23.1';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -1234,7 +1234,7 @@ function bindProfilo(r) {
     const off = $('#push-off'); if (off) off.addEventListener('click', async () => { await disablePush(); render(); toast('Notifiche disattivate'); });
   }
   if (r.sub === 'info') { $('#replay-onb').addEventListener('click', () => { OB = { step: 1, name: '', partner: '', house: '', avatar: AVATAR_IMGS.indexOf(((me().avatar || {}).img) || ''), split: (S.settings.split || {}).mode === 'custom' ? 'custom' : 'equal', pct: ((S.settings.split || {}).pct || {})[me().id] || 50 }; go('#/benvenuto'); }); }
-  if (r.sub === 'info') $('#reload-app').addEventListener('click', () => { navigator.serviceWorker?.getRegistration().then((reg) => reg && reg.update()); location.reload(); });
+  if (r.sub === 'info') $('#reload-app').addEventListener('click', () => { navigator.serviceWorker?.getRegistration().then((reg) => reg && reg.update()); try { sessionStorage.setItem('pari:nosplash', '1'); } catch (_) {} location.reload(); });
 }
 
 /* ---------- Esporta / importa ---------- */
@@ -1357,7 +1357,7 @@ window.addEventListener('scroll', () => { const h = document.querySelector('.pag
   }, { passive: false });
   const end = async () => {
     if (!pulling) return; pulling = false; app.style.transition = 'transform .3s var(--ease-out)';
-    if (dy >= TRIG) { busy = true; el.classList.add('loading'); T.textContent = 'Aggiorno…'; app.style.transform = `translateY(${TRIG}px)`; try { if (sync.enabled()) await Promise.race([sync.run(true), new Promise((r) => setTimeout(r, 4000))]); } catch (_) {} navigator.serviceWorker?.getRegistration().then((reg) => reg && reg.update()).catch(() => {}); setTimeout(() => location.reload(), 150); return; }
+    if (dy >= TRIG) { busy = true; el.classList.add('loading'); T.textContent = 'Aggiorno…'; app.style.transform = `translateY(${TRIG}px)`; try { if (sync.enabled()) await Promise.race([sync.run(true), new Promise((r) => setTimeout(r, 4000))]); } catch (_) {} navigator.serviceWorker?.getRegistration().then((reg) => reg && reg.update()).catch(() => {}); try { sessionStorage.setItem('pari:nosplash', '1'); } catch (_) {} setTimeout(() => location.reload(), 150); return; }
     app.style.transform = ''; el.classList.remove('show', 'ready'); dy = 0;
   };
   document.addEventListener('touchend', end); document.addEventListener('touchcancel', end);
@@ -1422,7 +1422,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) { au
 setInterval(() => { if (!document.hidden && sync.enabled()) sync.run(); }, 45000);
 if ('serviceWorker' in navigator) {
   let reloading = false;
-  navigator.serviceWorker.addEventListener('controllerchange', () => { if (reloading) return; reloading = true; if (navigator.serviceWorker.controller) location.reload(); });
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (reloading) return; reloading = true; if (navigator.serviceWorker.controller) { try { sessionStorage.setItem('pari:nosplash', '1'); } catch (_) {} location.reload(); } });
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then((reg) => {
       reg.update().catch(() => {});
