@@ -540,21 +540,19 @@ code.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-si
 .steps .onb-dots { margin: clamp(10px, 1.8vh, 24px) 0 4px; }
 /* passaggio fra i passi */
 ::view-transition-group(onb-stage) { animation-duration: .38s; }
-::view-transition-old(onb-stage) { animation: obOut .3s cubic-bezier(.4, 0, 1, 1) both; }
+/* la pagina che se ne va sparisce subito: si anima solo quella che arriva */
+::view-transition-old(onb-stage) { animation: none; opacity: 0; }
 ::view-transition-new(onb-stage) { animation: obIn .42s cubic-bezier(.23, 1, .32, 1) both; }
-html[data-ob-dir="back"] ::view-transition-old(onb-stage) { animation-name: obOutBack; }
 html[data-ob-dir="back"] ::view-transition-new(onb-stage) { animation-name: obInBack; }
-@keyframes obOut { to { opacity: 0; transform: translateX(-48px); } }
 @keyframes obIn { from { opacity: 0; transform: translateX(72px); } }
-@keyframes obOutBack { to { opacity: 0; transform: translateX(48px); } }
 @keyframes obInBack { from { opacity: 0; transform: translateX(-72px); } }
-::view-transition-old(onb-art) { animation: artOut .28s ease both; }
+::view-transition-old(onb-art) { animation: none; opacity: 0; }
 ::view-transition-new(onb-art) { animation: artIn .55s cubic-bezier(.23, 1, .32, 1) both; }
 @keyframes artOut { to { opacity: 0; transform: scale(.92); } }
 @keyframes artIn { from { opacity: 0; transform: scale(.86) translateY(10px); } 60% { transform: scale(1.03) translateY(-2px); } }
 ::view-transition-old(onb-logo), ::view-transition-new(onb-logo), ::view-transition-old(onb-top), ::view-transition-new(onb-top) { animation: none; }
 ::view-transition-group(onb-dots) { animation-duration: .3s; }
-@media (prefers-reduced-motion: reduce) { ::view-transition-old(onb-stage), ::view-transition-new(onb-stage), ::view-transition-old(onb-art), ::view-transition-new(onb-art) { animation: crossfadeOnly .2s ease both; } }
+@media (prefers-reduced-motion: reduce) { ::view-transition-new(onb-stage), ::view-transition-new(onb-art) { animation: crossfadeOnly .2s ease both; } }
 @keyframes crossfadeOnly { from { opacity: 0; } }
 
 /* accesso */
