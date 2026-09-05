@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.18.0';
+const APP_VERSION = '1.18.1';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -927,7 +927,7 @@ function pageWelcome() {
     <div class="onb-art"><img src="img/invito.png" alt=""></div>
     <div class="inv-card">
       <div class="inv-head"><span class="inv-ic">${icon('i-link')}</span><div><b>Il tuo link di invito</b><span>Condividi questo link con chi vuoi far unire al gruppo. Quando lo aprirà verrà aggiunto automaticamente.</span></div></div>
-      <div class="inv-link"><span class="inv-url">${esc(shown)}</span><button type="button" class="inv-copy" data-copy-link>Copia ${icon('i-copy')}</button></div>
+      <div class="inv-link"><span class="inv-url">${esc(shown)}</span><button type="button" class="inv-copy" data-copy-link><span class="l1">Copia ${icon('i-copy')}</span><span class="l2">Copiato ${icon('i-check')}</span></button></div>
       <div class="inv-share">
         <button type="button" data-share="whatsapp"><span class="inv-circle wa">${icon('i-whatsapp')}</span>WhatsApp</button>
         <button type="button" data-share="telegram"><span class="inv-circle tg">${icon('i-telegram')}</span>Telegram</button>
@@ -983,7 +983,10 @@ function bindWelcome() {
   const rng = $('#pct-range'); if (rng) rng.addEventListener('input', () => { OB.pct = +rng.value; $('#pct-me').textContent = OB.pct + '%'; $('#pct-other').textContent = (100 - OB.pct) + '%'; });
   $$('[data-ob-edit]').forEach((b) => b.addEventListener('click', () => obGo(1, 'back')));
   $$('[data-ob-back]').forEach((b) => b.addEventListener('click', () => obGo(Math.max(1, OB.step - 1), 'back')));
-  const cp = $('[data-copy-link]'); if (cp) cp.addEventListener('click', async () => { try { await navigator.clipboard.writeText(inviteLink()); toast('Link copiato'); } catch (_) { toast('Non riesco a copiare: tieni premuto sul link'); } });
+  const cp = $('[data-copy-link]'); if (cp) { let t; cp.addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(inviteLink()); } catch (_) { toast('Non riesco a copiare: tieni premuto sul link'); return; }
+    cp.classList.remove('done'); void cp.offsetWidth; cp.classList.add('done'); clearTimeout(t); t = setTimeout(() => cp.classList.remove('done'), 1800);
+  }); }
   $$('[data-share]').forEach((b) => b.addEventListener('click', async () => {
     const k = b.dataset.share, link = inviteLink(), text = inviteText();
     if (k === 'whatsapp') window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
