@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.11.0';
+const APP_VERSION = '1.11.1';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -296,7 +296,7 @@ function render(r, toTop) {
 /* ---------- Componenti condivisi ---------- */
 const ph = (label, cls = '') => `<span class="ph ${cls}">${esc(label)}</span>`;
 const imgKey = (m) => (m.id === 'm1' ? 'luca' : m.id === 'm2' ? 'martina' : '');
-const avatar = (m, lg = false) => imgKey(m) ? `<img class="avatar${lg ? ' lg' : ''}" src="img/${imgKey(m)}-avatar.png" alt="" title="${esc(m.name)}">` : `<span class="ph avatar${lg ? ' lg' : ''}" title="${esc(m.name)}">${esc(m.name.slice(0, 1))}</span>`;
+const avatar = (m, lg = false) => imgKey(m) ? `<img class="avatar${lg ? ' lg' : ''}" src="img/${imgKey(m)}-avatar.png" alt="" title="${esc(m.name)}">` : `<span class="avatar-col${lg ? ' lg' : ''}" style="--bg:${(m.avatar || {}).bg || '#2C4A3B'};--fg:${(m.avatar || {}).fg || '#F8F4EE'}" title="${esc(m.name)}">${icon('i-user')}</span>`;
 const couple = (cls = '') => `<div class="couple ${cls}" aria-hidden="true"><img src="img/luca.png" alt=""><img src="img/martina.png" alt=""></div>`;
 /* Scena in base al saldo: Luca deve → portafoglio vuoto; Martina deve → lei gli passa la banconota; pari → i due che si guardano */
 const coupleScene = (cls = '') => { const v = balances()[S.members[0].id] || 0; if (Math.abs(v) < 1) return couple(cls); return `<div class="couple scene ${cls}" aria-hidden="true"><img src="img/${v < 0 ? 'luca-deve' : 'martina-deve'}.png" alt=""></div>`; };
@@ -726,21 +726,23 @@ function pageActivity() {
 }
 
 /* ---------- Presentazione per chi apre l'app la prima volta ---------- */
-let OB = { step: 1, name: '', partner: '', house: '' };
+let OB = { step: 1, name: '', partner: '', house: '', avatar: 0 };
+const AVATARS = [{ bg: '#2C4A3B', fg: '#F8F4EE' }, { bg: '#F8D9D2', fg: '#D7563C' }, { bg: '#D3E7F5', fg: '#4E8FBF' }, { bg: '#E0DBF3', fg: '#7B68B8' }, { bg: '#D3E6D8', fg: '#4C8A66' }, { bg: '#F7E7C3', fg: '#C99A2E' }];
 const arrowIc = '<svg class="ic"><path d="M5 12h14M13 5l7 7-7 7"/></svg>';
 function pageWelcome() {
   const st = OB.step; const dots = `<div class="onb-dots">${[1, 2, 3, 4].map((i) => `<i class="${i === st ? 'on' : ''}"></i>`).join('')}</div>`;
-  const top = `<div class="onb-top"><button type="button" class="onb-skip" data-ob-skip>Salta</button></div>`;
+  const top = `<div class="onb-top">${st > 1 ? `<button type="button" class="icon-btn onb-back" data-ob-back aria-label="Indietro">${icon('i-back')}</button>` : '<span></span>'}<button type="button" class="onb-skip" data-ob-skip>Salta</button></div>`;
   let body = '';
   if (st === 1) body = `<img class="onb-logo" src="img/logo.png" alt="Divvy">
     <h1 class="onb-h">Ciao!<br>Come possiamo chiamarti?</h1><p class="onb-p">È il primo passo per iniziare a condividere le spese insieme.</p>
     <div class="onb-art"><img src="img/benvenuto.png" alt=""></div>
     <form class="onb-form" data-ob-form><label class="onb-field">${icon('i-user')}<input id="ob-name" type="text" placeholder="Il tuo nome" value="${esc(OB.name)}" autocomplete="given-name" autocapitalize="words" enterkeyhint="next"></label>
     <button class="btn onb-btn" type="submit">Continua ${arrowIc}</button></form>`;
-  else if (st === 2) body = `<img class="onb-logo sm" src="img/logo.png" alt="Divvy">
-    <h1 class="onb-h">Con chi dividi<br>le spese?</h1><p class="onb-p">Il suo nome comparirà nei saldi e negli avvisi.</p>
-    <div class="onb-art">${couple('onb-couple')}</div>
-    <form class="onb-form" data-ob-form><label class="onb-field">${icon('i-users')}<input id="ob-partner" type="text" placeholder="Il suo nome" value="${esc(OB.partner)}" autocapitalize="words" enterkeyhint="next"></label>
+  else if (st === 2) body = `<img class="onb-logo" src="img/logo.png" alt="Divvy">
+    <h1 class="onb-h">Perfetto, ${esc(OB.name || me().name)}! <span aria-hidden="true">👋</span><br><span class="onb-h2">Con chi condividi<br>le spese?</span></h1><p class="onb-p">Aggiungi la persona con cui inizierai a condividere le spese. Potrai aggiungerne altre in seguito.</p>
+    <div class="onb-art"><img src="img/benvenuto-2.png" alt=""></div>
+    <form class="onb-form" data-ob-form><div class="onb-lbl">Nome della persona</div><label class="onb-field">${icon('i-user')}<input id="ob-partner" type="text" placeholder="Es. Martina" value="${esc(OB.partner)}" autocapitalize="words" enterkeyhint="next"></label>
+    <div class="onb-lbl">Scegli un avatar <small>(opzionale)</small></div><div class="onb-avatars">${AVATARS.map((a, i) => `<button type="button" class="onb-av${OB.avatar === i ? ' on' : ''}" data-ob-av="${i}" style="--bg:${a.bg};--fg:${a.fg}" aria-label="Avatar ${i + 1}">${icon('i-user')}</button>`).join('')}</div>
     <button class="btn onb-btn" type="submit">Continua ${arrowIc}</button></form>`;
   else if (st === 3) body = `<img class="onb-logo sm" src="img/logo.png" alt="Divvy">
     <h1 class="onb-h">Collegate<br>i vostri telefoni</h1><p class="onb-p">Scegliete una parola segreta e scrivetela su entrambi i telefoni: le spese si allineano da sole.</p>
@@ -753,7 +755,7 @@ function pageWelcome() {
     <div class="onb-art"><div class="notif-preview onb-notif"><img src="icons/icon-192.png" alt=""><div><div class="t">${esc(sample.title)}</div><div class="b">${esc(sample.body).replace('\n', '<br>')}</div></div></div></div>
     <div class="onb-form">${isIOS() && !isStandalone() ? '<p class="small muted" style="margin:0 0 12px">Su iPhone le notifiche funzionano con l\'app sulla schermata Home: Condividi → Aggiungi alla schermata Home. Potrai attivarle dopo da Profilo → Notifiche.</p>' : ''}
     <button type="button" class="btn onb-btn" data-ob-push ${'PushManager' in window ? '' : 'disabled'}>Attiva le notifiche ${arrowIc}</button><button type="button" class="onb-link" data-ob-finish>Inizia senza notifiche</button></div>`; }
-  return `<div class="page onb">${top}${body}${dots}</div>`;
+  return `<div class="page onb${st === 2 ? ' left' : ''}">${top}${body}${dots}</div>`;
 }
 function obFinish() { S.settings.onboarded = true; save(); OB = { step: 1, name: '', partner: '', house: '' }; go('#/home'); toast(`Divvy è pronta, ${me().name}`); }
 function bindWelcome() {
@@ -767,12 +769,15 @@ function bindWelcome() {
       OB.partner = OB.partner || other().name; OB.step = 2; save(); render(); return; }
     if (OB.step === 2) { const n = ($('#ob-partner').value || '').trim(); if (!n) { $('#ob-partner').focus(); return; } OB.partner = n;
       const o = other(); if (o.name !== n) { o.name = n; S.settings.membersUpdatedAt = nowISO(); }
+      o.avatar = AVATARS[OB.avatar] || AVATARS[0];
       OB.step = 3; save(); render(); return; }
     if (OB.step === 3) { const h = ($('#ob-house').value || '').trim(); if (!h) { $('#ob-house').focus(); return; } OB.house = h;
       S.settings.sync.house = h; save(); OB.step = 4; render();
       sync.run(true).then((ok) => toast(ok ? 'Telefono collegato' : 'Non riesco a collegarmi: controlla la rete o il codice')); return; }
   });
   $$('[data-ob-later]').forEach((b) => b.addEventListener('click', () => { OB.step = 4; render(); }));
+  $$('[data-ob-back]').forEach((b) => b.addEventListener('click', () => { OB.step = Math.max(1, OB.step - 1); render(); }));
+  $$('[data-ob-av]').forEach((b) => b.addEventListener('click', () => { OB.avatar = +b.dataset.obAv; $$('.onb-av').forEach((x) => x.classList.toggle('on', x === b)); }));
   $$('[data-ob-finish]').forEach((b) => b.addEventListener('click', obFinish));
   $$('[data-ob-push]').forEach((b) => b.addEventListener('click', async () => { b.disabled = true; await enablePush(); obFinish(); }));
   const first = $('.onb-field input'); if (first && !first.value) setTimeout(() => first.focus({ preventScroll: true }), 400);
