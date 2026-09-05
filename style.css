@@ -215,7 +215,7 @@ img.avatar.lg { width: 44px; height: 44px; }
 .row .main { min-width: 0; display: flex; flex-direction: column; }
 .row .title { font-weight: 700; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .row .sub { font-size: 12.5px; color: var(--muted); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.row .right { text-align: right; display: flex; flex-direction: column; align-items: flex-end; }
+.row .right { text-align: right; display: flex; flex-direction: column; align-items: flex-end; padding-right: 10px; }
 .row .right .money { font-size: 15px; }
 .row .right .by { font-size: 11.5px; margin-top: 1px; font-weight: 600; }
 .row .right .money.green { color: var(--green); } .row .right .money.red { color: var(--red); } .row .right .money.muted { color: var(--muted); }
