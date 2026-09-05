@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.21.1';
+const APP_VERSION = '1.21.2';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -908,12 +908,13 @@ const STORES = [
   ['mcdonald', "McDonald's", 'cibo'], ['burger king', 'Burger King', 'cibo'], ['kfc', 'KFC', 'cibo'], ['ristorante', 'Ristorante', 'cibo'], ['pizzeria', 'Pizzeria', 'cibo'], ['trattoria', 'Trattoria', 'cibo'], ['osteria', 'Osteria', 'cibo'], ['bar ', 'Bar', 'cibo'], ['caffe', 'Caffè', 'cibo'], ['pasticceria', 'Pasticceria', 'cibo'], ['gelateria', 'Gelateria', 'cibo'], ['sushi', 'Sushi', 'cibo'], ['kebab', 'Kebab', 'cibo'],
   ['cinema', 'Cinema', 'tempo-libero'], ['uci', 'UCI Cinemas', 'tempo-libero'], ['the space', 'The Space Cinema', 'tempo-libero'], ['parcheggio', 'Parcheggio', 'trasporti'], ['hotel', 'Hotel', 'viaggi'], ['b&b', 'B&B', 'viaggi'],
 ];
+const storeMatch = (text) => { const t = ' ' + text.toLowerCase().replace(/[^a-z0-9&à-ú]+/g, ' ') + ' '; for (const [k, name, c] of STORES) { const kk = k.trim(); if (kk.length <= 4 ? t.includes(' ' + kk + ' ') : t.includes(kk)) return { name, cat: c }; } return null; };
 const NOISE = /scontrino|documento|commerciale|p\.? ?iva|partita|c\.?f\.|tel\.?|fax|cod\.? ?fisc|via |viale |piazza |corso |cassa|operatore|n\.? ?doc|data|ora |grazie|arrivederci|euro|totale|iva|resto|contanti|carta|bancomat|pagamento|reparto|descrizione|prezzo|qta|art\./i;
 const MONTHS = { gen: 1, feb: 2, mar: 3, apr: 4, mag: 5, giu: 6, lug: 7, ago: 8, set: 9, ott: 10, nov: 11, dic: 12, jan: 1, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, dec: 12 };
 function parseReceipt(text) {
   const lines = String(text).split(/\n+/).map((l) => l.replace(/[|_]/g, ' ').replace(/\s+/g, ' ').trim()).filter((l) => l.length > 1);
   const whole = lines.join('\n'); const low = whole.toLowerCase();
-  const digital = /hai pagato|pagamento (?:a|presso|effettuato|con carta)|transazione|addebito|satispay|revolut|paypal|apple pay|google pay|bonifico|beneficiario|intesa|unicredit|poste ?pay|bancoposta|fineco|n26|hype|mooney|carta di credito|carta di debito|movimento|operazione/i.test(low);
+  const digital = /hai pagato|hai autorizzato|pagamento (?:a|di|presso|effettuato|con carta|autorizzato)|prelievo o pagamento|transazione|addebito|satispay|revolut|paypal|apple pay|google pay|bonifico|beneficiario|intesa|unicredit|poste ?pay|bancoposta|fineco|n26|hype|mooney|cr[eé]dit agricole|cartaconto|bnl|bper|banco bpm|mediolanum|carta di credito|carta di debito|con la tua carta|movimento|operazione|ore fa|minuti fa/i.test(low);
   if (digital) return parseDigital(lines, whole);
   const norm = (l) => l.replace(/(\d)[oO](\d)/g, '$10$2').replace(/[oO](?=[.,]\d\d)/g, '0');
   const amountsIn = (l) => { const out = []; const re = /(?:€\s*)?(\d{1,4}(?:[.,]\d{3})?)[.,](\d{2})(?!\d)/g; let m; const s2 = norm(l); while ((m = re.exec(s2))) { const cents = parseInt(m[1].replace(/[.,]/g, ''), 10) * 100 + parseInt(m[2], 10); if (cents > 0 && cents < 1000000) out.push(cents); } return out; };
@@ -926,8 +927,7 @@ function parseReceipt(text) {
   // data
   let date = ''; for (const l of lines) { const m = norm(l).match(/(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})/); if (m) { let d = +m[1], mo = +m[2], y = +m[3]; if (y < 100) y += 2000; if (d >= 1 && d <= 31 && mo >= 1 && mo <= 12 && y >= 2015 && y <= 2035) { date = `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`; break; } } }
   // negozio e categoria
-  let store = '', cat = ''; const head = lines.slice(0, 8).join(' ').toLowerCase() + ' ';
-  for (const [k, name, c] of STORES) { if (head.includes(k)) { store = name; cat = c; break; } }
+  let store = '', cat = ''; const sm = storeMatch(lines.slice(0, 8).join(' ')); if (sm) { store = sm.name; cat = sm.cat; }
   if (!store) { const cand = lines.slice(0, 6).find((l) => /[a-zà-ú]{3,}/i.test(l) && !NOISE.test(l) && !/\d{3,}/.test(l)); if (cand) store = cand.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()).slice(0, 40); }
   return { amount, date, store, cat, lines: lines.length };
 }
@@ -936,16 +936,15 @@ function parseDigital(lines, whole) {
   const norm = (l) => l.replace(/(\d)[oO](\d)/g, '$10$2').replace(/[oO](?=[.,]\d\d)/g, '0');
   const amountsIn = (l) => { const out = []; const re = /[-−]?\s*(?:€|eur)?\s*(\d{1,4}(?:[.,]\d{3})?)[.,](\d{2})(?!\d)\s*(?:€|eur)?/gi; let m; const s2 = norm(l); while ((m = re.exec(s2))) { const cents = parseInt(m[1].replace(/[.,]/g, ''), 10) * 100 + parseInt(m[2], 10); if (cents > 0 && cents < 1000000) out.push({ cents, euro: /€|eur/i.test(m[0]) }); } return out; };
   // importo: prima le righe "hai pagato / importo / pagamento / totale / addebito", poi qualsiasi importo con €, poi il più grande
-  let amount = 0; const pri = lines.filter((l) => /hai pagato|importo|pagamento|pagato|totale|addebito|transazione|speso/i.test(l));
+  let amount = 0; const pri = lines.filter((l) => /hai pagato|hai autorizzato|importo|pagamento|pagato|totale|addebito|transazione|speso|prelievo/i.test(l));
   for (const l of pri) { const a = amountsIn(l); if (a.length) { amount = a[0].cents; break; } }
   if (!amount) { let all = []; lines.forEach((l) => (all = all.concat(amountsIn(l)))); const withEuro = all.filter((x) => x.euro); if (withEuro.length) amount = withEuro[0].cents; else if (all.length) amount = Math.max(...all.map((x) => x.cents)); }
   // esercente: "presso X", "a X", "da X", "beneficiario X", oppure marchio noto, oppure riga in maiuscolo
-  let store = '', cat = ''; const low = whole.toLowerCase() + ' ';
-  for (const [k, name, c] of STORES) { if (low.includes(k)) { store = name; cat = c; break; } }
+  let store = '', cat = ''; const sm = storeMatch(whole); if (sm) { store = sm.name; cat = sm.cat; }
   if (!store) { const m = whole.match(/(?:presso|a favore di|beneficiario|esercente|merchant|pagamento a|pagato a|hai pagato [^\n]*? a|da)\s*[:\-]?\s*([A-Za-zÀ-ú0-9&'.\- ]{3,40})/i); if (m) store = m[1].trim().replace(/\s+(il|lo|la|per|di|con|€|eur).*$/i, ''); }
   if (!store) { const cand = lines.find((l) => /^[A-Z0-9&'. \-]{4,}$/.test(l) && !/[0-9]{3,}/.test(l) && !NOISE.test(l) && !/PAGAMENTO|IMPORTO|TOTALE|EUR|SATISPAY|PAYPAL|REVOLUT|OGGI|IERI/i.test(l)); if (cand) store = cand; }
   store = store.replace(/[.\s]+$/, '').slice(0, 40); if (store && store === store.toUpperCase()) store = store.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
-  if (!cat && store) { const l2 = store.toLowerCase(); for (const [k, , c] of STORES) { if (l2.includes(k.trim())) { cat = c; break; } } }
+  if (!cat && store) { const sm2 = storeMatch(store); if (sm2) cat = sm2.cat; }
   // data: gg/mm/aaaa, "5 set 2026", "5 settembre 2026", oggi/ieri
   let date = '';
   for (const l of lines) { const m = norm(l).match(/(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})/); if (m) { let d = +m[1], mo = +m[2], y = +m[3]; if (y < 100) y += 2000; if (d >= 1 && d <= 31 && mo >= 1 && mo <= 12 && y >= 2015 && y <= 2035) { date = `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`; break; } } }
@@ -958,14 +957,14 @@ function loadOCR() {
   if (ocrLib) return Promise.resolve(ocrLib);
   return new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js'; sc.onload = () => { ocrLib = window.Tesseract; res(ocrLib); }; sc.onerror = () => rej(new Error('Serve la rete per scaricare il lettore la prima volta')); document.head.appendChild(sc); });
 }
-async function prepareImage(file) {
+async function prepareImage(file, boost) {
   let bmp; try { bmp = await createImageBitmap(file, { imageOrientation: 'from-image' }); } catch (_) { bmp = await createImageBitmap(file); }
   const max = 1800; const k = Math.min(1, max / Math.max(bmp.width, bmp.height)); const w = Math.round(bmp.width * k), h = Math.round(bmp.height * k);
   const c = document.createElement('canvas'); c.width = w; c.height = h; const ctx = c.getContext('2d'); ctx.drawImage(bmp, 0, 0, w, h);
   // scala di grigi con contrasto: aiuta la lettura della stampa termica
   const img = ctx.getImageData(0, 0, w, h); const d = img.data; let sum = 0; for (let i = 0; i < d.length; i += 4) { const g = d[i] * .3 + d[i + 1] * .59 + d[i + 2] * .11; d[i] = d[i + 1] = d[i + 2] = g; sum += g; }
   const mean = sum / (d.length / 4); const dark = mean < 110; // screenshot in modalità scura: testo chiaro su fondo scuro → inverto
-  for (let i = 0; i < d.length; i += 4) { let g = dark ? 255 - d[i] : d[i]; g = (g - (dark ? 255 - mean : mean)) * 1.35 + (dark ? 255 - mean : mean) + 10; g = g < 0 ? 0 : g > 255 ? 255 : g; d[i] = d[i + 1] = d[i + 2] = g; }
+  for (let i = 0; i < d.length; i += 4) { let g = dark ? 255 - d[i] : d[i]; if (boost) { const mm = dark ? 255 - mean : mean; g = (g - mm) * 1.35 + mm + 10; } g = g < 0 ? 0 : g > 255 ? 255 : g; d[i] = d[i + 1] = d[i + 2] = g; }
   ctx.putImageData(img, 0, 0); return c;
 }
 async function scanReceipt(file) {
@@ -973,12 +972,14 @@ async function scanReceipt(file) {
   openSheet('Lettura dello scontrino', `<div class="scan-box"><div class="scan-t" id="scan-t">Preparo la foto…</div><div class="scan-bar"><i id="scan-bar"></i></div><p class="small muted" style="margin:10px 0 0">La lettura avviene sul telefono: la foto non viene inviata da nessuna parte.</p></div>`);
   const setP = (t, p) => { const el = $('#scan-t'); if (el) el.textContent = t; const b = $('#scan-bar'); if (b) b.style.width = Math.round(p * 100) + '%'; };
   try {
-    const canvas = await prepareImage(file); setP('Scarico il lettore…', .05);
+    setP('Scarico il lettore…', .05);
     const T = await loadOCR();
-    const worker = await T.createWorker('ita', 1, { logger: (m) => { if (m.status === 'recognizing text') setP('Leggo lo scontrino… ' + Math.round(m.progress * 100) + '%', .2 + m.progress * .8); else if (/load|init/i.test(m.status)) setP('Preparo il lettore…', .1); } });
+    let pass = 0; const worker = await T.createWorker('ita', 1, { logger: (m) => { if (m.status === 'recognizing text') setP((pass ? 'Seconda lettura… ' : 'Leggo lo scontrino… ') + Math.round(m.progress * 100) + '%', (pass ? .6 : .2) + m.progress * .4); else if (/load|init/i.test(m.status)) setP('Preparo il lettore…', .1); } });
     await worker.setParameters({ preserve_interword_spaces: '1' });
-    const { data } = await worker.recognize(canvas); await worker.terminate();
-    const r = parseReceipt(data.text || ''); window.PARI && (window.PARI.lastOCR = data.text); closeSheet();
+    // primo passaggio in scala di grigi; se manca il totale, secondo passaggio con più contrasto
+    let { data } = await worker.recognize(await prepareImage(file, false)); let r = parseReceipt(data.text || ''); let txt = data.text || '';
+    if (!r.amount) { pass = 1; const d2 = await worker.recognize(await prepareImage(file, true)); const r2 = parseReceipt(d2.data.text || ''); if (r2.amount || (!r.store && r2.store)) { r = { ...r2, store: r2.store || r.store, date: r2.date || r.date, cat: r2.cat || r.cat }; txt = d2.data.text || ''; } }
+    await worker.terminate(); window.PARI && (window.PARI.lastOCR = txt); closeSheet();
     if (!r.amount && !r.store) { toast('Non riesco a leggere lo scontrino: prova con più luce e inquadratura dritta'); return; }
     if (r.store) { F.desc = r.store; const d = $('#desc'); if (d) d.value = r.store; }
     if (r.amount) { F.amount = moneyPlain(r.amount); const a = $('#amount'); if (a) { a.value = F.amount; a.dispatchEvent(new Event('input', { bubbles: true })); } }
