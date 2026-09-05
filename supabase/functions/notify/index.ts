@@ -8,8 +8,18 @@ const cors = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
+// testi della notifica nella lingua scelta sul telefono che la riceve (salvata nella riga "push")
+const LOCALES: Record<string, string> = { it: "it-IT", en: "en-GB", es: "es-ES", fr: "fr-FR", de: "de-DE" };
+const TXT: Record<string, Record<string, string>> = {
+  it: { owe: "Devi ancora: {0}", owed: "{0} ti deve ancora: {1}", even: "Siete in pari", pay: "{0} ha registrato un pagamento", exp: "{0} ha aggiunto una spesa", payment: "Pagamento", other: "L'altro" },
+  en: { owe: "You still owe: {0}", owed: "{0} still owes you: {1}", even: "You're all settled", pay: "{0} recorded a payment", exp: "{0} added an expense", payment: "Payment", other: "The other" },
+  es: { owe: "Aún debes: {0}", owed: "{0} aún te debe: {1}", even: "Estáis en paz", pay: "{0} registró un pago", exp: "{0} añadió un gasto", payment: "Pago", other: "La otra persona" },
+  fr: { owe: "Tu dois encore : {0}", owed: "{0} te doit encore : {1}", even: "Vous êtes à égalité", pay: "{0} a enregistré un paiement", exp: "{0} a ajouté une dépense", payment: "Paiement", other: "L'autre" },
+  de: { owe: "Du schuldest noch: {0}", owed: "{0} schuldet dir noch: {1}", even: "Ihr seid quitt", pay: "{0} hat eine Zahlung erfasst", exp: "{0} hat eine Ausgabe hinzugefügt", payment: "Zahlung", other: "Die andere Person" },
+};
+const t = (lang: string, k: string, ...a: string[]) => { let s = (TXT[lang] || TXT.it)[k] || TXT.it[k]; a.forEach((v, i) => { s = s.split(`{${i}}`).join(v); }); return s; };
 let CUR = "EUR";
-const fmt = (c: number) => { try { return new Intl.NumberFormat("it-IT", { style: "currency", currency: CUR }).format((c || 0) / 100); } catch (_) { return new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" }).format((c || 0) / 100); } };
+const fmt = (c: number, lang: string) => { const loc = LOCALES[lang] || "it-IT"; try { return new Intl.NumberFormat(loc, { style: "currency", currency: CUR }).format((c || 0) / 100); } catch (_) { return new Intl.NumberFormat(loc, { style: "currency", currency: "EUR" }).format((c || 0) / 100); } };
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -24,7 +34,6 @@ Deno.serve(async (req) => {
     const members = rows.find((r: any) => r.kind === "members")?.data?.members || [{ id: "m1", name: "Luca" }, { id: "m2", name: "Martina" }];
     CUR = rows.find((r: any) => r.kind === "members")?.data?.currency || "EUR";
     const subs = rows.filter((r: any) => r.kind === "push" && !r.deleted && r.data?.sub && r.data.member !== actor);
-    const actorName = members.find((m: any) => m.id === actor)?.name || "L'altro";
 
     // saldo: positivo = deve ricevere
     const bal: Record<string, number> = {}; members.forEach((m: any) => (bal[m.id] = 0));
@@ -35,10 +44,12 @@ Deno.serve(async (req) => {
     for (const id of entryIds) {
       const e = entries.find((x: any) => x.id === id); if (!e) { results.push(`${id}: non trovata`); continue; }
       for (const s of subs) {
+        const lang = String(s.data.lang || "it").slice(0, 2);
+        const actorName = members.find((m: any) => m.id === actor)?.name || t(lang, "other");
         const v = bal[s.data.member] || 0;
-        const line = v < 0 ? `Devi ancora: ${fmt(-v)}` : v > 0 ? `${actorName} ti deve ancora: ${fmt(v)}` : "Siete in pari";
-        const title = e.kind === "payment" ? `${actorName} ha registrato un pagamento` : `${actorName} ha aggiunto una spesa`;
-        const body = `${e.kind === "payment" ? "Pagamento" : e.desc}: ${fmt(e.amount)}\n${line}`;
+        const line = v < 0 ? t(lang, "owe", fmt(-v, lang)) : v > 0 ? t(lang, "owed", actorName, fmt(v, lang)) : t(lang, "even");
+        const title = e.kind === "payment" ? t(lang, "pay", actorName) : t(lang, "exp", actorName);
+        const body = `${e.kind === "payment" ? t(lang, "payment") : e.desc}: ${fmt(e.amount, lang)}\n${line}`;
         try {
           await webpush.sendNotification(s.data.sub, JSON.stringify({ title, body, tag: "pari-" + id, url: "./#/spesa/" + id }), { TTL: 86400 });
           results.push(`${s.id}: ok`);

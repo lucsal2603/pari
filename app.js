@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.24.0';
+const APP_VERSION = '1.25.0';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -41,6 +41,51 @@ const nowISO = () => new Date().toISOString();
 const todayStr = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
 const ym = (dateStr) => dateStr.slice(0, 7);
 const curYM = () => todayStr().slice(0, 7);
+/* ---------- Lingua dell'interfaccia (dizionari in i18n.js, chiavi = testo italiano) ---------- */
+const LANG_FALLBACK = { code: 'it', name: 'Italiano', locale: 'it-IT', flag: 'it' };
+const LANGS = () => (window.I18N && I18N.langs) || [LANG_FALLBACK];
+const LANG = () => (window.__S && window.__S.settings && window.__S.settings.lang) || 'it';
+const langInfo = (c) => LANGS().find((l) => l.code === (c || LANG())) || LANG_FALLBACK;
+const LOC = () => langInfo().locale;
+const detectLang = () => { const n = String(navigator.language || 'it').slice(0, 2).toLowerCase(); return LANGS().some((l) => l.code === n) ? n : 'en'; };
+const i18nPats = {};
+function i18nPatterns(L) {
+  if (i18nPats[L]) return i18nPats[L];
+  const d = I18N.dict[L]; const out = [];
+  for (const k of Object.keys(d)) { if (!k.includes('{')) continue; const re = new RegExp('^' + k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\\\{(\d)\\\}/g, '(.+?)') + '$', 's'); out.push({ re, out: d[k], n: k.length }); }
+  out.sort((a, b) => b.n - a.n); i18nPats[L] = out; return out;
+}
+function trStr(d, L, s, depth) {
+  const k = s.trim(); if (!k || !/[A-Za-zÀ-ú]/.test(k)) return s;
+  const lead = s.slice(0, s.length - s.trimStart().length), trail = s.slice(s.trimEnd().length);
+  if (Object.prototype.hasOwnProperty.call(d, k)) return lead + d[k] + trail;
+  if (depth > 2) return s;
+  for (const p of i18nPatterns(L)) { const m = p.re.exec(k); if (m) { let o = p.out; for (let i = 1; i < m.length; i++) o = o.split('{' + (i - 1) + '}').join(trStr(d, L, m[i], depth + 1)); return lead + o + trail; } }
+  return s;
+}
+/* T('testo italiano') → testo nella lingua scelta; T('Ciao {0}', nome) sostituisce le parti variabili */
+function T(s, ...args) {
+  s = String(s == null ? '' : s); const L = LANG(); let out = s;
+  if (L !== 'it' && window.I18N && I18N.dict[L]) out = args.length ? (Object.prototype.hasOwnProperty.call(I18N.dict[L], s) ? I18N.dict[L][s] : s) : trStr(I18N.dict[L], L, s, 0);
+  args.forEach((a, i) => { out = out.split('{' + i + '}').join(a); });
+  return out;
+}
+/* traduce i testi e gli attributi (placeholder, aria-label, title) di una parte di pagina appena disegnata */
+function translateDom(root) {
+  if (!root || LANG() === 'it' || !window.I18N) return;
+  const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT); const nodes = []; let n; while ((n = w.nextNode())) nodes.push(n);
+  for (const t of nodes) { const par = t.parentElement; if (!par || /^(SCRIPT|STYLE|TEXTAREA)$/.test(par.tagName) || par.closest('[data-no-i18n]')) continue; const v = t.nodeValue; if (!/[A-Za-zÀ-ú]/.test(v)) continue; const x = T(v); if (x !== v) t.nodeValue = x; }
+  root.querySelectorAll('[placeholder],[aria-label],[title]').forEach((el) => { for (const a of ['placeholder', 'aria-label', 'title']) { const v = el.getAttribute(a); if (v) { const x = T(v); if (x !== v) el.setAttribute(a, x); } } });
+}
+/* parti fisse (barra in basso, caricamento, tira-per-aggiornare): ricordo l'italiano per poterle ritradurre quando cambia lingua */
+function translateStatic(root) {
+  if (!root) return;
+  const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT); const nodes = []; let n; while ((n = w.nextNode())) nodes.push(n);
+  for (const t of nodes) { if (t.__it === undefined) t.__it = t.nodeValue; if (/[A-Za-zÀ-ú]/.test(t.__it)) t.nodeValue = T(t.__it); }
+  root.querySelectorAll('[aria-label],[title],[placeholder]').forEach((el) => { el.__it = el.__it || {}; for (const a of ['aria-label', 'title', 'placeholder']) { const v = el.getAttribute(a); if (v == null) continue; if (!(a in el.__it)) el.__it[a] = v; el.setAttribute(a, T(el.__it[a])); } });
+}
+function applyLang() { document.documentElement.lang = LANG(); translateStatic(document.getElementById('tabbar')); translateStatic(document.getElementById('splash')); translateStatic(document.querySelector('.ptr')); }
+
 const CURRENCIES = [
   ['EUR', 'Euro'], ['USD', 'Dollaro statunitense'], ['GBP', 'Sterlina britannica'], ['CHF', 'Franco svizzero'], ['JPY', 'Yen giapponese'], ['CAD', 'Dollaro canadese'], ['AUD', 'Dollaro australiano'], ['NZD', 'Dollaro neozelandese'],
   ['SEK', 'Corona svedese'], ['NOK', 'Corona norvegese'], ['DKK', 'Corona danese'], ['ISK', 'Corona islandese'], ['PLN', 'Złoty polacco'], ['CZK', 'Corona ceca'], ['HUF', 'Fiorino ungherese'], ['RON', 'Leu rumeno'], ['BGN', 'Lev bulgaro'], ['RSD', 'Dinaro serbo'],
@@ -48,17 +93,17 @@ const CURRENCIES = [
   ['BRL', 'Real brasiliano'], ['MXN', 'Peso messicano'], ['ARS', 'Peso argentino'], ['CLP', 'Peso cileno'], ['COP', 'Peso colombiano'],
   ['INR', 'Rupia indiana'], ['CNY', 'Yuan cinese'], ['HKD', 'Dollaro di Hong Kong'], ['SGD', 'Dollaro di Singapore'], ['KRW', 'Won sudcoreano'], ['THB', 'Baht thailandese'], ['IDR', 'Rupia indonesiana'], ['MYR', 'Ringgit malese'], ['PHP', 'Peso filippino'], ['VND', 'Dong vietnamita'],
 ];
-const currencyName = (code) => (CURRENCIES.find((c) => c[0] === code) || [code, code])[1];
+const currencyName = (code) => { const it = (CURRENCIES.find((c) => c[0] === code) || [code, code])[1]; if (LANG() === 'it') return it; try { const n = new Intl.DisplayNames([LOC()], { type: 'currency' }).of(code); return n && n !== code ? n.charAt(0).toUpperCase() + n.slice(1) : it; } catch (_) { return it; } };
 const fmtCache = {};
-const curFmt = () => { const c = (window.__S && window.__S.settings.currency) || 'EUR'; if (!fmtCache[c]) { try { fmtCache[c] = new Intl.NumberFormat('it-IT', { style: 'currency', currency: c, currencyDisplay: 'narrowSymbol' }); } catch (_) { try { fmtCache[c] = new Intl.NumberFormat('it-IT', { style: 'currency', currency: c }); } catch (__) { fmtCache[c] = new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }); } } } return fmtCache[c]; };
+const curFmt = () => { const c = (window.__S && window.__S.settings.currency) || 'EUR'; const kk = LANG() + c; if (!fmtCache[kk]) { try { fmtCache[kk] = new Intl.NumberFormat(LOC(), { style: 'currency', currency: c, currencyDisplay: 'narrowSymbol' }); } catch (_) { try { fmtCache[kk] = new Intl.NumberFormat(LOC(), { style: 'currency', currency: c }); } catch (__) { fmtCache[kk] = new Intl.NumberFormat(LOC(), { style: 'currency', currency: 'EUR' }); } } } return fmtCache[kk]; };
 const curSymbol = () => { try { return curFmt().formatToParts(0).find((p) => p.type === 'currency').value; } catch (_) { return '€'; } };
 const curDigits = () => { try { return curFmt().resolvedOptions().maximumFractionDigits; } catch (_) { return 2; } };
 const money = (cents) => curFmt().format((cents || 0) / 100);
-const moneyPlain = (cents) => new Intl.NumberFormat('it-IT', { minimumFractionDigits: curDigits(), maximumFractionDigits: curDigits() }).format((cents || 0) / 100);
-const monthName = (ymStr) => { const [y, m] = ymStr.split('-').map(Number); return new Date(y, m - 1, 1).toLocaleDateString('it-IT', { month: 'long', year: 'numeric' }); };
-const monthShort = (ymStr) => { const [y, m] = ymStr.split('-').map(Number); return new Date(y, m - 1, 1).toLocaleDateString('it-IT', { month: 'short' }).replace('.', ''); };
-const dateLong = (d) => { const [y, m, dd] = d.split('-').map(Number); return new Date(y, m - 1, dd).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' }); };
-const dateShort = (d) => { const [y, m, dd] = d.split('-').map(Number); return new Date(y, m - 1, dd).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' }).replace('.', ''); };
+const moneyPlain = (cents) => new Intl.NumberFormat(LOC(), { useGrouping: false, minimumFractionDigits: curDigits(), maximumFractionDigits: curDigits() }).format((cents || 0) / 100);
+const monthName = (ymStr) => { const [y, m] = ymStr.split('-').map(Number); return new Date(y, m - 1, 1).toLocaleDateString(LOC(), { month: 'long', year: 'numeric' }); };
+const monthShort = (ymStr) => { const [y, m] = ymStr.split('-').map(Number); return new Date(y, m - 1, 1).toLocaleDateString(LOC(), { month: 'short' }).replace('.', ''); };
+const dateLong = (d) => { const [y, m, dd] = d.split('-').map(Number); return new Date(y, m - 1, dd).toLocaleDateString(LOC(), { day: 'numeric', month: 'long', year: 'numeric' }); };
+const dateShort = (d) => { const [y, m, dd] = d.split('-').map(Number); return new Date(y, m - 1, dd).toLocaleDateString(LOC(), { day: 'numeric', month: 'short' }).replace('.', ''); };
 const shiftYM = (ymStr, delta) => { const [y, m] = ymStr.split('-').map(Number); const d = new Date(y, m - 1 + delta, 1); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); };
 const parseAmount = (s) => { const t = String(s || '').replace(/\s|€/g, '').replace(',', '.'); if (!t || isNaN(t)) return NaN; return Math.round(parseFloat(t) * 100); };
 const relDay = (d) => {
@@ -81,7 +126,7 @@ function defaultState() {
     entries: [],
     activity: [],
     groups: [{ id: 'g1', name: 'Spese casa', createdAt: '2026-09-04T00:00:00.000Z', updatedAt: '2026-09-04T00:00:00.000Z', deleted: false }],
-    settings: { me: 'm1', currency: 'EUR', together: '', sync: { url: SUPA_URL, key: SUPA_ANON, house: '' }, lastPull: null, membersUpdatedAt: null, groupsUpdatedAt: null, lastGroup: 'g1', deviceId: null, push: null, pushUpdatedAt: null, notified: [], onboarded: false },
+    settings: { me: 'm1', currency: 'EUR', together: '', sync: { url: SUPA_URL, key: SUPA_ANON, house: '' }, lastPull: null, membersUpdatedAt: null, groupsUpdatedAt: null, lastGroup: 'g1', deviceId: null, push: null, pushUpdatedAt: null, notified: [], onboarded: false, lang: detectLang() },
     ui: { month: curYM(), statsRange: 'mese', balTab: 0, homeMode: 'paid' },
   };
 }
@@ -92,6 +137,8 @@ function load() {
     if (!st.settings.sync.url) { st.settings.sync.url = SUPA_URL; st.settings.sync.key = SUPA_ANON; }
     // telefoni già collegati prima dell'arrivo della presentazione: non la mostro
     if ((s.settings || {}).onboarded === undefined) st.settings.onboarded = !!(st.settings.sync && st.settings.sync.house);
+    // telefoni che usavano l'app prima delle lingue: restano in italiano
+    if ((s.settings || {}).lang === undefined) st.settings.lang = 'it';
     return st; } } catch (e) { console.warn('stato corrotto', e); }
   return defaultState();
 }
@@ -198,7 +245,7 @@ function showDailyLove() {
 function notifText(e, actorName, balForMe) {
   const line = balForMe < 0 ? `Devi ancora: ${money(-balForMe)}` : balForMe > 0 ? `${actorName} ti deve ancora: ${money(balForMe)}` : 'Siete in pari';
   const title = e.kind === 'payment' ? `${actorName} ha registrato un pagamento` : `${actorName} ha aggiunto una spesa`;
-  return { title, body: `${e.kind === 'payment' ? 'Pagamento' : e.desc}: ${money(e.amount)}\n${line}` };
+  return { title: T(title), body: T(`${e.kind === 'payment' ? 'Pagamento' : e.desc}: ${money(e.amount)}`) + '\n' + T(line) };
 }
 async function showLocalNotification(title, body, url) {
   if (!('Notification' in window) || Notification.permission !== 'granted') return false;
@@ -338,7 +385,7 @@ function render(r, toTop) {
   tabbar.classList.toggle('hide', onb); view.classList.toggle('no-tabbar', onb);
   const tabName = r.name === 'profilo' ? 'profilo' : r.name === 'statistiche' ? 'bilanci' : r.name;
   $$('.tab').forEach((t) => t.classList.toggle('on', t.dataset.tab === tabName));
-  view.innerHTML = fn(r);
+  view.innerHTML = fn(r); translateDom(view);
   window.scrollTo(0, keep);
   bind(r); initSwipes();
   const reveal = () => { $$('.chart').forEach((c) => c.classList.add('in')); $$('[data-w]').forEach((el) => (el.style.width = el.dataset.w)); };
@@ -572,7 +619,7 @@ function pageDetail(r) {
     <div class="detail-top">
       <span class="cat-ic${isPay ? ' pay' : ''}">${icon(isPay ? 'c-pagamento' : c.icon)}</span>
       <div class="name">${esc(isPay ? `${payer.name} ha pagato ${member(parts[0]?.[0]).name}` : e.desc)}</div>
-      <div class="date">${esc(dateLong(e.date))}${!isPay && e.cat ? ' · ' + esc(c.name) : ''}${e.recurringOf || e.recurring ? ' · si ripete ogni mese' : ''}${groups().length > 1 || !groupOf(e) ? ' · ' + esc(groupName(e)) : ''}</div>
+      <div class="date">${esc(dateLong(e.date))}${!isPay && e.cat ? ' · <span>' + esc(c.name) + '</span>' : ''}${e.recurringOf || e.recurring ? ' · <span>si ripete ogni mese</span>' : ''}${groups().length > 1 || !groupOf(e) ? ' · ' + esc(groupName(e)) : ''}</div>
       <div class="amt">${money(e.amount)}</div>
       <div class="by ${payer.id === S.members[0].id ? 'green' : 'orange'}">${isPay ? 'Saldo aggiornato' : 'Pagato da ' + esc(payer.name)}</div>
       ${(() => { const m = myShare(e); return m.label ? `<div style="margin-top:10px"><span class="pill ${m.cls === 'green' ? 'green' : 'red'}">${esc(m.label)}</span></div>` : ''; })()}
@@ -581,7 +628,7 @@ function pageDetail(r) {
     <section class="card"><div class="people">${parts.map(([id, v]) => `<div>${avatar(member(id))}<span>${esc(member(id).name)}</span><span class="money">${money(v)}</span></div>`).join('')}</div></section>`}
     ${e.notes ? `<h2 class="sec-title section">Note</h2><div class="notes">${esc(e.notes)}</div>` : ''}
     <div class="section btn-row"><a class="btn soft" href="#/modifica/${e.id}">Modifica</a><button class="btn danger" data-del="${e.id}">Elimina</button></div>
-    <div class="section small muted" style="text-align:center">Aggiunta ${esc(new Date(e.createdAt).toLocaleString('it-IT', { dateStyle: 'medium', timeStyle: 'short' }))}${e.updatedAt !== e.createdAt ? ' · modificata ' + esc(new Date(e.updatedAt).toLocaleString('it-IT', { dateStyle: 'medium', timeStyle: 'short' })) : ''}</div>
+    <div class="section small muted" style="text-align:center">Aggiunta ${esc(new Date(e.createdAt).toLocaleString(LOC(), { dateStyle: 'medium', timeStyle: 'short' }))}${e.updatedAt !== e.createdAt ? ' · modificata ' + esc(new Date(e.updatedAt).toLocaleString(LOC(), { dateStyle: 'medium', timeStyle: 'short' })) : ''}</div>
   </div>`;
 }
 
@@ -604,7 +651,7 @@ function pageForm(r) {
     <form id="f" novalidate>
       ${isPay ? '' : `<div class="scan-row"><label class="btn soft scan-btn">${icon('i-camera')} Fotografa lo scontrino<input type="file" accept="image/*" capture="environment" id="scan-cam" hidden></label><label class="scan-gallery">${icon('i-image')} dalla galleria<input type="file" accept="image/*" id="scan-gal" hidden></label></div>`}
       ${isPay ? '' : `<div class="field"><label for="desc">Descrizione</label><input id="desc" type="text" placeholder="Cena pizza" value="${esc(F.desc)}" autocomplete="off" enterkeyhint="next"></div>`}
-      <div class="field"><label for="amount">Importo</label><div class="money-input"><span class="cur">${esc(curSymbol())}</span><input id="amount" type="text" inputmode="decimal" placeholder="0,00" value="${esc(F.amount)}" autocomplete="off"></div><div class="hint err" id="amount-err" hidden>Inserisci un importo valido.</div></div>
+      <div class="field"><label for="amount">Importo</label><div class="money-input"><span class="cur">${esc(curSymbol())}</span><input id="amount" type="text" inputmode="decimal" placeholder="${esc(moneyPlain(0))}" value="${esc(F.amount)}" autocomplete="off"></div><div class="hint err" id="amount-err" hidden>Inserisci un importo valido.</div></div>
       ${isPay
         ? `<div class="field"><div class="lbl">Pagamento</div><div class="pay-dir">${avatar(payerOf(F.paidBy))}<span class="txt"><span class="t">${esc(payerOf(F.paidBy).name)} dà a ${esc(payerOf(F.to).name)}</span><span class="d">${F.amount ? '€ ' + esc(F.amount) : 'la somma qui sopra'} · il saldo fra voi si aggiorna</span></span>${avatar(payerOf(F.to))}</div></div>`
         : `<div class="field"><div class="pay-dir soft">${avatar(payerOf(F.paidBy))}<span class="txt"><span class="t">${F.id ? 'Pagata da ' + esc(payerOf(F.paidBy).name) : 'Paghi tu, ' + esc(payerOf(F.paidBy).name)}</span><span class="d" id="half-hint">${halfHint()}</span></span></div></div>
@@ -668,6 +715,7 @@ function pageProfilo(r) {
   if (r.sub === 'sync') return pageSync();
   if (r.sub === 'notifiche') return pageNotifiche();
   if (r.sub === 'valuta') return pageValuta();
+  if (r.sub === 'lingua') return pageLingua();
   if (r.sub === 'info') return pageInfo();
   if (r.sub === 'esporta') return pageExport();
   const together = S.settings.together ? `Insieme dal ${esc(S.settings.together)} <span aria-hidden="true">❤️</span>` : 'Le nostre spese, a metà <span aria-hidden="true">❤️</span>';
@@ -679,6 +727,7 @@ function pageProfilo(r) {
       <a href="#/profilo/sezioni">${icon('i-list')}<span>Sezioni</span><span class="val">${groups().length}</span>${icon('i-right', 'ic chev')}</a>
       <a href="#/profilo/categorie">${icon('i-grid')}<span>Categorie</span><span></span>${icon('i-right', 'ic chev')}</a>
       <a href="#/profilo/valuta">${icon('i-coin')}<span>Valuta</span><span class="val">${esc(S.settings.currency || 'EUR')} (${esc(curSymbol())})</span>${icon('i-right', 'ic chev')}</a>
+      <a href="#/profilo/lingua">${icon('i-globe')}<span>Lingua</span><span class="val" data-no-i18n><i class="flag ${esc(langInfo().flag)} mini" aria-hidden="true"></i>${esc(langInfo().name)}</span>${icon('i-right', 'ic chev')}</a>
       <a href="#/profilo/esporta">${icon('i-download')}<span>Esporta dati</span><span></span>${icon('i-right', 'ic chev')}</a>
       <a href="#/profilo/notifiche">${icon('i-heart')}<span>Notifiche</span><span class="val">${S.settings.push && Notification?.permission === 'granted' ? 'attive' : 'non attive'}</span>${icon('i-right', 'ic chev')}</a>
       <a href="#/profilo/sync">${icon('i-cloud')}<span>Backup e sincronizzazione</span><span class="sync-dot ${syncOn ? '' : 'off'}" title="${syncOn ? 'attiva' : 'non attiva'}"></span>${icon('i-right', 'ic chev')}</a>
@@ -736,7 +785,7 @@ function pageExport() {
 }
 function pageSync() {
   const s = S.settings.sync; const on = sync.enabled();
-  const st = sync.status === 'busy' ? 'Sincronizzazione in corso…' : sync.status === 'err' ? 'Errore: ' + (sync.lastError || 'controlla URL e chiave') : on ? (S.settings.lastPull ? 'Ultimo aggiornamento ' + new Date(S.settings.lastPull).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' }) : 'Collegata, mai sincronizzata') : 'Non attiva: i dati restano solo su questo telefono';
+  const st = sync.status === 'busy' ? 'Sincronizzazione in corso…' : sync.status === 'err' ? 'Errore: ' + (sync.lastError || 'controlla URL e chiave') : on ? (S.settings.lastPull ? 'Ultimo aggiornamento ' + new Date(S.settings.lastPull).toLocaleString(LOC(), { dateStyle: 'short', timeStyle: 'short' }) : 'Collegata, mai sincronizzata') : 'Non attiva: i dati restano solo su questo telefono';
   return `<div class="page slide">${subHead('Backup e sincronizzazione')}
     <section class="card"><div class="status-line"><span class="sync-dot ${!on ? 'off' : sync.status === 'busy' ? 'busy' : sync.status === 'err' ? 'err' : ''}"></span>${esc(st)}</div>
     <p class="small muted" style="margin:10px 0 0">Il database condiviso è già impostato. Per collegare i due telefoni basta scrivere lo stesso <b>codice casa</b> su entrambi e premere "Salva e collega".</p></section>
@@ -769,7 +818,14 @@ function pageValuta() {
   return `<div class="page slide">${subHead('Valuta')}
     <p class="muted small" style="margin:0 2px 12px">La valuta vale per tutte le spese del gruppo, su entrambi i telefoni. Gli importi già inseriti restano gli stessi numeri: cambiano solo simbolo e formato.</p>
     <label class="search">${icon('i-search')}<input id="cur-q" type="search" placeholder="Cerca una valuta…" autocomplete="off"></label>
-    <section class="card list-card"><div class="list" id="cur-list">${CURRENCIES.map(([code, name]) => { let sym = code; try { sym = new Intl.NumberFormat('it-IT', { style: 'currency', currency: code, currencyDisplay: 'narrowSymbol' }).formatToParts(0).find((p) => p.type === 'currency').value; } catch (_) {} return `<button type="button" class="row" data-cur="${code}" data-name="${esc(name.toLowerCase())}"><span class="cat-ic" style="font-weight:800;font-size:14px">${esc(sym.length > 3 ? code.slice(0, 3) : sym)}</span><span class="main"><span class="title">${esc(name)}</span><span class="sub">${code}</span></span><span class="right">${cur === code ? icon('i-check', 'ic green') : ''}</span></button>`; }).join('')}</div></section>
+    <section class="card list-card"><div class="list" id="cur-list">${CURRENCIES.map(([code, name]) => { let sym = code; try { sym = new Intl.NumberFormat(LOC(), { style: 'currency', currency: code, currencyDisplay: 'narrowSymbol' }).formatToParts(0).find((p) => p.type === 'currency').value; } catch (_) {} const nm = currencyName(code); return `<button type="button" class="row" data-cur="${code}" data-name="${esc((name + ' ' + nm).toLowerCase())}"><span class="cat-ic" style="font-weight:800;font-size:14px">${esc(sym.length > 3 ? code.slice(0, 3) : sym)}</span><span class="main"><span class="title" data-no-i18n>${esc(nm)}</span><span class="sub">${code}</span></span><span class="right">${cur === code ? icon('i-check', 'ic green') : ''}</span></button>`; }).join('')}</div></section>
+  </div>`;
+}
+function pageLingua() {
+  const cur = LANG();
+  return `<div class="page slide">${subHead('Lingua')}
+    <p class="muted small" style="margin:0 2px 12px">${esc(T("La lingua vale solo per questo telefono: {0} può sceglierne un'altra sul suo.", other().name))}</p>
+    <section class="card list-card"><div class="list">${LANGS().map((l) => `<button type="button" class="row" data-lang="${l.code}"><span class="flag ${esc(l.flag)}" aria-hidden="true"></span><span class="main"><span class="title" data-no-i18n>${esc(l.name)}</span><span class="sub" data-no-i18n>${esc(l.code.toUpperCase())}</span></span><span class="right">${cur === l.code ? icon('i-check', 'ic green') : ''}</span></button>`).join('')}</div></section>
   </div>`;
 }
 function pageInfo() {
@@ -792,7 +848,7 @@ function pageActivity() {
   const days = []; S.activity.forEach((a) => { const k = a.ts.slice(0, 10); let d = days.find((x) => x.k === k); if (!d) { d = { k, items: [] }; days.push(d); } d.items.push(a); });
   const text = (a) => { const who = member(a.by).name; const amt = money(a.amount); const d = esc(a.desc || ''); switch (a.type) { case 'add': return `<b>${esc(who)}</b> ha aggiunto <b>${d}</b> (${amt})`; case 'edit': return `<b>${esc(who)}</b> ha modificato <b>${d}</b> (${amt})`; case 'delete': return `<b>${esc(who)}</b> ha eliminato <b>${d}</b> (${amt})`; case 'restore': return `<b>${esc(who)}</b> ha ripristinato <b>${d}</b>`; case 'settle': return `<b>${esc(who)}</b> ha registrato un pagamento di <b>${amt}</b>`; default: return d; } };
   return `<div class="page slide">${subHead('Attività', '#/spese')}
-    <section class="card">${days.length ? `<div class="feed">${days.map((d) => `<div class="day">${esc(relDay(d.k))}</div>${d.items.map((a) => `<a class="ev ${a.type}" href="#/spesa/${a.entryId}"><div class="t">${text(a)}</div><div class="when">${esc(new Date(a.ts).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }))}</div></a>`).join('')}`).join('')}</div>` : emptyBox('Ancora niente', 'Qui compare tutto quello che aggiungete, modificate o saldate.')}</section>
+    <section class="card">${days.length ? `<div class="feed">${days.map((d) => `<div class="day">${esc(relDay(d.k))}</div>${d.items.map((a) => `<a class="ev ${a.type}" href="#/spesa/${a.entryId}"><div class="t">${text(a)}</div><div class="when">${esc(new Date(a.ts).toLocaleTimeString(LOC(), { hour: '2-digit', minute: '2-digit' }))}</div></a>`).join('')}`).join('')}</div>` : emptyBox('Ancora niente', 'Qui compare tutto quello che aggiungete, modificate o saldate.')}</section>
   </div>`;
 }
 
@@ -930,6 +986,7 @@ const STORES = [
   ['mcdonald', "McDonald's", 'cibo'], ['burger king', 'Burger King', 'cibo'], ['kfc', 'KFC', 'cibo'], ['ristorante', 'Ristorante', 'cibo'], ['pizzeria', 'Pizzeria', 'cibo'], ['trattoria', 'Trattoria', 'cibo'], ['osteria', 'Osteria', 'cibo'], ['bar ', 'Bar', 'cibo'], ['caffe', 'Caffè', 'cibo'], ['pasticceria', 'Pasticceria', 'cibo'], ['gelateria', 'Gelateria', 'cibo'], ['sushi', 'Sushi', 'cibo'], ['kebab', 'Kebab', 'cibo'],
   ['cinema', 'Cinema', 'tempo-libero'], ['uci', 'UCI Cinemas', 'tempo-libero'], ['the space', 'The Space Cinema', 'tempo-libero'], ['parcheggio', 'Parcheggio', 'trasporti'], ['hotel', 'Hotel', 'viaggi'], ['b&b', 'B&B', 'viaggi'],
 ];
+const GENERIC = new Set(['Farmacia', 'Parafarmacia', 'Ristorante', 'Pizzeria', 'Trattoria', 'Osteria', 'Bar', 'Caffè', 'Pasticceria', 'Gelateria', 'Sushi', 'Kebab', 'Cinema', 'Parcheggio', 'Hotel', 'B&B', 'Brico']);
 const storeMatch = (text) => { const t = ' ' + text.toLowerCase().replace(/[^a-z0-9&à-ú]+/g, ' ') + ' '; for (const [k, name, c] of STORES) { const kk = k.trim(); if (kk.length <= 4 ? t.includes(' ' + kk + ' ') : t.includes(kk)) return { name, cat: c }; } return null; };
 const NOISE = /scontrino|documento|commerciale|p\.? ?iva|partita|c\.?f\.|tel\.?|fax|cod\.? ?fisc|via |viale |piazza |corso |cassa|operatore|n\.? ?doc|data|ora |grazie|arrivederci|euro|totale|iva|resto|contanti|carta|bancomat|pagamento|reparto|descrizione|prezzo|qta|art\./i;
 const MONTHS = { gen: 1, feb: 2, mar: 3, apr: 4, mag: 5, giu: 6, lug: 7, ago: 8, set: 9, ott: 10, nov: 11, dic: 12, jan: 1, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, dec: 12 };
@@ -961,11 +1018,18 @@ function parseDigital(lines, whole) {
   let amount = 0; const pri = lines.filter((l) => /hai pagato|hai autorizzato|importo|pagamento|pagato|totale|addebito|transazione|speso|prelievo/i.test(l));
   for (const l of pri) { const a = amountsIn(l); if (a.length) { amount = a[0].cents; break; } }
   if (!amount) { let all = []; lines.forEach((l) => (all = all.concat(amountsIn(l)))); const withEuro = all.filter((x) => x.euro); if (withEuro.length) amount = withEuro[0].cents; else if (all.length) amount = Math.max(...all.map((x) => x.cents)); }
-  // esercente: "presso X", "a X", "da X", "beneficiario X", oppure marchio noto, oppure riga in maiuscolo
-  let store = '', cat = ''; const sm = storeMatch(whole); if (sm) { store = sm.name; cat = sm.cat; }
-  if (!store) { const m = whole.match(/(?:presso|a favore di|beneficiario|esercente|merchant|pagamento a|pagato a|hai pagato [^\n]*? a|da)\s*[:\-]?\s*([A-Za-zÀ-ú0-9&'.\- ]{3,40})/i); if (m) store = m[1].trim().replace(/\s+(il|lo|la|per|di|con|€|eur).*$/i, ''); }
+  // esercente: prima quello scritto nella notifica ("presso X", "a X", "beneficiario X"), poi marchio noto, poi riga in maiuscolo
+  let store = '', cat = '';
+  const flat = whole.replace(/-\s*\n\s*/g, '-').replace(/\s*\n\s*/g, ' ');
+  const mm = flat.match(/\b(?:presso|a favore di|beneficiario|esercente|merchant|pagamento a|pagato a|hai pagato [^\n]*? a|da)\b\s*[:\-]?\s*([A-Za-zÀ-ú0-9&'.\- ]{3,60})/i);
+  if (mm) { let x = mm[1].trim(); if (/^[A-ZÀ-Ú0-9]/.test(x)) { const cut = x.search(/\s+[a-zà-ú]{2,}\b/); if (cut > 0) x = x.slice(0, cut); } else x = x.replace(/\s+(il|lo|la|per|di|con|in|alle|€|eur).*$/i, ''); x = x.replace(/[\s.,;:-]+$/, ''); if (/^(?!(?:un|una|carta|conto|banca|te|tu|noi)$)[A-Za-zÀ-ú]/.test(x) && x.replace(/[^A-Za-zÀ-ú]/g, '').length >= 3) store = x; }
+  const sm = storeMatch(store || whole); if (sm) { cat = sm.cat; if (!store || !GENERIC.has(sm.name)) store = sm.name; }
+  if (!store) { const smw = storeMatch(whole); if (smw && !GENERIC.has(smw.name)) { store = smw.name; cat = smw.cat; } }
   if (!store) { const cand = lines.find((l) => /^[A-Z0-9&'. \-]{4,}$/.test(l) && !/[0-9]{3,}/.test(l) && !NOISE.test(l) && !/PAGAMENTO|IMPORTO|TOTALE|EUR|SATISPAY|PAYPAL|REVOLUT|OGGI|IERI/i.test(l)); if (cand) store = cand; }
-  store = store.replace(/[.\s]+$/, '').slice(0, 40); if (store && store === store.toUpperCase()) store = store.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+  store = store.replace(/[.\s]+$/, '').slice(0, 40);
+  // "RAMEN BAR AKIRA-BRESCIA" → via la città attaccata col trattino
+  if (/^[^a-zà-ú]*$/.test(store)) store = store.replace(/\s*-\s*[A-ZÀ-Ú]{3,}$/, '');
+  if (store && store === store.toUpperCase()) store = store.toLowerCase().replace(/(^|[\s'&(-])([a-zà-ú])/g, (a, b, c) => b + c.toUpperCase());
   if (!cat && store) { const sm2 = storeMatch(store); if (sm2) cat = sm2.cat; }
   // data: gg/mm/aaaa, "5 set 2026", "5 settembre 2026", oggi/ieri
   let date = '';
@@ -979,34 +1043,53 @@ function loadOCR() {
   if (ocrLib) return Promise.resolve(ocrLib);
   return new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js'; sc.onload = () => { ocrLib = window.Tesseract; res(ocrLib); }; sc.onerror = () => rej(new Error('Serve la rete per scaricare il lettore la prima volta')); document.head.appendChild(sc); });
 }
-async function prepareImage(file, boost) {
+async function prepareImage(file, mode) {
   let bmp; try { bmp = await createImageBitmap(file, { imageOrientation: 'from-image' }); } catch (_) { bmp = await createImageBitmap(file); }
-  const max = 1800; const k = Math.min(1, max / Math.max(bmp.width, bmp.height)); const w = Math.round(bmp.width * k), h = Math.round(bmp.height * k);
-  const c = document.createElement('canvas'); c.width = w; c.height = h; const ctx = c.getContext('2d'); ctx.drawImage(bmp, 0, 0, w, h);
-  // scala di grigi con contrasto: aiuta la lettura della stampa termica
-  const img = ctx.getImageData(0, 0, w, h); const d = img.data; let sum = 0; for (let i = 0; i < d.length; i += 4) { const g = d[i] * .3 + d[i + 1] * .59 + d[i + 2] * .11; d[i] = d[i + 1] = d[i + 2] = g; sum += g; }
-  const mean = sum / (d.length / 4); const dark = mean < 110; // screenshot in modalità scura: testo chiaro su fondo scuro → inverto
-  for (let i = 0; i < d.length; i += 4) { let g = dark ? 255 - d[i] : d[i]; if (boost) { const mm = dark ? 255 - mean : mean; g = (g - mm) * 1.35 + mm + 10; } g = g < 0 ? 0 : g > 255 ? 255 : g; d[i] = d[i + 1] = d[i + 2] = g; }
-  ctx.putImageData(img, 0, 0); return c;
+  // foto grandi rimpicciolite, screenshot piccoli (notifiche) ingranditi: il lettore vuole lettere alte almeno 25-30 px
+  const k = Math.min(2, 1800 / Math.max(bmp.width, bmp.height)); const w = Math.round(bmp.width * k), h = Math.round(bmp.height * k);
+  const c = document.createElement('canvas'); c.width = w; c.height = h; const ctx = c.getContext('2d'); ctx.imageSmoothingQuality = 'high'; ctx.drawImage(bmp, 0, 0, w, h);
+  const img = ctx.getImageData(0, 0, w, h); const d = img.data; const n = w * h; const g = new Uint8ClampedArray(n); let sum = 0;
+  for (let i = 0, j = 0; i < n; i++, j += 4) { const v = d[j] * .3 + d[j + 1] * .59 + d[j + 2] * .11; g[i] = v; sum += v; }
+  const mean = sum / n; const dark = mean < 110;
+  if (mode === 'adaptive-dark' || mode === 'adaptive-light') {
+    // soglia locale (media in una finestra intorno al pixel): funziona anche con sfondi non uniformi,
+    // tipo una notifica semitrasparente sopra una foto o uno scontrino fotografato con luce di lato
+    const W = w + 1; const I = new Float64Array(W * (h + 1));
+    for (let y = 1; y <= h; y++) { let row = 0; const o = y * W, po = (y - 1) * W, go = (y - 1) * w; for (let x = 1; x <= w; x++) { row += g[go + x - 1]; I[o + x] = I[po + x] + row; } }
+    const r = Math.max(14, Math.round(Math.min(w, h) / 14)); const C = 12; const light = mode === 'adaptive-light';
+    for (let y = 0; y < h; y++) { const y0 = Math.max(0, y - r), y1 = Math.min(h, y + r + 1); for (let x = 0; x < w; x++) { const x0 = Math.max(0, x - r), x1 = Math.min(w, x + r + 1); const m = (I[y1 * W + x1] - I[y0 * W + x1] - I[y1 * W + x0] + I[y0 * W + x0]) / ((y1 - y0) * (x1 - x0)); const v = g[y * w + x]; const isText = light ? v > m + C : v < m - C; const o = (y * w + x) * 4; d[o] = d[o + 1] = d[o + 2] = isText ? 0 : 255; } }
+  } else {
+    const boost = mode === 'boost';
+    for (let i = 0, j = 0; i < n; i++, j += 4) { let v = dark ? 255 - g[i] : g[i]; if (boost) { const mm = dark ? 255 - mean : mean; v = (v - mm) * 1.35 + mm + 10; } d[j] = d[j + 1] = d[j + 2] = v < 0 ? 0 : v > 255 ? 255 : v; }
+  }
+  ctx.putImageData(img, 0, 0); c.__mean = mean; return c;
 }
 async function scanReceipt(file) {
   const root = $('#sheet-root');
   openSheet('Lettura dello scontrino', `<div class="scan-box"><div class="scan-t" id="scan-t">Preparo la foto…</div><div class="scan-bar"><i id="scan-bar"></i></div><p class="small muted" style="margin:10px 0 0">La lettura avviene sul telefono: la foto non viene inviata da nessuna parte.</p></div>`);
-  const setP = (t, p) => { const el = $('#scan-t'); if (el) el.textContent = t; const b = $('#scan-bar'); if (b) b.style.width = Math.round(p * 100) + '%'; };
+  const setP = (t, p) => { const el = $('#scan-t'); if (el) el.textContent = T(t); const b = $('#scan-bar'); if (b) b.style.width = Math.round(p * 100) + '%'; };
   try {
     setP('Scarico il lettore…', .05);
     const T = await loadOCR();
-    let pass = 0; const worker = await T.createWorker('ita', 1, { logger: (m) => { if (m.status === 'recognizing text') setP((pass ? 'Seconda lettura… ' : 'Leggo lo scontrino… ') + Math.round(m.progress * 100) + '%', (pass ? .6 : .2) + m.progress * .4); else if (/load|init/i.test(m.status)) setP('Preparo il lettore…', .1); } });
+    let pass = 0; const worker = await T.createWorker('ita', 1, { logger: (m) => { if (m.status === 'recognizing text') setP((pass ? `Rileggo (${pass + 1}ª volta)… ` : 'Leggo lo scontrino… ') + Math.round(m.progress * 100) + '%', .2 + Math.min(.75, (pass + m.progress) * .2)); else if (/load|init/i.test(m.status)) setP('Preparo il lettore…', .1); } });
     await worker.setParameters({ preserve_interword_spaces: '1' });
-    // primo passaggio in scala di grigi; se manca il totale, secondo passaggio con più contrasto
-    let { data } = await worker.recognize(await prepareImage(file, false)); let r = parseReceipt(data.text || ''); let txt = data.text || '';
-    if (!r.amount) { pass = 1; const d2 = await worker.recognize(await prepareImage(file, true)); const r2 = parseReceipt(d2.data.text || ''); if (r2.amount || (!r.store && r2.store)) { r = { ...r2, store: r2.store || r.store, date: r2.date || r.date, cat: r2.cat || r.cat }; txt = d2.data.text || ''; } }
+    // più passaggi con pre-elaborazioni diverse: mi fermo appena trovo importo e negozio, altrimenti tengo il migliore
+    const first = await prepareImage(file, 'gray'); const darkShot = first.__mean < 128;
+    const modes = ['gray', darkShot ? 'adaptive-light' : 'adaptive-dark', darkShot ? 'adaptive-dark' : 'adaptive-light', 'boost'];
+    const score = (x, conf) => (x.amount ? 2 : 0) + (x.store ? 1 : 0) + (x.date ? .3 : 0) + (conf || 0) / 200;
+    let r = null, txt = '', best = -1;
+    for (pass = 0; pass < modes.length; pass++) {
+      const cv = pass === 0 ? first : await prepareImage(file, modes[pass]);
+      const { data } = await worker.recognize(cv); const t = data.text || ''; const x = parseReceipt(t); const sc = score(x, data.confidence);
+      if (sc > best) { best = sc; txt = t; r = r ? { ...x, store: x.store || r.store, date: x.date || r.date, cat: x.cat || r.cat } : x; } else if (r) { r = { ...r, store: r.store || x.store, date: r.date || x.date, cat: r.cat || x.cat }; }
+      if (r.amount && r.store) break;
+    }
     await worker.terminate(); window.PARI && (window.PARI.lastOCR = txt); closeSheet();
     if (!r.amount && !r.store) { toast('Non riesco a leggere lo scontrino: prova con più luce e inquadratura dritta'); return; }
     if (r.store) { F.desc = r.store; const d = $('#desc'); if (d) d.value = r.store; }
     if (r.amount) { F.amount = moneyPlain(r.amount); const a = $('#amount'); if (a) { a.value = F.amount; a.dispatchEvent(new Event('input', { bubbles: true })); } }
     if (r.date) { F.date = r.date; const dt = $('#date'); if (dt) dt.value = r.date; }
-    if (r.cat) { F.cat = r.cat; $$('.cat-circle').forEach((x) => x.classList.toggle('on', x.dataset.cat === F.cat)); const cn = $('#cat-name'); if (cn) cn.textContent = catOf(F.cat).name; }
+    if (r.cat) { F.cat = r.cat; $$('.cat-circle').forEach((x) => x.classList.toggle('on', x.dataset.cat === F.cat)); const cn = $('#cat-name'); if (cn) cn.textContent = T(catOf(F.cat).name); }
     $$('.scan-fill').forEach((x) => x.classList.remove('scan-fill')); ['#desc', '#amount', '#date'].forEach((sel) => { const el = $(sel); if (el && el.value) el.classList.add('scan-fill'); });
     toast(r.amount ? `Letto: ${r.store || 'scontrino'} · ${money(r.amount)}. Controlla e conferma` : 'Ho trovato il negozio ma non il totale: scrivilo tu');
   } catch (e) { closeSheet(); console.warn('ocr', e); toast(e.message && /rete/.test(e.message) ? e.message : 'Lettura non riuscita: riprova con una foto più nitida'); }
@@ -1037,7 +1120,7 @@ function rememberHouse() { const h = S.settings.sync.house; if (h && auth.user()
 function restoreHouseFromAccount() { const u = auth.user(); const h = u && u.user_metadata && u.user_metadata.house; if (h && !S.settings.sync.house) { S.settings.sync.house = h; S.settings.lastPull = null; S.settings.lastPush = null; save(); return true; } return false; }
 function ensureHouse() { if (!S.settings.sync.house) { if (!restoreHouseFromAccount()) { S.settings.sync.house = newHouseCode(); S.settings.lastPull = null; S.settings.lastPush = null; save(); } if (sync.enabled()) sync.run(true); } rememberHouse(); return S.settings.sync.house; }
 const inviteLink = () => appUrl() + '#/join/' + encodeURIComponent(ensureHouse());
-const inviteText = () => `Unisciti al mio gruppo su Divvy per dividere le spese: ${inviteLink()}`;
+const inviteText = () => T('Unisciti al mio gruppo su Divvy per dividere le spese: {0}', inviteLink());
 /* chi apre un link di invito: il codice del gruppo viene salvato e applicato dopo l'accesso */
 function applyJoin(code) {
   if (!code) return false; const cur = S.settings.sync.house;
@@ -1200,7 +1283,7 @@ function bindForm(r) {
   $$('[data-soon]').forEach((b) => b.addEventListener('click', () => { if (b.dataset.soon === 'friends') toast('Dividere con amici arriva in una prossima versione'); }));
   $$('[data-split]').forEach((b) => b.addEventListener('click', () => { const v = b.dataset.split; if (v === 'equal') F.splitMethod = 'equal'; else if (F.splitMethod === 'equal') F.splitMethod = 'exact'; rerender(); }));
   $$('[data-share]').forEach((inp) => inp.addEventListener('input', () => { F.splitInput[inp.dataset.share] = inp.value; validateSplit(); }));
-  $$('[data-cat]').forEach((b) => b.addEventListener('click', () => { F.cat = F.cat === b.dataset.cat ? '' : b.dataset.cat; $$('.cat-circle').forEach((x) => x.classList.toggle('on', x.dataset.cat === F.cat)); $('#cat-name').textContent = F.cat ? catOf(F.cat).name : 'Nessuna categoria'; }));
+  $$('[data-cat]').forEach((b) => b.addEventListener('click', () => { F.cat = F.cat === b.dataset.cat ? '' : b.dataset.cat; $$('.cat-circle').forEach((x) => x.classList.toggle('on', x.dataset.cat === F.cat)); $('#cat-name').textContent = T(F.cat ? catOf(F.cat).name : 'Nessuna categoria'); }));
   const rec = $('#recurring'); if (rec) rec.addEventListener('click', () => { F.recurring = !F.recurring; rec.setAttribute('aria-checked', F.recurring); });
   ['#scan-cam', '#scan-gal'].forEach((sel) => { const i = $(sel); if (i) i.addEventListener('change', () => { const f = i.files && i.files[0]; if (f) scanReceipt(f); i.value = ''; }); });
   if (pendingScan && F.kind === 'expense') { const f = pendingScan; pendingScan = null; setTimeout(() => scanReceipt(f), 350); }
@@ -1247,6 +1330,9 @@ function bindProfilo(r) {
     });
     const n = $('#sync-now'); if (n) n.addEventListener('click', async () => { toast('Sincronizzo…'); const ok = await sync.run(true); render(); toast(ok ? 'Aggiornato' : 'Errore: ' + (sync.lastError || '')); });
     const off = $('#sync-off'); if (off) off.addEventListener('click', () => { S.settings.sync = { url: SUPA_URL, key: SUPA_ANON, house: '' }; S.settings.lastPull = null; save(); sync.status = 'idle'; render(); toast('Scollegata: i dati restano sul telefono'); });
+  }
+  if (r.sub === 'lingua') {
+    $$('[data-lang]').forEach((b) => b.addEventListener('click', () => { S.settings.lang = b.dataset.lang; if (S.settings.push) { S.settings.pushUpdatedAt = nowISO(); sync.schedule(); } save(); applyLang(); toast(T('Lingua: {0}', langInfo().name)); render(); }));
   }
   if (r.sub === 'valuta') {
     $$('[data-cur]').forEach((b) => b.addEventListener('click', () => { S.settings.currency = b.dataset.cur; S.settings.membersUpdatedAt = nowISO(); save(); sync.schedule(); toast(`Valuta: ${currencyName(b.dataset.cur)}`); render(); }));
@@ -1302,7 +1388,7 @@ const sync = {
       const rows = S.entries.filter((e) => (e.updatedAt || '') > since).map((e) => ({ house: s.house, id: e.id, kind: 'entry', data: e, updated_at: e.updatedAt, deleted: !!e.deleted }));
       if ((S.settings.membersUpdatedAt || '') > since && S.settings.membersUpdatedAt) rows.push({ house: s.house, id: 'members', kind: 'members', data: { members: S.members, together: S.settings.together, currency: S.settings.currency || 'EUR' }, updated_at: S.settings.membersUpdatedAt || nowISO(), deleted: false });
       if ((S.settings.groupsUpdatedAt || '') > since && S.settings.groupsUpdatedAt) rows.push({ house: s.house, id: 'groups', kind: 'groups', data: { groups: S.groups }, updated_at: S.settings.groupsUpdatedAt, deleted: false });
-      if ((S.settings.pushUpdatedAt || '') > since || (force && S.settings.push)) rows.push({ house: s.house, id: 'push-' + S.settings.deviceId, kind: 'push', data: S.settings.push ? { ...S.settings.push, member: me().id } : { device: S.settings.deviceId }, updated_at: S.settings.pushUpdatedAt || nowISO(), deleted: !S.settings.push });
+      if ((S.settings.pushUpdatedAt || '') > since || (force && S.settings.push)) rows.push({ house: s.house, id: 'push-' + S.settings.deviceId, kind: 'push', data: S.settings.push ? { ...S.settings.push, member: me().id, lang: LANG() } : { device: S.settings.deviceId }, updated_at: S.settings.pushUpdatedAt || nowISO(), deleted: !S.settings.push });
       const freshMine = S.entries.filter((e) => !e.deleted && (e.createdAt || '') > since && e.paidBy === me().id && !e.recurringOf).map((e) => e.id);
       S.activity.filter((a) => (a.ts || '') > since).forEach((a) => rows.push({ house: s.house, id: 'act-' + a.id, kind: 'activity', data: a, updated_at: a.ts, deleted: false }));
       if (rows.length) {
@@ -1369,7 +1455,7 @@ window.addEventListener('scroll', () => { const h = document.querySelector('.pag
 /* ---------- Tira giù per ricaricare (su qualsiasi pagina) ---------- */
 (function pullToRefresh() {
   const app = $('#view'); const el = document.createElement('div'); el.className = 'ptr'; el.innerHTML = `<span class="ptr-ic">${icon('i-undo')}</span><span class="ptr-t">Tira per aggiornare</span>`; document.body.appendChild(el);
-  const T = document.querySelector('.ptr-t'), MAX = 110, TRIG = 72; let y0 = 0, pulling = false, dy = 0, busy = false;
+  const lbl = document.querySelector('.ptr-t'), MAX = 110, TRIG = 72; let y0 = 0, pulling = false, dy = 0, busy = false;
   const canPull = () => window.scrollY <= 0 && !$('#sheet-root').firstChild && !busy && !document.body.classList.contains('fixed-screen');
   document.addEventListener('touchstart', (e) => { if (e.touches.length !== 1 || !canPull()) { pulling = false; return; } y0 = e.touches[0].clientY; pulling = true; dy = 0; }, { passive: true });
   document.addEventListener('touchmove', (e) => {
@@ -1377,11 +1463,11 @@ window.addEventListener('scroll', () => { const h = document.querySelector('.pag
     if (d <= 0 || window.scrollY > 0) { if (dy > 0) { dy = 0; app.style.transform = ''; el.classList.remove('show', 'ready'); } return; }
     if (e.cancelable) e.preventDefault();
     dy = Math.min(MAX, d * 0.55); app.style.transition = 'none'; app.style.transform = `translateY(${dy}px)`;
-    el.classList.add('show'); el.classList.toggle('ready', dy >= TRIG); el.style.setProperty('--p', Math.min(1, dy / TRIG)); T.textContent = dy >= TRIG ? 'Rilascia per ricaricare' : 'Tira per aggiornare';
+    el.classList.add('show'); el.classList.toggle('ready', dy >= TRIG); el.style.setProperty('--p', Math.min(1, dy / TRIG)); lbl.textContent = T(dy >= TRIG ? 'Rilascia per ricaricare' : 'Tira per aggiornare');
   }, { passive: false });
   const end = async () => {
     if (!pulling) return; pulling = false; app.style.transition = 'transform .3s var(--ease-out)';
-    if (dy >= TRIG) { busy = true; el.classList.add('loading'); T.textContent = 'Aggiorno…'; app.style.transform = `translateY(${TRIG}px)`; try { if (sync.enabled()) await Promise.race([sync.run(true), new Promise((r) => setTimeout(r, 4000))]); } catch (_) {} navigator.serviceWorker?.getRegistration().then((reg) => reg && reg.update()).catch(() => {}); try { sessionStorage.setItem('pari:nosplash', '1'); } catch (_) {} setTimeout(() => location.reload(), 150); return; }
+    if (dy >= TRIG) { busy = true; el.classList.add('loading'); lbl.textContent = T('Aggiorno…'); app.style.transform = `translateY(${TRIG}px)`; try { if (sync.enabled()) await Promise.race([sync.run(true), new Promise((r) => setTimeout(r, 4000))]); } catch (_) {} navigator.serviceWorker?.getRegistration().then((reg) => reg && reg.update()).catch(() => {}); try { sessionStorage.setItem('pari:nosplash', '1'); } catch (_) {} setTimeout(() => location.reload(), 150); return; }
     app.style.transform = ''; el.classList.remove('show', 'ready'); dy = 0;
   };
   document.addEventListener('touchend', end); document.addEventListener('touchcancel', end);
@@ -1391,7 +1477,7 @@ window.addEventListener('scroll', () => { const h = document.querySelector('.pag
 function openSheet(title, bodyHTML, onOpen) {
   closeSheet(true);
   const root = $('#sheet-root');
-  root.innerHTML = `<div class="backdrop"></div><div class="sheet" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="grab"><i></i></div><div class="shead"><span class="t">${esc(title)}</span><button class="close" type="button" aria-label="Chiudi">${icon('i-x')}</button></div><div class="sbody">${bodyHTML}</div></div>`;
+  root.innerHTML = `<div class="backdrop"></div><div class="sheet" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="grab"><i></i></div><div class="shead"><span class="t">${esc(title)}</span><button class="close" type="button" aria-label="Chiudi">${icon('i-x')}</button></div><div class="sbody">${bodyHTML}</div></div>`; translateDom(root);
   const bd = $('.backdrop', root), sh = $('.sheet', root);
   requestAnimationFrame(() => requestAnimationFrame(() => { bd.classList.add('in'); sh.classList.add('in'); }));
   bd.addEventListener('click', () => closeSheet()); $('.close', sh).addEventListener('click', () => closeSheet());
@@ -1416,7 +1502,7 @@ function actionSheet(title, items) {
 }
 let toastTimer;
 function toast(text, action) {
-  const root = $('#toast-root'); root.innerHTML = `<div class="toast-wrap"><div class="toast"><span>${esc(text)}</span>${action ? `<button type="button">${esc(action.label)}</button>` : ''}</div></div>`;
+  text = T(text); const root = $('#toast-root'); root.innerHTML = `<div class="toast-wrap"><div class="toast"><span>${esc(text)}</span>${action ? `<button type="button">${esc(T(action.label))}</button>` : ''}</div></div>`;
   const t = $('.toast', root); requestAnimationFrame(() => requestAnimationFrame(() => t.classList.add('in')));
   if (action) $('button', t).addEventListener('click', () => { action.fn(); root.innerHTML = ''; });
   clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.classList.remove('in'); setTimeout(() => { if ($('.toast', root) === t) root.innerHTML = ''; }, 300); }, action ? 5000 : 2600);
@@ -1426,6 +1512,7 @@ function toast(text, action) {
 importSplitwiseOnce();
 materializeRecurring();
 (async () => {
+  applyLang();
   await auth.handleRedirect();
   if (auth.recovery) history.replaceState(null, '', '#/recupero');
   else if (!auth.user()) { if (!/^#\/(accedi|registrati|legale|conferma|join)/.test(location.hash)) history.replaceState(null, '', '#/accedi'); }

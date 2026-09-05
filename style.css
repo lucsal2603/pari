@@ -755,3 +755,20 @@ body.fixed-screen .view { height: 100dvh; overflow: hidden; padding-bottom: calc
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
   .chart .bar { transform: scaleY(1); }
 }
+
+/* ---------- Lingua: bandierine fatte solo di colori ---------- */
+.flag { display: inline-block; width: 40px; height: 28px; border-radius: 7px; flex: none; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .08); background-size: 100% 100%; }
+.flag.mini { width: 22px; height: 15px; border-radius: 4px; margin-right: 8px; vertical-align: -3px; }
+.flag.it { background: linear-gradient(90deg, #009246 0 33.4%, #fff 33.4% 66.7%, #ce2b37 66.7%); }
+.flag.fr { background: linear-gradient(90deg, #0055a4 0 33.4%, #fff 33.4% 66.7%, #ef4135 66.7%); }
+.flag.de { background: linear-gradient(180deg, #000 0 33.4%, #dd0000 33.4% 66.7%, #ffce00 66.7%); }
+.flag.es { background: linear-gradient(180deg, #aa151b 0 25%, #f1bf00 25% 75%, #aa151b 75%); }
+.flag.en { background:
+  linear-gradient(#c8102e, #c8102e) center / 100% 18% no-repeat,
+  linear-gradient(#c8102e, #c8102e) center / 18% 100% no-repeat,
+  linear-gradient(#fff, #fff) center / 100% 32% no-repeat,
+  linear-gradient(#fff, #fff) center / 32% 100% no-repeat,
+  linear-gradient(35deg, transparent 46%, #fff 46% 54%, transparent 54%),
+  linear-gradient(-35deg, transparent 46%, #fff 46% 54%, transparent 54%),
+  #012169; }
+.list-card .row .flag { margin-left: 2px; }
