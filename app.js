@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.10.2';
+const APP_VERSION = '1.11.0';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -69,7 +69,7 @@ function defaultState() {
     entries: [],
     activity: [],
     groups: [{ id: 'g1', name: 'Spese casa', createdAt: '2026-09-04T00:00:00.000Z', updatedAt: '2026-09-04T00:00:00.000Z', deleted: false }],
-    settings: { me: 'm1', currency: 'EUR', together: '', sync: { url: SUPA_URL, key: SUPA_ANON, house: '' }, lastPull: null, membersUpdatedAt: null, groupsUpdatedAt: null, lastGroup: 'g1', deviceId: null, push: null, pushUpdatedAt: null, notified: [] },
+    settings: { me: 'm1', currency: 'EUR', together: '', sync: { url: SUPA_URL, key: SUPA_ANON, house: '' }, lastPull: null, membersUpdatedAt: null, groupsUpdatedAt: null, lastGroup: 'g1', deviceId: null, push: null, pushUpdatedAt: null, notified: [], onboarded: false },
     ui: { month: curYM(), statsRange: 'mese', balTab: 0, homeMode: 'paid' },
   };
 }
@@ -78,6 +78,8 @@ function load() {
   try { const raw = localStorage.getItem(KEY); if (raw) { const s = JSON.parse(raw); const d = defaultState(); const st = { ...d, ...s, settings: { ...d.settings, ...(s.settings || {}), sync: { ...d.settings.sync, ...((s.settings || {}).sync || {}) } }, ui: { ...d.ui, ...(s.ui || {}), month: curYM() } };
     if (!Array.isArray(s.groups)) { st.groups = d.groups; st.entries.forEach((e) => { if (!e.group) e.group = 'g1'; }); st.settings.lastGroup = 'g1'; }
     if (!st.settings.sync.url) { st.settings.sync.url = SUPA_URL; st.settings.sync.key = SUPA_ANON; }
+    // telefoni già collegati prima dell'arrivo della presentazione: non la mostro
+    if ((s.settings || {}).onboarded === undefined) st.settings.onboarded = !!(st.settings.sync && st.settings.sync.house);
     return st; } } catch (e) { console.warn('stato corrotto', e); }
   return defaultState();
 }
@@ -278,9 +280,10 @@ function render(r, toTop) {
   // toTop solo quando cambia pagina: i ridisegni per un cambio di stato (Pagato/Quota, mese, tab) tengono la posizione
   const keep = toTop ? 0 : window.scrollY;
   r = r || currentRoute || { name: 'home', id: '', q: {} }; currentRoute = r;
-  const pages = { home: pageHome, spese: pageSpese, bilanci: pageBilanci, profilo: pageProfilo, nuova: pageForm, modifica: pageForm, spesa: pageDetail, statistiche: pageStats, attivita: pageActivity };
+  const pages = { home: pageHome, spese: pageSpese, bilanci: pageBilanci, profilo: pageProfilo, nuova: pageForm, modifica: pageForm, spesa: pageDetail, statistiche: pageStats, attivita: pageActivity, benvenuto: pageWelcome };
   const fn = pages[r.name] || pageHome;
-  tabbar.classList.remove('hide'); view.classList.remove('no-tabbar');
+  const onb = r.name === 'benvenuto';
+  tabbar.classList.toggle('hide', onb); view.classList.toggle('no-tabbar', onb);
   const tabName = r.name === 'profilo' ? 'profilo' : r.name === 'statistiche' ? 'bilanci' : r.name;
   $$('.tab').forEach((t) => t.classList.toggle('on', t.dataset.tab === tabName));
   view.innerHTML = fn(r);
@@ -709,7 +712,7 @@ function pageInfo() {
       <div><span class="k">Attività registrate</span><span class="v">${S.activity.length}</span></div>
       <div><span class="k">Spazio usato</span><span class="v">${Math.round((localStorage.getItem(KEY) || '').length / 1024)} KB</span></div>
     </div></section>
-    <div class="section btn-row"><button class="btn soft" id="reload-app">Ricarica l'app</button></div>
+    <div class="section btn-row"><button class="btn soft" id="reload-app">Ricarica l'app</button><button class="btn ghost" id="replay-onb">Rivedi la presentazione</button></div>
   </div>`;
 }
 
@@ -720,6 +723,59 @@ function pageActivity() {
   return `<div class="page slide">${subHead('Attività', '#/spese')}
     <section class="card">${days.length ? `<div class="feed">${days.map((d) => `<div class="day">${esc(relDay(d.k))}</div>${d.items.map((a) => `<a class="ev ${a.type}" href="#/spesa/${a.entryId}"><div class="t">${text(a)}</div><div class="when">${esc(new Date(a.ts).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }))}</div></a>`).join('')}`).join('')}</div>` : emptyBox('Ancora niente', 'Qui compare tutto quello che aggiungete, modificate o saldate.')}</section>
   </div>`;
+}
+
+/* ---------- Presentazione per chi apre l'app la prima volta ---------- */
+let OB = { step: 1, name: '', partner: '', house: '' };
+const arrowIc = '<svg class="ic"><path d="M5 12h14M13 5l7 7-7 7"/></svg>';
+function pageWelcome() {
+  const st = OB.step; const dots = `<div class="onb-dots">${[1, 2, 3, 4].map((i) => `<i class="${i === st ? 'on' : ''}"></i>`).join('')}</div>`;
+  const top = `<div class="onb-top"><button type="button" class="onb-skip" data-ob-skip>Salta</button></div>`;
+  let body = '';
+  if (st === 1) body = `<img class="onb-logo" src="img/logo.png" alt="Divvy">
+    <h1 class="onb-h">Ciao!<br>Come possiamo chiamarti?</h1><p class="onb-p">È il primo passo per iniziare a condividere le spese insieme.</p>
+    <div class="onb-art"><img src="img/benvenuto.png" alt=""></div>
+    <form class="onb-form" data-ob-form><label class="onb-field">${icon('i-user')}<input id="ob-name" type="text" placeholder="Il tuo nome" value="${esc(OB.name)}" autocomplete="given-name" autocapitalize="words" enterkeyhint="next"></label>
+    <button class="btn onb-btn" type="submit">Continua ${arrowIc}</button></form>`;
+  else if (st === 2) body = `<img class="onb-logo sm" src="img/logo.png" alt="Divvy">
+    <h1 class="onb-h">Con chi dividi<br>le spese?</h1><p class="onb-p">Il suo nome comparirà nei saldi e negli avvisi.</p>
+    <div class="onb-art">${couple('onb-couple')}</div>
+    <form class="onb-form" data-ob-form><label class="onb-field">${icon('i-users')}<input id="ob-partner" type="text" placeholder="Il suo nome" value="${esc(OB.partner)}" autocapitalize="words" enterkeyhint="next"></label>
+    <button class="btn onb-btn" type="submit">Continua ${arrowIc}</button></form>`;
+  else if (st === 3) body = `<img class="onb-logo sm" src="img/logo.png" alt="Divvy">
+    <h1 class="onb-h">Collegate<br>i vostri telefoni</h1><p class="onb-p">Scegliete una parola segreta e scrivetela su entrambi i telefoni: le spese si allineano da sole.</p>
+    <div class="onb-art"><div class="couple-circle onb-circle"><img src="img/coppia.png" alt=""></div></div>
+    <form class="onb-form" data-ob-form><label class="onb-field">${icon('i-cloud')}<input id="ob-house" type="text" placeholder="Codice casa" value="${esc(OB.house)}" autocapitalize="off" autocorrect="off" enterkeyhint="done"></label>
+    <button class="btn onb-btn" type="submit">Continua ${arrowIc}</button><button type="button" class="onb-link" data-ob-later>Lo faccio dopo</button></form>`;
+  else { const sample = notifText({ kind: 'expense', desc: 'Spesa', amount: 2030 }, other().name, -20000);
+    body = `<img class="onb-logo sm" src="img/logo.png" alt="Divvy">
+    <h1 class="onb-h">Non perderti<br>nessuna spesa</h1><p class="onb-p">Ricevi un avviso quando ${esc(other().name)} aggiunge una spesa o un pagamento.</p>
+    <div class="onb-art"><div class="notif-preview onb-notif"><img src="icons/icon-192.png" alt=""><div><div class="t">${esc(sample.title)}</div><div class="b">${esc(sample.body).replace('\n', '<br>')}</div></div></div></div>
+    <div class="onb-form">${isIOS() && !isStandalone() ? '<p class="small muted" style="margin:0 0 12px">Su iPhone le notifiche funzionano con l\'app sulla schermata Home: Condividi → Aggiungi alla schermata Home. Potrai attivarle dopo da Profilo → Notifiche.</p>' : ''}
+    <button type="button" class="btn onb-btn" data-ob-push ${'PushManager' in window ? '' : 'disabled'}>Attiva le notifiche ${arrowIc}</button><button type="button" class="onb-link" data-ob-finish>Inizia senza notifiche</button></div>`; }
+  return `<div class="page onb">${top}${body}${dots}</div>`;
+}
+function obFinish() { S.settings.onboarded = true; save(); OB = { step: 1, name: '', partner: '', house: '' }; go('#/home'); toast(`Divvy è pronta, ${me().name}`); }
+function bindWelcome() {
+  $$('[data-ob-skip]').forEach((b) => b.addEventListener('click', obFinish));
+  const form = $('[data-ob-form]');
+  if (form) form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (OB.step === 1) { const n = ($('#ob-name').value || '').trim(); if (!n) { $('#ob-name').focus(); return; } OB.name = n;
+      const found = S.members.find((m) => m.name.trim().toLowerCase() === n.toLowerCase());
+      if (found) S.settings.me = found.id; else { S.members[0].name = n; S.settings.me = 'm1'; S.settings.membersUpdatedAt = nowISO(); }
+      OB.partner = OB.partner || other().name; OB.step = 2; save(); render(); return; }
+    if (OB.step === 2) { const n = ($('#ob-partner').value || '').trim(); if (!n) { $('#ob-partner').focus(); return; } OB.partner = n;
+      const o = other(); if (o.name !== n) { o.name = n; S.settings.membersUpdatedAt = nowISO(); }
+      OB.step = 3; save(); render(); return; }
+    if (OB.step === 3) { const h = ($('#ob-house').value || '').trim(); if (!h) { $('#ob-house').focus(); return; } OB.house = h;
+      S.settings.sync.house = h; save(); OB.step = 4; render();
+      sync.run(true).then((ok) => toast(ok ? 'Telefono collegato' : 'Non riesco a collegarmi: controlla la rete o il codice')); return; }
+  });
+  $$('[data-ob-later]').forEach((b) => b.addEventListener('click', () => { OB.step = 4; render(); }));
+  $$('[data-ob-finish]').forEach((b) => b.addEventListener('click', obFinish));
+  $$('[data-ob-push]').forEach((b) => b.addEventListener('click', async () => { b.disabled = true; await enablePush(); obFinish(); }));
+  const first = $('.onb-field input'); if (first && !first.value) setTimeout(() => first.focus({ preventScroll: true }), 400);
 }
 
 /* ---------- Banner installazione iOS ---------- */
@@ -758,6 +814,7 @@ function bind(r) {
     ]); });
   }
   if (r.name === 'nuova' || r.name === 'modifica') bindForm(r);
+  if (r.name === 'benvenuto') bindWelcome();
   if (r.name === 'profilo') bindProfilo(r);
 }
 
@@ -824,6 +881,7 @@ function bindProfilo(r) {
     const test = $('#push-test'); if (test) test.addEventListener('click', async () => { const t = notifText({ kind: 'expense', desc: 'Spesa', amount: 1000 }, other().name, balances()[me().id] || 0); const ok = await showLocalNotification(t.title, t.body); toast(ok ? 'Inviata: guarda in alto' : 'Non riesco a mostrarla'); });
     const off = $('#push-off'); if (off) off.addEventListener('click', async () => { await disablePush(); render(); toast('Notifiche disattivate'); });
   }
+  if (r.sub === 'info') { $('#replay-onb').addEventListener('click', () => { OB = { step: 1, name: '', partner: '', house: S.settings.sync.house || '' }; go('#/benvenuto'); }); }
   if (r.sub === 'info') $('#reload-app').addEventListener('click', () => { navigator.serviceWorker?.getRegistration().then((reg) => reg && reg.update()); location.reload(); });
 }
 
@@ -986,6 +1044,7 @@ function toast(text, action) {
 importSplitwiseOnce();
 showDailyLove();
 materializeRecurring();
+if (!S.settings.onboarded) history.replaceState(null, '', '#/benvenuto');
 route();
 if (sync.enabled()) sync.run();
 document.addEventListener('visibilitychange', () => { if (!document.hidden) { materializeRecurring(); if (sync.enabled()) sync.run(); } });
