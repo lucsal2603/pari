@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.15.1';
+const APP_VERSION = '1.16.0';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -118,6 +118,7 @@ const auth = {
   async refreshIfNeeded() { if (!this.s || !this.s.refresh_token) return; if (Date.now() < ((this.s.expires_at || 0) * 1000) - 120000) return; try { const r = await fetch(SUPA_URL + '/auth/v1/token?grant_type=refresh_token', { method: 'POST', headers: this.h(), body: JSON.stringify({ refresh_token: this.s.refresh_token }) }); const j = await r.json(); if (r.ok && j.access_token) this.setSession(j); else if (r.status === 400 || r.status === 401) { this.s = null; this.save(); } } catch (_) {} },
   async recover(email) { const r = await fetch(SUPA_URL + '/auth/v1/recover?redirect_to=' + encodeURIComponent(appUrl()), { method: 'POST', headers: this.h(), body: JSON.stringify({ email }) }); if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(authMsg(j)); } },
   async updatePassword(password) { const r = await fetch(SUPA_URL + '/auth/v1/user', { method: 'PUT', headers: { ...this.h(), Authorization: 'Bearer ' + this.s.access_token }, body: JSON.stringify({ password }) }); const j = await r.json(); if (!r.ok) throw new Error(authMsg(j)); this.s.user = j; this.save(); },
+  async updateMeta(data) { if (!this.s) return; try { const r = await fetch(SUPA_URL + '/auth/v1/user', { method: 'PUT', headers: { ...this.h(), Authorization: 'Bearer ' + this.s.access_token }, body: JSON.stringify({ data }) }); if (r.ok) { this.s.user = await r.json(); this.save(); } } catch (_) {} },
   async fetchUser() { if (!this.s) return; try { const r = await fetch(SUPA_URL + '/auth/v1/user', { headers: { apikey: SUPA_ANON, Authorization: 'Bearer ' + this.s.access_token } }); if (r.ok) { this.s.user = await r.json(); this.save(); } } catch (_) {} },
   oauth(provider) { location.href = SUPA_URL + '/auth/v1/authorize?provider=' + provider + '&redirect_to=' + encodeURIComponent(appUrl()); },
   /* ritorno da un link (OAuth, conferma email, recupero password): i dati stanno nel frammento dell'URL */
@@ -791,7 +792,9 @@ function pageLogin() {
     <p class="login-foot">Non hai un account? <a class="login-link u" href="#/registrati">Registrati</a></p>
   </div>`;
 }
-function afterLogin() { try { localStorage.removeItem(PENDING_KEY); } catch (_) {} OB = { step: 1, name: '', partner: '', house: '', avatar: 0, split: 'equal', pct: 50 }; go(S.settings.onboarded ? '#/home' : '#/benvenuto'); if (sync.enabled()) sync.run(); }
+/* la presentazione si vede una sola volta per account (segnata sia sul telefono sia nei metadati dell'utente) */
+const onboardingDone = () => { const u = auth.user(); if (!u) return true; return !!((u.user_metadata || {}).onboarded) || S.settings.onboardedFor === u.id; };
+function afterLogin() { try { localStorage.removeItem(PENDING_KEY); } catch (_) {} OB = { step: 1, name: '', partner: '', house: '', avatar: 0, split: 'equal', pct: 50 }; go(onboardingDone() ? '#/home' : '#/benvenuto'); if (sync.enabled()) sync.run(); }
 function bindLogin() {
   const form = $('[data-login-form]');
   $('#lg-email').addEventListener('input', (e) => (LG.email = e.target.value.trim()));
@@ -925,7 +928,7 @@ function pageWelcome() {
   return `<div class="page onb">${top}${body}${dots}</div>`;
 }
 function obFinish() {
-  S.settings.onboarded = true; save(); const nm = me().name; OB = { step: 1, name: '', partner: '', house: '', avatar: 0, split: 'equal', pct: 50 }; go('#/home');
+  S.settings.onboarded = true; const u = auth.user(); if (u) { S.settings.onboardedFor = u.id; auth.updateMeta({ onboarded: true }); } save(); const nm = me().name; OB = { step: 1, name: '', partner: '', house: '', avatar: 0, split: 'equal', pct: 50 }; go('#/home');
   if (!sync.enabled()) toast(`Per condividere con ${other().name}: Profilo → Backup e sincronizzazione`); else if (!S.settings.push) toast('Attiva gli avvisi da Profilo → Notifiche'); else toast(`Divvy è pronta, ${nm}`);
 }
 function bindWelcome() {
@@ -1227,7 +1230,7 @@ materializeRecurring();
   await auth.handleRedirect();
   if (auth.recovery) history.replaceState(null, '', '#/recupero');
   else if (!auth.user()) { if (!/^#\/(accedi|registrati|legale|conferma)/.test(location.hash)) history.replaceState(null, '', '#/accedi'); }
-  else if (!S.settings.onboarded) history.replaceState(null, '', '#/benvenuto');
+  else if (!onboardingDone()) history.replaceState(null, '', '#/benvenuto');
   if (auth.user()) showDailyLove();
   route();
   auth.refreshIfNeeded().then(() => { if (!auth.user() && currentRoute && currentRoute.name !== 'accedi') render(); });
