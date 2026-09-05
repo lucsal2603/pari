@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.11.1';
+const APP_VERSION = '1.12.0';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -539,7 +539,7 @@ function pageForm(r) {
     F = editing ? { routeKey: location.hash, id: editing.id, kind: editing.kind, group: editing.group || null, desc: editing.desc || '', amount: moneyPlain(editing.amount), date: editing.date, cat: editing.cat || '', paidBy: editing.paidBy, splitMethod: editing.splitMethod || 'equal', splitInput: { ...(editing.splitInput || {}) }, notes: editing.notes || '', recurring: editing.recurring === 'monthly', to: Object.keys(editing.owed || {})[0] }
       : { routeKey: location.hash, id: null, kind: r.q.tipo === 'pagamento' ? 'payment' : 'expense', desc: '', amount: '', date: todayStr(), cat: '', paidBy: me().id, splitMethod: 'equal', splitInput: {}, notes: '', recurring: false, to: other().id, group: (groups().find((g) => g.id === S.settings.lastGroup) || groups()[0] || {}).id || null };
     if (editing && F.group === undefined) F.group = editing.group || null;
-    if (F.kind === 'expense') F.splitMethod = 'equal';
+    if (F.kind === 'expense') { const sp = S.settings.split; if (!editing && sp && sp.mode === 'custom' && sp.pct) { F.splitMethod = 'percent'; F.splitInput = { ...sp.pct }; } else F.splitMethod = 'equal'; }
     if (!editing && F.kind === 'payment') { const bal = balances(); const v = bal[me().id] || 0; if (v < 0) { F.paidBy = me().id; F.to = other().id; F.amount = moneyPlain(-v); } else if (v > 0) { F.paidBy = other().id; F.to = me().id; F.amount = moneyPlain(v); } }
   }
   const isPay = F.kind === 'payment'; const a = me(), b = other();
@@ -552,7 +552,7 @@ function pageForm(r) {
       <div class="field"><label for="amount">Importo</label><div class="money-input"><span class="cur">€</span><input id="amount" type="text" inputmode="decimal" placeholder="0,00" value="${esc(F.amount)}" autocomplete="off"></div><div class="hint err" id="amount-err" hidden>Inserisci un importo valido.</div></div>
       ${isPay
         ? `<div class="field"><div class="lbl">Pagamento</div><div class="pay-dir">${avatar(payerOf(F.paidBy))}<span class="txt"><span class="t">${esc(payerOf(F.paidBy).name)} dà a ${esc(payerOf(F.to).name)}</span><span class="d">${F.amount ? '€ ' + esc(F.amount) : 'la somma qui sopra'} · il saldo fra voi si aggiorna</span></span>${avatar(payerOf(F.to))}</div></div>`
-        : `<div class="field"><div class="pay-dir soft">${avatar(payerOf(F.paidBy))}<span class="txt"><span class="t">${F.id ? 'Pagata da ' + esc(payerOf(F.paidBy).name) : 'Paghi tu, ' + esc(payerOf(F.paidBy).name)}</span><span class="d" id="half-hint">${F.amount && !isNaN(parseAmount(F.amount)) ? 'Metà a testa: ' + money(Math.round(parseAmount(F.amount) / 2)) : 'Divisa a metà con ' + esc(other().name)}</span></span></div></div>
+        : `<div class="field"><div class="pay-dir soft">${avatar(payerOf(F.paidBy))}<span class="txt"><span class="t">${F.id ? 'Pagata da ' + esc(payerOf(F.paidBy).name) : 'Paghi tu, ' + esc(payerOf(F.paidBy).name)}</span><span class="d" id="half-hint">${halfHint()}</span></span></div></div>
            <div class="field"><div class="lbl">Categoria <small>(opzionale)</small></div><div class="cat-circles">${CATS.map((c) => `<button type="button" class="cat-circle${F.cat === c.id ? ' on' : ''}" data-cat="${c.id}" aria-label="${esc(c.name)}" title="${esc(c.name)}">${icon(c.icon)}</button>`).join('')}</div><div class="cat-name" id="cat-name">${F.cat ? esc(catOf(F.cat).name) : 'Nessuna categoria'}</div></div>`}
       <div class="field"><div class="lbl">Sezione</div><div class="chips" id="form-groups">${groups().map((g) => `<button type="button" class="chip${F.group === g.id ? ' on' : ''}" data-group="${g.id}">${esc(g.name)}</button>`).join('')}<button type="button" class="chip" data-group-new>${icon('i-plus')}Nuova</button></div>
         <div id="group-new" ${F.newGroup ? '' : 'hidden'}><div style="display:flex;gap:8px"><input class="input" id="group-name" type="text" placeholder="Nome della sezione, es. Vacanze" value="${esc(F.newGroupName || '')}" autocomplete="off"><button type="button" class="btn sm" id="group-create" style="height:50px;flex:none">Crea</button></div></div>
@@ -563,6 +563,11 @@ function pageForm(r) {
       <div class="form-foot"><button class="btn" type="submit" id="save">${editing ? 'Salva modifiche' : isPay ? 'Registra pagamento' : 'Aggiungi spesa'}</button></div>
     </form>
   </div>`;
+}
+function halfHint() {
+  const v = parseAmount(F.amount); const o = other();
+  if (F.splitMethod === 'percent' && F.splitInput) { const pm = +F.splitInput[me().id] || 50; return !isNaN(v) ? `Tu ${pm}%: ${money(Math.round(v * pm / 100))} · ${o.name} ${100 - pm}%` : `Divisa ${pm}% / ${100 - pm}% con ${o.name}`; }
+  return !isNaN(v) ? 'Metà a testa: ' + money(Math.round(v / 2)) : 'Divisa a metà con ' + o.name;
 }
 function computeOwed() {
   const amount = parseAmount(F.amount); const ids = S.members.map((m) => m.id);
@@ -726,7 +731,7 @@ function pageActivity() {
 }
 
 /* ---------- Presentazione per chi apre l'app la prima volta ---------- */
-let OB = { step: 1, name: '', partner: '', house: '', avatar: 0 };
+let OB = { step: 1, name: '', partner: '', house: '', avatar: 0, split: 'equal', pct: 50 };
 const AVATARS = [{ bg: '#2C4A3B', fg: '#F8F4EE' }, { bg: '#F8D9D2', fg: '#D7563C' }, { bg: '#D3E7F5', fg: '#4E8FBF' }, { bg: '#E0DBF3', fg: '#7B68B8' }, { bg: '#D3E6D8', fg: '#4C8A66' }, { bg: '#F7E7C3', fg: '#C99A2E' }];
 const arrowIc = '<svg class="ic"><path d="M5 12h14M13 5l7 7-7 7"/></svg>';
 function pageWelcome() {
@@ -744,20 +749,30 @@ function pageWelcome() {
     <form class="onb-form" data-ob-form><div class="onb-lbl">Nome della persona</div><label class="onb-field">${icon('i-user')}<input id="ob-partner" type="text" placeholder="Es. Martina" value="${esc(OB.partner)}" autocapitalize="words" enterkeyhint="next"></label>
     <div class="onb-lbl">Scegli un avatar <small>(opzionale)</small></div><div class="onb-avatars">${AVATARS.map((a, i) => `<button type="button" class="onb-av${OB.avatar === i ? ' on' : ''}" data-ob-av="${i}" style="--bg:${a.bg};--fg:${a.fg}" aria-label="Avatar ${i + 1}">${icon('i-user')}</button>`).join('')}</div>
     <button class="btn onb-btn" type="submit">Continua ${arrowIc}</button></form>`;
-  else if (st === 3) body = `<img class="onb-logo sm" src="img/logo.png" alt="Divvy">
-    <h1 class="onb-h">Collegate<br>i vostri telefoni</h1><p class="onb-p">Scegliete una parola segreta e scrivetela su entrambi i telefoni: le spese si allineano da sole.</p>
-    <div class="onb-art"><div class="couple-circle onb-circle"><img src="img/coppia.png" alt=""></div></div>
-    <form class="onb-form" data-ob-form><label class="onb-field">${icon('i-cloud')}<input id="ob-house" type="text" placeholder="Codice casa" value="${esc(OB.house)}" autocapitalize="off" autocorrect="off" enterkeyhint="done"></label>
-    <button class="btn onb-btn" type="submit">Continua ${arrowIc}</button><button type="button" class="onb-link" data-ob-later>Lo faccio dopo</button></form>`;
-  else { const sample = notifText({ kind: 'expense', desc: 'Spesa', amount: 2030 }, other().name, -20000);
-    body = `<img class="onb-logo sm" src="img/logo.png" alt="Divvy">
-    <h1 class="onb-h">Non perderti<br>nessuna spesa</h1><p class="onb-p">Ricevi un avviso quando ${esc(other().name)} aggiunge una spesa o un pagamento.</p>
-    <div class="onb-art"><div class="notif-preview onb-notif"><img src="icons/icon-192.png" alt=""><div><div class="t">${esc(sample.title)}</div><div class="b">${esc(sample.body).replace('\n', '<br>')}</div></div></div></div>
-    <div class="onb-form">${isIOS() && !isStandalone() ? '<p class="small muted" style="margin:0 0 12px">Su iPhone le notifiche funzionano con l\'app sulla schermata Home: Condividi → Aggiungi alla schermata Home. Potrai attivarle dopo da Profilo → Notifiche.</p>' : ''}
-    <button type="button" class="btn onb-btn" data-ob-push ${'PushManager' in window ? '' : 'disabled'}>Attiva le notifiche ${arrowIc}</button><button type="button" class="onb-link" data-ob-finish>Inizia senza notifiche</button></div>`; }
-  return `<div class="page onb${st === 2 ? ' left' : ''}">${top}${body}${dots}</div>`;
+  else if (st === 3) { const pm = OB.pct, po = 100 - OB.pct;
+    body = `<img class="onb-logo" src="img/logo.png" alt="Divvy">
+    <h1 class="onb-h onb-dark">Come vuoi<br>dividere le spese?</h1><p class="onb-p">Imposta una modalità predefinita. Potrai cambiarla per ogni singola spesa.</p>
+    <div class="onb-art"><img src="img/benvenuto-3.png" alt=""></div>
+    <form class="onb-form" data-ob-form>
+      <button type="button" class="onb-opt${OB.split === 'equal' ? ' on' : ''}" data-ob-split="equal"><span class="radio"></span><span class="txt"><b>Metà e metà</b><small>50% / 50% per ogni spesa</small></span>${icon('i-users')}</button>
+      <button type="button" class="onb-opt${OB.split === 'custom' ? ' on' : ''}" data-ob-split="custom"><span class="radio"></span><span class="txt"><b>Personalizzato</b><small>Scegli tu le percentuali</small></span>${icon('i-sliders')}</button>
+      <div class="onb-pct" id="onb-pct" ${OB.split === 'custom' ? '' : 'hidden'}><div class="row-between"><span>${esc(OB.name || me().name)} <b id="pct-me">${pm}%</b></span><span><b id="pct-other">${po}%</b> ${esc(OB.partner || other().name)}</span></div><input type="range" id="pct-range" min="5" max="95" step="5" value="${pm}" aria-label="Percentuale a tuo carico"></div>
+      <button class="btn onb-btn" type="submit">Continua ${arrowIc}</button></form>`; }
+  else { const a = me(), b = other(); const sp = S.settings.split || { mode: 'equal' }; const pm = sp.mode === 'custom' ? sp.pct[a.id] : 50;
+    body = `<img class="onb-logo" src="img/logo.png" alt="Divvy">
+    <h1 class="onb-h onb-dark">Tutto pronto,<br>${esc(a.name)}! <span aria-hidden="true">🎉</span></h1><p class="onb-p">Da ora tenere i conti sarà molto più semplice.</p>
+    <div class="onb-art"><img src="img/benvenuto-4.png" alt=""></div>
+    <div class="onb-summary"><div class="row-between"><b class="onb-sum-t">Il tuo riepilogo</b><button type="button" class="onb-edit" data-ob-edit>Modifica</button></div>
+      <div class="onb-people"><span>${avatar(a, true)}${esc(a.name)}</span><span>${avatar(b, true)}${esc(b.name)}</span></div>
+      <div class="onb-kv">${icon('i-balance')}<span>Divisione predefinita</span><b>${pm}% / ${100 - pm}%</b></div>
+      <div class="onb-kv">${icon('i-coins')}<span>Valuta</span><b>Euro (€)</b></div></div>
+    <div class="onb-form"><button type="button" class="btn onb-btn" data-ob-finish>Inizia con Divvy ${arrowIc}</button></div>`; }
+  return `<div class="page onb">${top}${body}${dots}</div>`;
 }
-function obFinish() { S.settings.onboarded = true; save(); OB = { step: 1, name: '', partner: '', house: '' }; go('#/home'); toast(`Divvy è pronta, ${me().name}`); }
+function obFinish() {
+  S.settings.onboarded = true; save(); const nm = me().name; OB = { step: 1, name: '', partner: '', house: '', avatar: 0, split: 'equal', pct: 50 }; go('#/home');
+  if (!sync.enabled()) toast(`Per condividere con ${other().name}: Profilo → Backup e sincronizzazione`); else if (!S.settings.push) toast('Attiva gli avvisi da Profilo → Notifiche'); else toast(`Divvy è pronta, ${nm}`);
+}
 function bindWelcome() {
   $$('[data-ob-skip]').forEach((b) => b.addEventListener('click', obFinish));
   const form = $('[data-ob-form]');
@@ -771,11 +786,11 @@ function bindWelcome() {
       const o = other(); if (o.name !== n) { o.name = n; S.settings.membersUpdatedAt = nowISO(); }
       o.avatar = AVATARS[OB.avatar] || AVATARS[0];
       OB.step = 3; save(); render(); return; }
-    if (OB.step === 3) { const h = ($('#ob-house').value || '').trim(); if (!h) { $('#ob-house').focus(); return; } OB.house = h;
-      S.settings.sync.house = h; save(); OB.step = 4; render();
-      sync.run(true).then((ok) => toast(ok ? 'Telefono collegato' : 'Non riesco a collegarmi: controlla la rete o il codice')); return; }
+    if (OB.step === 3) { const a = me(), b = other(); S.settings.split = OB.split === 'custom' ? { mode: 'custom', pct: { [a.id]: OB.pct, [b.id]: 100 - OB.pct } } : { mode: 'equal' }; save(); OB.step = 4; render(); return; }
   });
-  $$('[data-ob-later]').forEach((b) => b.addEventListener('click', () => { OB.step = 4; render(); }));
+  $$('[data-ob-split]').forEach((b) => b.addEventListener('click', () => { OB.split = b.dataset.obSplit; $$('.onb-opt').forEach((x) => x.classList.toggle('on', x === b)); $('#onb-pct').hidden = OB.split !== 'custom'; }));
+  const rng = $('#pct-range'); if (rng) rng.addEventListener('input', () => { OB.pct = +rng.value; $('#pct-me').textContent = OB.pct + '%'; $('#pct-other').textContent = (100 - OB.pct) + '%'; });
+  $$('[data-ob-edit]').forEach((b) => b.addEventListener('click', () => { OB.step = 1; render(); }));
   $$('[data-ob-back]').forEach((b) => b.addEventListener('click', () => { OB.step = Math.max(1, OB.step - 1); render(); }));
   $$('[data-ob-av]').forEach((b) => b.addEventListener('click', () => { OB.avatar = +b.dataset.obAv; $$('.onb-av').forEach((x) => x.classList.toggle('on', x === b)); }));
   $$('[data-ob-finish]').forEach((b) => b.addEventListener('click', obFinish));
@@ -830,7 +845,7 @@ function bindForm(r) {
   bindSeg($('[data-seg="kind"]'), (v) => { F.kind = v; if (v === 'payment') { const bal = balances(); const m = bal[me().id] || 0; if (m < 0) { F.paidBy = me().id; F.to = other().id; F.amount = moneyPlain(-m); } else if (m > 0) { F.paidBy = other().id; F.to = me().id; F.amount = moneyPlain(m); } } rerender(); });
   bindSeg($('[data-seg="splitMethod"]'), (v) => { F.splitMethod = v; F.splitInput = {}; rerender(); });
   const desc = $('#desc'); if (desc) desc.addEventListener('input', () => (F.desc = desc.value));
-  const amount = $('#amount'); amount.addEventListener('input', () => { F.amount = amount.value; $('#amount-err').hidden = true; const d = $('#half-hint'); const v = parseAmount(F.amount); if (d) d.textContent = !isNaN(v) ? 'Metà a testa: ' + money(Math.round(v / 2)) : 'Divisa a metà con ' + other().name; validateSplit(); });
+  const amount = $('#amount'); amount.addEventListener('input', () => { F.amount = amount.value; $('#amount-err').hidden = true; const d = $('#half-hint'); if (d) d.textContent = halfHint(); validateSplit(); });
   $('#date').addEventListener('change', (ev) => (F.date = ev.target.value || todayStr()));
   $('#notes').addEventListener('input', (ev) => (F.notes = ev.target.value));
   $$('[data-pick]').forEach((b) => b.addEventListener('click', () => { if (b.dataset.pick === 'payer') F.paidBy = b.dataset.id; else F.to = b.dataset.id; rerender(); }));
@@ -886,7 +901,7 @@ function bindProfilo(r) {
     const test = $('#push-test'); if (test) test.addEventListener('click', async () => { const t = notifText({ kind: 'expense', desc: 'Spesa', amount: 1000 }, other().name, balances()[me().id] || 0); const ok = await showLocalNotification(t.title, t.body); toast(ok ? 'Inviata: guarda in alto' : 'Non riesco a mostrarla'); });
     const off = $('#push-off'); if (off) off.addEventListener('click', async () => { await disablePush(); render(); toast('Notifiche disattivate'); });
   }
-  if (r.sub === 'info') { $('#replay-onb').addEventListener('click', () => { OB = { step: 1, name: '', partner: '', house: S.settings.sync.house || '' }; go('#/benvenuto'); }); }
+  if (r.sub === 'info') { $('#replay-onb').addEventListener('click', () => { OB = { step: 1, name: '', partner: '', house: '', avatar: 0, split: (S.settings.split || {}).mode === 'custom' ? 'custom' : 'equal', pct: ((S.settings.split || {}).pct || {})[me().id] || 50 }; go('#/benvenuto'); }); }
   if (r.sub === 'info') $('#reload-app').addEventListener('click', () => { navigator.serviceWorker?.getRegistration().then((reg) => reg && reg.update()); location.reload(); });
 }
 
