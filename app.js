@@ -807,7 +807,7 @@ function bindLogin() {
       LG.busy = false; LG.sent = ''; afterLogin();
     } catch (err) { LG.busy = false; render(); toast(err.message); }
   });
-  setTimeout(() => { const i = $('#lg-email'); if (i && !i.value) i.focus({ preventScroll: true }); }, 400);
+  if (!isNative()) setTimeout(() => { const i = $('#lg-email'); if (i && !i.value) i.focus({ preventScroll: true }); }, 400);
 }
 let RG = { email: '', show1: false, show2: false, terms: false, news: false, busy: false };
 function pageRegister() {
