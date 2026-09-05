@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.22.4';
+const APP_VERSION = '1.23.0';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -1409,7 +1409,14 @@ materializeRecurring();
   if (auth.user()) { applyPendingJoin(); if (restoreHouseFromAccount() && sync.enabled()) sync.run(true); rememberHouse(); showDailyLove(); }
   route();
   auth.refreshIfNeeded().then(() => { if (!auth.user() && currentRoute && currentRoute.name !== 'accedi') render(); });
+  hideSplash();
 })();
+/* schermata di caricamento: barra che si riempie, poi dissolvenza (resta almeno 1,6 s per non scattare) */
+function hideSplash() {
+  const sp = document.getElementById('splash'); if (!sp) return;
+  const wait = Math.max(0, 1600 - (Date.now() - (window.__t0 || Date.now())));
+  setTimeout(() => { sp.classList.add('done'); setTimeout(() => { sp.classList.add('out'); setTimeout(() => sp.remove(), 500); }, 380); }, wait);
+}
 if (sync.enabled()) sync.run();
 document.addEventListener('visibilitychange', () => { if (!document.hidden) { auth.refreshIfNeeded(); materializeRecurring(); if (sync.enabled()) sync.run(); } });
 setInterval(() => { if (!document.hidden && sync.enabled()) sync.run(); }, 45000);
