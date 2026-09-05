@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.15.0';
+const APP_VERSION = '1.15.1';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -864,7 +864,6 @@ function pageConfirm() {
     <div class="conf-box"><span class="conf-i">${icon('i-info')}</span><div><b>Non trovi l'email?</b><span>Controlla anche nella cartella spam o promozioni.</span></div></div>
     <div class="onb-form"><a class="btn onb-btn" href="#/accedi" data-confirmed>Ho confermato l'email ${arrowIc}</a></div>
     <p class="login-foot conf-foot">Non hai ricevuto l'email?<br><button type="button" class="login-link u" data-resend>Invia di nuovo</button></p>
-    <div class="auth-hills" aria-hidden="true"><svg viewBox="0 0 390 120" preserveAspectRatio="none"><ellipse cx="60" cy="150" rx="230" ry="110" fill="#CFE3D5"/><ellipse cx="360" cy="160" rx="240" ry="120" fill="#B9D6C2"/><ellipse cx="180" cy="190" rx="260" ry="110" fill="#9FC7AB"/></svg></div>
   </div>`;
 }
 function bindConfirm() {
