@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.21.3';
+const APP_VERSION = '1.22.0';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -320,10 +320,10 @@ function render(r, toTop) {
   r = r || currentRoute || { name: 'home', id: '', q: {} }; currentRoute = r;
   const publicPages = ['accedi', 'registrati', 'recupero', 'legale', 'conferma'];
   if (!auth.user() && !publicPages.includes(r.name)) { r = { name: 'accedi', id: '', sub: '', q: {}, back: null }; currentRoute = r; }
-  const pages = { home: pageHome, spese: pageSpese, bilanci: pageBilanci, profilo: pageProfilo, nuova: pageForm, modifica: pageForm, spesa: pageDetail, statistiche: pageStats, attivita: pageActivity, benvenuto: pageWelcome, accedi: pageLogin, registrati: pageRegister, recupero: pageRecovery, legale: pageLegal, conferma: pageConfirm };
+  const pages = { home: pageHome, spese: pageSpese, bilanci: pageBilanci, profilo: pageProfilo, nuova: pageForm, modifica: pageForm, spesa: pageDetail, statistiche: pageStats, attivita: pageActivity, benvenuto: pageWelcome, accedi: pageLogin, registrati: pageRegister, recupero: pageRecovery, legale: pageLegal, conferma: pageConfirm, fatto: pageDone };
   const fn = pages[r.name] || pageHome;
-  const onb = ['benvenuto', 'accedi', 'registrati', 'recupero', 'conferma'].includes(r.name) || (r.name === 'legale' && !auth.user());
-  document.body.classList.toggle('fixed-screen', ['accedi', 'registrati', 'recupero', 'conferma', 'benvenuto'].includes(r.name));
+  const onb = ['benvenuto', 'accedi', 'registrati', 'recupero', 'conferma', 'fatto'].includes(r.name) || (r.name === 'legale' && !auth.user());
+  document.body.classList.toggle('fixed-screen', ['accedi', 'registrati', 'recupero', 'conferma', 'benvenuto', 'fatto'].includes(r.name));
   tabbar.classList.toggle('hide', onb); view.classList.toggle('no-tabbar', onb);
   const tabName = r.name === 'profilo' ? 'profilo' : r.name === 'statistiche' ? 'bilanci' : r.name;
   $$('.tab').forEach((t) => t.classList.toggle('on', t.dataset.tab === tabName));
@@ -640,12 +640,12 @@ function submitForm() {
   if (!validateSplit()) { toast('Controlla la divisione'); return; }
   const owed = computeOwed();
   const data = { kind: F.kind, desc: F.kind === 'payment' ? 'Pagamento' : F.desc.trim(), amount, date: F.date || todayStr(), cat: F.kind === 'payment' ? '' : F.cat, paidBy: F.paidBy, splitMethod: F.kind === 'payment' ? 'exact' : F.splitMethod, splitInput: F.splitMethod === 'equal' ? {} : { ...F.splitInput }, owed, notes: F.notes.trim(), group: F.group || null };
+  const wasKind = F.kind;
   if (F.group) { S.settings.lastGroup = F.group; }
   if (F.id) { const id = F.id; F = null; updateEntry(id, data); toast('Modifiche salvate'); go('#/spesa/' + id); return; }
   data.recurring = F.recurring ? 'monthly' : null; F = null;
   const e = addEntry(data);
-  go(data.kind === 'payment' ? '#/bilanci' : '#/home');
-  toast(data.kind === 'payment' ? 'Pagamento registrato' : 'Spesa aggiunta', { label: 'Annulla', fn: () => { deleteEntry(e.id); toast('Annullata'); } });
+  go('#/fatto/' + e.id);
 }
 
 /* ---------- PROFILO + sottopagine ---------- */
@@ -992,6 +992,23 @@ async function scanReceipt(file) {
   } catch (e) { closeSheet(); console.warn('ocr', e); toast(e.message && /rete/.test(e.message) ? e.message : 'Lettura non riuscita: riprova con una foto più nitida'); }
 }
 
+/* ---------- Conferma dopo aver aggiunto una spesa o un pagamento ---------- */
+function pageDone(r) {
+  const e = S.entries.find((x) => x.id === r.id);
+  if (!e) { setTimeout(() => go('#/home'), 0); return '<div class="page"></div>'; }
+  const isPay = e.kind === 'payment'; const c = catOf(e.cat); const payer = member(e.paidBy); const to = isPay ? member(Object.keys(e.owed || {})[0]) : null;
+  const sub = isPay ? `a ${esc(to ? to.name : '')}` : (e.notes ? esc(e.notes) : esc(c.name));
+  return `<div class="page onb done">
+    <div class="done-art"><img src="img/fatto.png" alt=""></div>
+    <h1 class="done-h">${isPay ? 'Pagamento registrato!' : 'Pagamento aggiunto!'}<svg class="done-line" viewBox="0 0 220 12" preserveAspectRatio="none"><path d="M3 8 C 60 2, 150 2, 217 7" fill="none" stroke="#A9D3B6" stroke-width="5" stroke-linecap="round"/></svg></h1>
+    <p class="done-p">Tutto ok, l'abbiamo salvato.</p>
+    <div class="done-card"><span class="cat-ic${isPay ? ' pay' : ''}">${icon(isPay ? 'c-pagamento' : c.icon)}</span><div class="done-txt"><b>${esc(isPay ? 'Pagamento' : e.desc)}</b><span>${sub}</span><span>${esc(dateShort(e.date))} ${esc(String(e.date).slice(0, 4))} • ${esc(payer.name)}</span></div><span class="done-amt">€ ${esc(moneyPlain(e.amount))}</span></div>
+    <div class="done-actions"><a class="btn onb-btn" href="#/home">Perfetto!</a><a class="done-link" href="#/nuova${isPay ? '?tipo=pagamento' : ''}">${isPay ? 'Registra un altro pagamento' : 'Aggiungi un altro pagamento'}</a></div>
+    <svg class="done-sq l" viewBox="0 0 120 90" aria-hidden="true"><path d="M8 70 C 25 20, 45 25, 40 55 C 36 80, 60 85, 75 35" fill="none" stroke="#B9D9C4" stroke-width="7" stroke-linecap="round"/></svg>
+    <svg class="done-sq r" viewBox="0 0 120 90" aria-hidden="true"><path d="M10 60 C 30 20, 50 35, 55 60 C 60 85, 85 80, 110 30" fill="none" stroke="#B9D9C4" stroke-width="7" stroke-linecap="round"/></svg>
+  </div>`;
+}
+
 /* ---------- Presentazione per chi apre l'app la prima volta ---------- */
 let OB = { step: 1, name: '', partner: '', house: '', avatar: -1, split: 'equal', pct: 50 };
 const JOIN_KEY = 'pari:join';
@@ -1112,6 +1129,7 @@ function installBanner() {
 /* ---------- Bind eventi per pagina ---------- */
 function bind(r) {
   $$('[data-back]').forEach((b) => b.addEventListener('click', () => { if (r.name === 'nuova' || r.name === 'modifica') F = null; back(b.dataset.back); }));
+  if (r.name === 'fatto') { const l = $('.done-link'); if (l) l.addEventListener('click', () => { F = null; }); }
   $$('[data-month]').forEach((b) => b.addEventListener('click', () => { const d = +b.dataset.month; S.ui.month = d === 0 ? curYM() : shiftYM(S.ui.month, d); save(); render(); const l = $('.monthnav .label'); if (l) l.classList.add('swap'); }));
   $$('[data-year]').forEach((b) => b.addEventListener('click', () => { S.ui.month = String(+S.ui.month.slice(0, 4) + +b.dataset.year) + S.ui.month.slice(4); save(); render(); }));
   const sh = $('#scan-home'); if (sh) sh.addEventListener('change', () => { const f = sh.files && sh.files[0]; if (!f) return; pendingScan = f; F = null; go('#/nuova'); });
