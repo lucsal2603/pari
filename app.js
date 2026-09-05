@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.22.0';
+const APP_VERSION = '1.22.1';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -802,7 +802,7 @@ const onboardingDone = () => { const u = auth.user(); if (!u) return true; retur
 const INTRO_AT_EVERY_LOGIN = true; // richiesta di Lucas (5/9): a ogni accesso ripartono le 4 pagine dalla prima
 function afterLogin() {
   try { localStorage.removeItem(PENDING_KEY); } catch (_) {}
-  applyPendingJoin();
+  applyPendingJoin(); if (restoreHouseFromAccount() && sync.enabled()) sync.run(true);
   const done = onboardingDone();
   OB = { step: 1, name: done ? me().name : '', partner: '', house: '', avatar: AVATAR_IMGS.indexOf(((me().avatar || {}).img) || ''), split: (S.settings.split || {}).mode === 'custom' ? 'custom' : 'equal', pct: ((S.settings.split || {}).pct || {})[me().id] || 50 };
   go(done && !INTRO_AT_EVERY_LOGIN ? '#/home' : '#/benvenuto'); if (sync.enabled()) sync.run();
@@ -1013,14 +1013,16 @@ function pageDone(r) {
 let OB = { step: 1, name: '', partner: '', house: '', avatar: -1, split: 'equal', pct: 50 };
 const JOIN_KEY = 'pari:join';
 const newHouseCode = () => { const A = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let c = ''; const r = crypto.getRandomValues(new Uint8Array(6)); for (let i = 0; i < 6; i++) c += A[r[i] % A.length]; return c; };
-function ensureHouse() { if (!S.settings.sync.house) { S.settings.sync.house = newHouseCode(); save(); if (sync.enabled()) sync.run(true); } return S.settings.sync.house; }
+function rememberHouse() { const h = S.settings.sync.house; if (h && auth.user() && ((auth.user().user_metadata || {}).house !== h)) auth.updateMeta({ house: h }); }
+function restoreHouseFromAccount() { const u = auth.user(); const h = u && u.user_metadata && u.user_metadata.house; if (h && !S.settings.sync.house) { S.settings.sync.house = h; S.settings.lastPull = null; S.settings.lastPush = null; save(); return true; } return false; }
+function ensureHouse() { if (!S.settings.sync.house) { if (!restoreHouseFromAccount()) { S.settings.sync.house = newHouseCode(); S.settings.lastPull = null; S.settings.lastPush = null; save(); } if (sync.enabled()) sync.run(true); } rememberHouse(); return S.settings.sync.house; }
 const inviteLink = () => appUrl() + '#/join/' + encodeURIComponent(ensureHouse());
 const inviteText = () => `Unisciti al mio gruppo su Divvy per dividere le spese: ${inviteLink()}`;
 /* chi apre un link di invito: il codice del gruppo viene salvato e applicato dopo l'accesso */
 function applyJoin(code) {
   if (!code) return false; const cur = S.settings.sync.house;
   if (cur && cur !== code && active().length) { toast('Sei già in un gruppo: cambialo da Profilo → Backup e sincronizzazione'); return false; }
-  S.settings.sync.house = code; S.settings.joinedVia = code; save(); if (sync.enabled()) sync.run(true); return true;
+  S.settings.sync.house = code; S.settings.joinedVia = code; S.settings.lastPull = null; S.settings.lastPush = null; save(); rememberHouse(); if (sync.enabled()) sync.run(true); return true;
 }
 function applyPendingJoin() { let code = ''; try { code = localStorage.getItem(JOIN_KEY) || ''; localStorage.removeItem(JOIN_KEY); } catch (_) {} if (code && applyJoin(code)) toast('Sei nel gruppo: le spese si sincronizzano'); }
 const AVATAR_IMGS = ['avatar-1.png', 'avatar-2.png', 'avatar-3.png', 'avatar-4.png', 'avatar-5.png'];
@@ -1219,7 +1221,7 @@ function bindProfilo(r) {
   }
   if (r.sub === 'sync') {
     $('#save-sync').addEventListener('click', async () => {
-      S.settings.sync = { url: $('#s-url').value.trim().replace(/\/+$/, ''), key: $('#s-key').value.trim(), house: $('#s-house').value.trim() }; save();
+      const prev = S.settings.sync.house; S.settings.sync = { url: $('#s-url').value.trim().replace(/\/+$/, ''), key: $('#s-key').value.trim(), house: $('#s-house').value.trim() }; if (S.settings.sync.house !== prev) { S.settings.lastPull = null; S.settings.lastPush = null; } save(); rememberHouse();
       if (!sync.enabled()) { toast('Compila tutti e tre i campi'); return; }
       toast('Collego…'); const ok = await sync.run(true); render(); toast(ok ? 'Collegata: dati sincronizzati' : 'Non riesco a collegarmi: ' + (sync.lastError || 'controlla i valori'));
     });
@@ -1272,10 +1274,10 @@ const sync = {
     try {
       const s = S.settings.sync; const base = s.url + '/rest/v1/pari_rows';
       // 1) spingo le righe locali cambiate dopo l'ultimo invio
-      const since = S.settings.lastPush || '';
+      const since = force ? '' : (S.settings.lastPush || '');
       const rows = S.entries.filter((e) => (e.updatedAt || '') > since).map((e) => ({ house: s.house, id: e.id, kind: 'entry', data: e, updated_at: e.updatedAt, deleted: !!e.deleted }));
-      if ((S.settings.membersUpdatedAt || '') > since) rows.push({ house: s.house, id: 'members', kind: 'members', data: { members: S.members, together: S.settings.together }, updated_at: S.settings.membersUpdatedAt || nowISO(), deleted: false });
-      if ((S.settings.groupsUpdatedAt || '') > since) rows.push({ house: s.house, id: 'groups', kind: 'groups', data: { groups: S.groups }, updated_at: S.settings.groupsUpdatedAt, deleted: false });
+      if ((S.settings.membersUpdatedAt || '') > since && S.settings.membersUpdatedAt) rows.push({ house: s.house, id: 'members', kind: 'members', data: { members: S.members, together: S.settings.together }, updated_at: S.settings.membersUpdatedAt || nowISO(), deleted: false });
+      if ((S.settings.groupsUpdatedAt || '') > since && S.settings.groupsUpdatedAt) rows.push({ house: s.house, id: 'groups', kind: 'groups', data: { groups: S.groups }, updated_at: S.settings.groupsUpdatedAt, deleted: false });
       if ((S.settings.pushUpdatedAt || '') > since || (force && S.settings.push)) rows.push({ house: s.house, id: 'push-' + S.settings.deviceId, kind: 'push', data: S.settings.push ? { ...S.settings.push, member: me().id } : { device: S.settings.deviceId }, updated_at: S.settings.pushUpdatedAt || nowISO(), deleted: !S.settings.push });
       const freshMine = S.entries.filter((e) => !e.deleted && (e.createdAt || '') > since && e.paidBy === me().id && !e.recurringOf).map((e) => e.id);
       S.activity.filter((a) => (a.ts || '') > since).forEach((a) => rows.push({ house: s.house, id: 'act-' + a.id, kind: 'activity', data: a, updated_at: a.ts, deleted: false }));
@@ -1400,7 +1402,7 @@ materializeRecurring();
   if (auth.recovery) history.replaceState(null, '', '#/recupero');
   else if (!auth.user()) { if (!/^#\/(accedi|registrati|legale|conferma|join)/.test(location.hash)) history.replaceState(null, '', '#/accedi'); }
   else if (!onboardingDone()) history.replaceState(null, '', '#/benvenuto');
-  if (auth.user()) { applyPendingJoin(); showDailyLove(); }
+  if (auth.user()) { applyPendingJoin(); if (restoreHouseFromAccount() && sync.enabled()) sync.run(true); rememberHouse(); showDailyLove(); }
   route();
   auth.refreshIfNeeded().then(() => { if (!auth.user() && currentRoute && currentRoute.name !== 'accedi') render(); });
 })();
