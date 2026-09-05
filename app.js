@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.20.0';
+const APP_VERSION = '1.21.0';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -408,7 +408,7 @@ function pageHome() {
   const pa = st.total ? Math.round((va / st.total) * 100) : 0, pb = st.total ? 100 - pa : 0;
   const syncCls = !sync.enabled() ? 'off' : sync.status === 'busy' ? 'busy' : sync.status === 'err' ? 'err' : '';
   return `<div class="page">
-    <div class="head left"><div class="greet">Ciao ${esc(a.name)}! <span aria-hidden="true">👋</span></div><label class="icon-btn scan-home" title="Fotografa uno scontrino" aria-label="Fotografa uno scontrino">${icon('i-camera')}<input type="file" accept="image/*" capture="environment" id="scan-home" hidden></label></div>
+    <div class="head left"><div class="greet">Ciao ${esc(a.name)}! <span aria-hidden="true">👋</span></div><label class="icon-btn scan-home" title="Fotografa uno scontrino" aria-label="Fotografa uno scontrino">${icon('i-camera')}<input type="file" accept="image/*" id="scan-home" hidden></label></div>
     <section class="card hero${sent.even ? ' even' : sent.sign === '+' ? ' owed' : ' owe'}">
       <div class="k">Saldo totale</div>
       <div class="amt">${sent.even ? money(0) : sent.sign + ' ' + money(sent.amount)}</div>
@@ -907,8 +907,12 @@ const STORES = [
   ['cinema', 'Cinema', 'tempo-libero'], ['uci', 'UCI Cinemas', 'tempo-libero'], ['the space', 'The Space Cinema', 'tempo-libero'], ['parcheggio', 'Parcheggio', 'trasporti'], ['hotel', 'Hotel', 'viaggi'], ['b&b', 'B&B', 'viaggi'],
 ];
 const NOISE = /scontrino|documento|commerciale|p\.? ?iva|partita|c\.?f\.|tel\.?|fax|cod\.? ?fisc|via |viale |piazza |corso |cassa|operatore|n\.? ?doc|data|ora |grazie|arrivederci|euro|totale|iva|resto|contanti|carta|bancomat|pagamento|reparto|descrizione|prezzo|qta|art\./i;
+const MONTHS = { gen: 1, feb: 2, mar: 3, apr: 4, mag: 5, giu: 6, lug: 7, ago: 8, set: 9, ott: 10, nov: 11, dic: 12, jan: 1, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, dec: 12 };
 function parseReceipt(text) {
   const lines = String(text).split(/\n+/).map((l) => l.replace(/[|_]/g, ' ').replace(/\s+/g, ' ').trim()).filter((l) => l.length > 1);
+  const whole = lines.join('\n'); const low = whole.toLowerCase();
+  const digital = /hai pagato|pagamento (?:a|presso|effettuato|con carta)|transazione|addebito|satispay|revolut|paypal|apple pay|google pay|bonifico|beneficiario|intesa|unicredit|poste ?pay|bancoposta|fineco|n26|hype|mooney|carta di credito|carta di debito|movimento|operazione/i.test(low);
+  if (digital) return parseDigital(lines, whole);
   const norm = (l) => l.replace(/(\d)[oO](\d)/g, '$10$2').replace(/[oO](?=[.,]\d\d)/g, '0');
   const amountsIn = (l) => { const out = []; const re = /(?:€\s*)?(\d{1,4}(?:[.,]\d{3})?)[.,](\d{2})(?!\d)/g; let m; const s2 = norm(l); while ((m = re.exec(s2))) { const cents = parseInt(m[1].replace(/[.,]/g, ''), 10) * 100 + parseInt(m[2], 10); if (cents > 0 && cents < 1000000) out.push(cents); } return out; };
   // totale: righe con TOTALE (non subtotale/parziale), altrimenti "importo pagato", altrimenti il più grande nella metà bassa
@@ -925,6 +929,28 @@ function parseReceipt(text) {
   if (!store) { const cand = lines.slice(0, 6).find((l) => /[a-zà-ú]{3,}/i.test(l) && !NOISE.test(l) && !/\d{3,}/.test(l)); if (cand) store = cand.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()).slice(0, 40); }
   return { amount, date, store, cat, lines: lines.length };
 }
+/* ricevute digitali: screenshot di banca, Satispay, PayPal, notifiche di pagamento */
+function parseDigital(lines, whole) {
+  const norm = (l) => l.replace(/(\d)[oO](\d)/g, '$10$2').replace(/[oO](?=[.,]\d\d)/g, '0');
+  const amountsIn = (l) => { const out = []; const re = /[-−]?\s*(?:€|eur)?\s*(\d{1,4}(?:[.,]\d{3})?)[.,](\d{2})(?!\d)\s*(?:€|eur)?/gi; let m; const s2 = norm(l); while ((m = re.exec(s2))) { const cents = parseInt(m[1].replace(/[.,]/g, ''), 10) * 100 + parseInt(m[2], 10); if (cents > 0 && cents < 1000000) out.push({ cents, euro: /€|eur/i.test(m[0]) }); } return out; };
+  // importo: prima le righe "hai pagato / importo / pagamento / totale / addebito", poi qualsiasi importo con €, poi il più grande
+  let amount = 0; const pri = lines.filter((l) => /hai pagato|importo|pagamento|pagato|totale|addebito|transazione|speso/i.test(l));
+  for (const l of pri) { const a = amountsIn(l); if (a.length) { amount = a[0].cents; break; } }
+  if (!amount) { let all = []; lines.forEach((l) => (all = all.concat(amountsIn(l)))); const withEuro = all.filter((x) => x.euro); if (withEuro.length) amount = withEuro[0].cents; else if (all.length) amount = Math.max(...all.map((x) => x.cents)); }
+  // esercente: "presso X", "a X", "da X", "beneficiario X", oppure marchio noto, oppure riga in maiuscolo
+  let store = '', cat = ''; const low = whole.toLowerCase() + ' ';
+  for (const [k, name, c] of STORES) { if (low.includes(k)) { store = name; cat = c; break; } }
+  if (!store) { const m = whole.match(/(?:presso|a favore di|beneficiario|esercente|merchant|pagamento a|pagato a|hai pagato [^\n]*? a|da)\s*[:\-]?\s*([A-Za-zÀ-ú0-9&'.\- ]{3,40})/i); if (m) store = m[1].trim().replace(/\s+(il|lo|la|per|di|con|€|eur).*$/i, ''); }
+  if (!store) { const cand = lines.find((l) => /^[A-Z0-9&'. \-]{4,}$/.test(l) && !/[0-9]{3,}/.test(l) && !NOISE.test(l) && !/PAGAMENTO|IMPORTO|TOTALE|EUR|SATISPAY|PAYPAL|REVOLUT|OGGI|IERI/i.test(l)); if (cand) store = cand; }
+  store = store.replace(/[.\s]+$/, '').slice(0, 40); if (store && store === store.toUpperCase()) store = store.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+  if (!cat && store) { const l2 = store.toLowerCase(); for (const [k, , c] of STORES) { if (l2.includes(k.trim())) { cat = c; break; } } }
+  // data: gg/mm/aaaa, "5 set 2026", "5 settembre 2026", oggi/ieri
+  let date = '';
+  for (const l of lines) { const m = norm(l).match(/(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})/); if (m) { let d = +m[1], mo = +m[2], y = +m[3]; if (y < 100) y += 2000; if (d >= 1 && d <= 31 && mo >= 1 && mo <= 12 && y >= 2015 && y <= 2035) { date = `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`; break; } } }
+  if (!date) { const m = whole.match(/(\d{1,2})\s+(gen|feb|mar|apr|mag|giu|lug|ago|set|ott|nov|dic|jan|may|jun|jul|aug|sep|oct|dec)[a-z]*\.?\s*(\d{4})?/i); if (m) { const y = m[3] ? +m[3] : new Date().getFullYear(); const mo = MONTHS[m[2].toLowerCase()]; const d = +m[1]; if (mo && d >= 1 && d <= 31) date = `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`; } }
+  if (!date && /\bieri\b/i.test(whole)) { const x = new Date(); x.setDate(x.getDate() - 1); date = x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); }
+  return { amount, date, store, cat, lines: lines.length, digital: true };
+}
 let ocrLib = null, pendingScan = null;
 function loadOCR() {
   if (ocrLib) return Promise.resolve(ocrLib);
@@ -936,7 +962,8 @@ async function prepareImage(file) {
   const c = document.createElement('canvas'); c.width = w; c.height = h; const ctx = c.getContext('2d'); ctx.drawImage(bmp, 0, 0, w, h);
   // scala di grigi con contrasto: aiuta la lettura della stampa termica
   const img = ctx.getImageData(0, 0, w, h); const d = img.data; let sum = 0; for (let i = 0; i < d.length; i += 4) { const g = d[i] * .3 + d[i + 1] * .59 + d[i + 2] * .11; d[i] = d[i + 1] = d[i + 2] = g; sum += g; }
-  const mean = sum / (d.length / 4); for (let i = 0; i < d.length; i += 4) { let g = (d[i] - mean) * 1.35 + mean + 10; g = g < 0 ? 0 : g > 255 ? 255 : g; d[i] = d[i + 1] = d[i + 2] = g; }
+  const mean = sum / (d.length / 4); const dark = mean < 110; // screenshot in modalità scura: testo chiaro su fondo scuro → inverto
+  for (let i = 0; i < d.length; i += 4) { let g = dark ? 255 - d[i] : d[i]; g = (g - (dark ? 255 - mean : mean)) * 1.35 + (dark ? 255 - mean : mean) + 10; g = g < 0 ? 0 : g > 255 ? 255 : g; d[i] = d[i + 1] = d[i + 2] = g; }
   ctx.putImageData(img, 0, 0); return c;
 }
 async function scanReceipt(file) {
