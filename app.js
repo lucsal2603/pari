@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.19.0';
+const APP_VERSION = '1.20.0';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -408,7 +408,7 @@ function pageHome() {
   const pa = st.total ? Math.round((va / st.total) * 100) : 0, pb = st.total ? 100 - pa : 0;
   const syncCls = !sync.enabled() ? 'off' : sync.status === 'busy' ? 'busy' : sync.status === 'err' ? 'err' : '';
   return `<div class="page">
-    <div class="head left"><div class="greet">Ciao ${esc(a.name)}! <span aria-hidden="true">👋</span></div><a class="who-chip" href="#/profilo"><span class="sync-dot ${syncCls}" title="Sincronizzazione"></span>${esc(a.name)} ${avatar(a)}</a></div>
+    <div class="head left"><div class="greet">Ciao ${esc(a.name)}! <span aria-hidden="true">👋</span></div><label class="icon-btn scan-home" title="Fotografa uno scontrino" aria-label="Fotografa uno scontrino">${icon('i-camera')}<input type="file" accept="image/*" capture="environment" id="scan-home" hidden></label></div>
     <section class="card hero${sent.even ? ' even' : sent.sign === '+' ? ' owed' : ' owe'}">
       <div class="k">Saldo totale</div>
       <div class="amt">${sent.even ? money(0) : sent.sign + ' ' + money(sent.amount)}</div>
@@ -589,6 +589,7 @@ function pageForm(r) {
   return `<div class="page up">
     <div class="head"><button class="icon-btn" data-back="${editing ? '#/spesa/' + editing.id : '#/home'}" aria-label="Annulla">${icon('i-x')}</button><div class="title">${editing ? (isPay ? 'Modifica pagamento' : 'Modifica spesa') : (isPay ? 'Nuovo pagamento' : 'Nuova spesa')}</div><button class="icon-btn green" id="save-top" aria-label="Salva">${icon('i-check')}</button></div>
     <form id="f" novalidate>
+      ${isPay ? '' : `<div class="scan-row"><label class="btn soft scan-btn">${icon('i-camera')} Fotografa lo scontrino<input type="file" accept="image/*" capture="environment" id="scan-cam" hidden></label><label class="scan-gallery">${icon('i-image')} dalla galleria<input type="file" accept="image/*" id="scan-gal" hidden></label></div>`}
       ${isPay ? '' : `<div class="field"><label for="desc">Descrizione</label><input id="desc" type="text" placeholder="Cena pizza" value="${esc(F.desc)}" autocomplete="off" enterkeyhint="next"></div>`}
       <div class="field"><label for="amount">Importo</label><div class="money-input"><span class="cur">€</span><input id="amount" type="text" inputmode="decimal" placeholder="0,00" value="${esc(F.amount)}" autocomplete="off"></div><div class="hint err" id="amount-err" hidden>Inserisci un importo valido.</div></div>
       ${isPay
@@ -896,6 +897,69 @@ function bindRecovery() {
   $('[data-recovery-form]').addEventListener('submit', async (e) => { e.preventDefault(); const pw = $('#rc-pass').value || ''; if (pw.length < 6) { toast('Almeno 6 caratteri'); return; } try { await auth.updatePassword(pw); auth.recovery = false; toast('Password aggiornata'); afterLogin(); } catch (err) { toast(err.message); } });
 }
 
+/* ---------- Lettura dello scontrino (OCR sul telefono, niente servizi esterni) ---------- */
+const STORES = [
+  ['esselunga', 'Esselunga', 'spesa'], ['coop', 'Coop', 'spesa'], ['conad', 'Conad', 'spesa'], ['carrefour', 'Carrefour', 'spesa'], ['lidl', 'Lidl', 'spesa'], ['eurospin', 'Eurospin', 'spesa'], ['pam', 'Pam', 'spesa'], ['despar', 'Despar', 'spesa'], ['iper', 'Iper', 'spesa'], ['bennet', 'Bennet', 'spesa'], ['tigros', 'Tigros', 'spesa'], ['famila', 'Famila', 'spesa'], ['aldi', 'Aldi', 'spesa'], ['md ', 'MD', 'spesa'], ['penny', 'Penny', 'spesa'], ['unes', 'Unes', 'spesa'], ['todis', 'Todis', 'spesa'], ['crai', 'Crai', 'spesa'], ['simply', 'Simply', 'spesa'], ['auchan', 'Auchan', 'spesa'], ['italmark', 'Italmark', 'spesa'], ['gigante', 'Il Gigante', 'spesa'],
+  ['decathlon', 'Decathlon', 'shopping'], ['zara', 'Zara', 'shopping'], ['h&m', 'H&M', 'shopping'], ['ovs', 'OVS', 'shopping'], ['ikea', 'Ikea', 'casa'], ['leroy', 'Leroy Merlin', 'casa'], ['brico', 'Brico', 'casa'], ['mediaworld', 'MediaWorld', 'shopping'], ['unieuro', 'Unieuro', 'shopping'], ['euronics', 'Euronics', 'shopping'], ['tigota', 'Tigotà', 'shopping'], ['acqua e sapone', 'Acqua & Sapone', 'casa'], ['primark', 'Primark', 'shopping'], ['amazon', 'Amazon', 'shopping'],
+  ['farmacia', 'Farmacia', 'salute'], ['parafarmacia', 'Parafarmacia', 'salute'],
+  ['eni', 'Eni', 'trasporti'], ['q8', 'Q8', 'trasporti'], ['esso', 'Esso', 'trasporti'], ['tamoil', 'Tamoil', 'trasporti'], ['ip ', 'IP', 'trasporti'], ['agip', 'Agip', 'trasporti'], ['autogrill', 'Autogrill', 'cibo'], ['autostrade', 'Autostrade', 'trasporti'], ['trenitalia', 'Trenitalia', 'trasporti'], ['italo', 'Italo', 'trasporti'], ['atm', 'ATM', 'trasporti'],
+  ['mcdonald', "McDonald's", 'cibo'], ['burger king', 'Burger King', 'cibo'], ['kfc', 'KFC', 'cibo'], ['ristorante', 'Ristorante', 'cibo'], ['pizzeria', 'Pizzeria', 'cibo'], ['trattoria', 'Trattoria', 'cibo'], ['osteria', 'Osteria', 'cibo'], ['bar ', 'Bar', 'cibo'], ['caffe', 'Caffè', 'cibo'], ['pasticceria', 'Pasticceria', 'cibo'], ['gelateria', 'Gelateria', 'cibo'], ['sushi', 'Sushi', 'cibo'], ['kebab', 'Kebab', 'cibo'],
+  ['cinema', 'Cinema', 'tempo-libero'], ['uci', 'UCI Cinemas', 'tempo-libero'], ['the space', 'The Space Cinema', 'tempo-libero'], ['parcheggio', 'Parcheggio', 'trasporti'], ['hotel', 'Hotel', 'viaggi'], ['b&b', 'B&B', 'viaggi'],
+];
+const NOISE = /scontrino|documento|commerciale|p\.? ?iva|partita|c\.?f\.|tel\.?|fax|cod\.? ?fisc|via |viale |piazza |corso |cassa|operatore|n\.? ?doc|data|ora |grazie|arrivederci|euro|totale|iva|resto|contanti|carta|bancomat|pagamento|reparto|descrizione|prezzo|qta|art\./i;
+function parseReceipt(text) {
+  const lines = String(text).split(/\n+/).map((l) => l.replace(/[|_]/g, ' ').replace(/\s+/g, ' ').trim()).filter((l) => l.length > 1);
+  const norm = (l) => l.replace(/(\d)[oO](\d)/g, '$10$2').replace(/[oO](?=[.,]\d\d)/g, '0');
+  const amountsIn = (l) => { const out = []; const re = /(?:€\s*)?(\d{1,4}(?:[.,]\d{3})?)[.,](\d{2})(?!\d)/g; let m; const s2 = norm(l); while ((m = re.exec(s2))) { const cents = parseInt(m[1].replace(/[.,]/g, ''), 10) * 100 + parseInt(m[2], 10); if (cents > 0 && cents < 1000000) out.push(cents); } return out; };
+  // totale: righe con TOTALE (non subtotale/parziale), altrimenti "importo pagato", altrimenti il più grande nella metà bassa
+  let amount = 0; const totLines = lines.filter((l) => /tota\s*l|t0tale|tot\.|totle/i.test(l) && !/sub|parz|sconto|risparm|punti|iva/i.test(l));
+  for (const l of totLines) { const a = amountsIn(l); if (a.length) amount = Math.max(amount, ...a); }
+  const noPay = (l) => !/resto|contant|bancomat|carta|pagamento|pos\b|cambio/i.test(l);
+  if (!amount) for (const l of lines.filter((l) => /pagato|importo/i.test(l) && noPay(l))) { const a = amountsIn(l); if (a.length) { amount = Math.max(amount, ...a); } }
+  if (!amount) { const tail = lines.slice(Math.floor(lines.length * 0.4)).filter(noPay); let all = []; tail.forEach((l) => (all = all.concat(amountsIn(l)))); if (all.length) amount = Math.max(...all); }
+  // data
+  let date = ''; for (const l of lines) { const m = norm(l).match(/(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})/); if (m) { let d = +m[1], mo = +m[2], y = +m[3]; if (y < 100) y += 2000; if (d >= 1 && d <= 31 && mo >= 1 && mo <= 12 && y >= 2015 && y <= 2035) { date = `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`; break; } } }
+  // negozio e categoria
+  let store = '', cat = ''; const head = lines.slice(0, 8).join(' ').toLowerCase() + ' ';
+  for (const [k, name, c] of STORES) { if (head.includes(k)) { store = name; cat = c; break; } }
+  if (!store) { const cand = lines.slice(0, 6).find((l) => /[a-zà-ú]{3,}/i.test(l) && !NOISE.test(l) && !/\d{3,}/.test(l)); if (cand) store = cand.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()).slice(0, 40); }
+  return { amount, date, store, cat, lines: lines.length };
+}
+let ocrLib = null, pendingScan = null;
+function loadOCR() {
+  if (ocrLib) return Promise.resolve(ocrLib);
+  return new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js'; sc.onload = () => { ocrLib = window.Tesseract; res(ocrLib); }; sc.onerror = () => rej(new Error('Serve la rete per scaricare il lettore la prima volta')); document.head.appendChild(sc); });
+}
+async function prepareImage(file) {
+  let bmp; try { bmp = await createImageBitmap(file, { imageOrientation: 'from-image' }); } catch (_) { bmp = await createImageBitmap(file); }
+  const max = 1800; const k = Math.min(1, max / Math.max(bmp.width, bmp.height)); const w = Math.round(bmp.width * k), h = Math.round(bmp.height * k);
+  const c = document.createElement('canvas'); c.width = w; c.height = h; const ctx = c.getContext('2d'); ctx.drawImage(bmp, 0, 0, w, h);
+  // scala di grigi con contrasto: aiuta la lettura della stampa termica
+  const img = ctx.getImageData(0, 0, w, h); const d = img.data; let sum = 0; for (let i = 0; i < d.length; i += 4) { const g = d[i] * .3 + d[i + 1] * .59 + d[i + 2] * .11; d[i] = d[i + 1] = d[i + 2] = g; sum += g; }
+  const mean = sum / (d.length / 4); for (let i = 0; i < d.length; i += 4) { let g = (d[i] - mean) * 1.35 + mean + 10; g = g < 0 ? 0 : g > 255 ? 255 : g; d[i] = d[i + 1] = d[i + 2] = g; }
+  ctx.putImageData(img, 0, 0); return c;
+}
+async function scanReceipt(file) {
+  const root = $('#sheet-root');
+  openSheet('Lettura dello scontrino', `<div class="scan-box"><div class="scan-t" id="scan-t">Preparo la foto…</div><div class="scan-bar"><i id="scan-bar"></i></div><p class="small muted" style="margin:10px 0 0">La lettura avviene sul telefono: la foto non viene inviata da nessuna parte.</p></div>`);
+  const setP = (t, p) => { const el = $('#scan-t'); if (el) el.textContent = t; const b = $('#scan-bar'); if (b) b.style.width = Math.round(p * 100) + '%'; };
+  try {
+    const canvas = await prepareImage(file); setP('Scarico il lettore…', .05);
+    const T = await loadOCR();
+    const worker = await T.createWorker('ita', 1, { logger: (m) => { if (m.status === 'recognizing text') setP('Leggo lo scontrino… ' + Math.round(m.progress * 100) + '%', .2 + m.progress * .8); else if (/load|init/i.test(m.status)) setP('Preparo il lettore…', .1); } });
+    await worker.setParameters({ preserve_interword_spaces: '1' });
+    const { data } = await worker.recognize(canvas); await worker.terminate();
+    const r = parseReceipt(data.text || ''); window.PARI && (window.PARI.lastOCR = data.text); closeSheet();
+    if (!r.amount && !r.store) { toast('Non riesco a leggere lo scontrino: prova con più luce e inquadratura dritta'); return; }
+    if (r.store) { F.desc = r.store; const d = $('#desc'); if (d) d.value = r.store; }
+    if (r.amount) { F.amount = moneyPlain(r.amount); const a = $('#amount'); if (a) { a.value = F.amount; a.dispatchEvent(new Event('input', { bubbles: true })); } }
+    if (r.date) { F.date = r.date; const dt = $('#date'); if (dt) dt.value = r.date; }
+    if (r.cat) { F.cat = r.cat; $$('.cat-circle').forEach((x) => x.classList.toggle('on', x.dataset.cat === F.cat)); const cn = $('#cat-name'); if (cn) cn.textContent = catOf(F.cat).name; }
+    $$('.scan-fill').forEach((x) => x.classList.remove('scan-fill')); ['#desc', '#amount', '#date'].forEach((sel) => { const el = $(sel); if (el && el.value) el.classList.add('scan-fill'); });
+    toast(r.amount ? `Letto: ${r.store || 'scontrino'} · ${money(r.amount)}. Controlla e conferma` : 'Ho trovato il negozio ma non il totale: scrivilo tu');
+  } catch (e) { closeSheet(); console.warn('ocr', e); toast(e.message && /rete/.test(e.message) ? e.message : 'Lettura non riuscita: riprova con una foto più nitida'); }
+}
+
 /* ---------- Presentazione per chi apre l'app la prima volta ---------- */
 let OB = { step: 1, name: '', partner: '', house: '', avatar: -1, split: 'equal', pct: 50 };
 const JOIN_KEY = 'pari:join';
@@ -1018,6 +1082,7 @@ function bind(r) {
   $$('[data-back]').forEach((b) => b.addEventListener('click', () => { if (r.name === 'nuova' || r.name === 'modifica') F = null; back(b.dataset.back); }));
   $$('[data-month]').forEach((b) => b.addEventListener('click', () => { const d = +b.dataset.month; S.ui.month = d === 0 ? curYM() : shiftYM(S.ui.month, d); save(); render(); const l = $('.monthnav .label'); if (l) l.classList.add('swap'); }));
   $$('[data-year]').forEach((b) => b.addEventListener('click', () => { S.ui.month = String(+S.ui.month.slice(0, 4) + +b.dataset.year) + S.ui.month.slice(4); save(); render(); }));
+  const sh = $('#scan-home'); if (sh) sh.addEventListener('change', () => { const f = sh.files && sh.files[0]; if (!f) return; pendingScan = f; F = null; go('#/nuova'); });
   $$('[data-install-hide]').forEach((b) => b.addEventListener('click', () => { sessionStorage.setItem('pari:install-hide', '1'); b.closest('.install').remove(); }));
   bindSeg($('[data-seg="homeMode"]'), (v) => { S.ui.homeMode = v; save(); render(); });
   bindSeg($('[data-seg="balTab"]'), (v) => { S.ui.balTab = +v; save(); render(); });
@@ -1065,6 +1130,8 @@ function bindForm(r) {
   $$('[data-share]').forEach((inp) => inp.addEventListener('input', () => { F.splitInput[inp.dataset.share] = inp.value; validateSplit(); }));
   $$('[data-cat]').forEach((b) => b.addEventListener('click', () => { F.cat = F.cat === b.dataset.cat ? '' : b.dataset.cat; $$('.cat-circle').forEach((x) => x.classList.toggle('on', x.dataset.cat === F.cat)); $('#cat-name').textContent = F.cat ? catOf(F.cat).name : 'Nessuna categoria'; }));
   const rec = $('#recurring'); if (rec) rec.addEventListener('click', () => { F.recurring = !F.recurring; rec.setAttribute('aria-checked', F.recurring); });
+  ['#scan-cam', '#scan-gal'].forEach((sel) => { const i = $(sel); if (i) i.addEventListener('change', () => { const f = i.files && i.files[0]; if (f) scanReceipt(f); i.value = ''; }); });
+  if (pendingScan && F.kind === 'expense') { const f = pendingScan; pendingScan = null; setTimeout(() => scanReceipt(f), 350); }
   $$('#form-groups [data-group]').forEach((b) => b.addEventListener('click', () => { F.group = b.dataset.group; F.newGroup = false; $$('#form-groups .chip').forEach((x) => x.classList.toggle('on', x === b)); $('#group-new').hidden = true; }));
   const gn = $('[data-group-new]'); if (gn) gn.addEventListener('click', () => { F.newGroup = true; $('#group-new').hidden = false; $('#group-name').focus(); });
   const gname = $('#group-name'); if (gname) gname.addEventListener('input', () => (F.newGroupName = gname.value));
@@ -1299,5 +1366,5 @@ if ('serviceWorker' in navigator) {
     }).catch(() => {});
   });
 }
-window.PARI = { state: () => S, addEntry, balances, monthStats, sync, toast };
+window.PARI = { state: () => S, addEntry, balances, monthStats, sync, toast, parseReceipt, scanReceipt };
 })();

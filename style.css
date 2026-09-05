@@ -301,6 +301,20 @@ img.avatar.lg { width: 44px; height: 44px; }
 .switch[aria-checked="true"]::after { transform: translateX(20px); }
 .form-foot { position: sticky; bottom: calc(var(--tabbar-h) + var(--sab)); padding: 12px 0 calc(var(--sab) + 6px); background: linear-gradient(to top, var(--bg) 70%, transparent); margin-top: 18px; }
 
+/* ---------- Lettura scontrino ---------- */
+.scan-home { background: var(--green); color: var(--white); cursor: pointer; }
+.scan-home .ic { width: 22px; height: 22px; }
+.scan-home:active { background: var(--green-2); }
+.scan-row { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
+.scan-btn { flex: 1; height: 48px; cursor: pointer; }
+.scan-gallery { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 700; color: var(--green); cursor: pointer; white-space: nowrap; }
+.scan-gallery .ic { width: 18px; height: 18px; }
+.scan-box { padding: 4px 0 8px; }
+.scan-t { font-weight: 700; font-size: 15px; margin-bottom: 10px; }
+.scan-bar { height: 8px; border-radius: 4px; background: var(--card-2); overflow: hidden; }
+.scan-bar i { display: block; height: 100%; width: 3%; background: var(--green); border-radius: 4px; transition: width .3s ease; }
+.scan-fill { background: var(--green-soft) !important; border-color: var(--green-line) !important; transition: background-color .4s ease; }
+
 /* ---------- Dettaglio spesa ---------- */
 .detail-top { text-align: center; padding: 6px 0 4px; }
 .detail-top .cat-ic { width: 60px; height: 60px; }

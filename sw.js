@@ -1,7 +1,7 @@
 /* Divvy — service worker.
    Shell (html/js/css): prima la rete, cache solo se offline → gli aggiornamenti si vedono subito.
    Immagini, icone, font: prima la cache. Supabase: mai toccato. */
-const VERSION = 'pari-v1.19.0';
+const VERSION = 'pari-v1.20.0';
 const SHELL = [
   './', './index.html', './style.css', './app.js', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png', './icons/favicon.png',
@@ -38,8 +38,9 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(req.url);
   if (url.hostname.endsWith('supabase.co') || url.hostname.endsWith('supabase.in')) return;
   const isFont = url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com';
+  const isOCR = url.hostname === 'cdn.jsdelivr.net' || url.hostname === 'tessdata.projectnaptha.com';
   const sameOrigin = url.origin === self.location.origin;
-  if (!sameOrigin && !isFont) return;
+  if (!sameOrigin && !isFont && !isOCR) return;
 
   const isShell = req.mode === 'navigate' || /\.(html|js|css|webmanifest)$/.test(url.pathname) || url.pathname.endsWith('/');
   if (sameOrigin && isShell) {
