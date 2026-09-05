@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.12.0';
+const APP_VERSION = '1.13.0';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -96,6 +96,41 @@ function renameGroup(id, name) { const g = S.groups.find((x) => x.id === id); if
 function deleteGroup(id) { const g = S.groups.find((x) => x.id === id); if (!g) return; g.deleted = true; g.updatedAt = nowISO(); S.settings.groupsUpdatedAt = g.updatedAt; if (S.settings.lastGroup === id) S.settings.lastGroup = (groups()[0] || {}).id || null; save(); sync.schedule(); }
 
 if (!S.settings.deviceId) { S.settings.deviceId = 'd-' + uid(); save(); }
+
+/* ---------- Accesso (Supabase Auth: email/password, Apple, Google) ----------
+   L'accesso identifica la persona; le spese restano nella "casa" condivisa come prima. */
+const AUTH_KEY = 'pari:auth';
+const appUrl = () => location.origin + location.pathname;
+const authMsg = (j) => { const m = (j && (j.msg || j.message || j.error_description || j.error)) || ''; const t = String(m).toLowerCase();
+  if (t.includes('invalid login')) return 'Email o password sbagliate'; if (t.includes('already registered') || t.includes('already been registered')) return 'Esiste già un account con questa email: accedi'; if (t.includes('password should be')) return 'La password deve avere almeno 6 caratteri'; if (t.includes('email not confirmed')) return 'Conferma prima l\'email che ti abbiamo mandato'; if (t.includes('rate limit')) return 'Troppi tentativi: riprova tra un minuto'; if (t.includes('provider is not enabled') || t.includes('unsupported provider')) return 'Accesso non ancora attivo con questo servizio'; if (t.includes('invalid email') || t.includes('validate email')) return 'Controlla l\'email'; return m || 'Qualcosa è andato storto'; };
+const auth = {
+  s: null, recovery: false,
+  load() { try { this.s = JSON.parse(localStorage.getItem(AUTH_KEY) || 'null'); } catch (_) { this.s = null; } },
+  save() { try { if (this.s) localStorage.setItem(AUTH_KEY, JSON.stringify(this.s)); else localStorage.removeItem(AUTH_KEY); } catch (_) {} },
+  user() { return this.s && this.s.user; },
+  email() { const u = this.user(); return (u && u.email) || ''; },
+  h(json = true) { const o = { apikey: SUPA_ANON }; if (json) o['Content-Type'] = 'application/json'; return o; },
+  setSession(j) { if (j.expires_in && !j.expires_at) j.expires_at = Math.floor(Date.now() / 1000) + j.expires_in; this.s = { access_token: j.access_token, refresh_token: j.refresh_token, expires_at: j.expires_at, user: j.user || null }; this.save(); },
+  async signUp(email, password) { const r = await fetch(SUPA_URL + '/auth/v1/signup', { method: 'POST', headers: this.h(), body: JSON.stringify({ email, password, options: { emailRedirectTo: appUrl() } }) }); const j = await r.json(); if (!r.ok) throw new Error(authMsg(j)); if (j.access_token) { this.setSession(j); return 'ok'; } return 'confirm'; },
+  async signIn(email, password) { const r = await fetch(SUPA_URL + '/auth/v1/token?grant_type=password', { method: 'POST', headers: this.h(), body: JSON.stringify({ email, password }) }); const j = await r.json(); if (!r.ok) throw new Error(authMsg(j)); this.setSession(j); },
+  async signOut() { try { if (this.s) await fetch(SUPA_URL + '/auth/v1/logout', { method: 'POST', headers: { apikey: SUPA_ANON, Authorization: 'Bearer ' + this.s.access_token } }); } catch (_) {} this.s = null; this.save(); },
+  async refreshIfNeeded() { if (!this.s || !this.s.refresh_token) return; if (Date.now() < ((this.s.expires_at || 0) * 1000) - 120000) return; try { const r = await fetch(SUPA_URL + '/auth/v1/token?grant_type=refresh_token', { method: 'POST', headers: this.h(), body: JSON.stringify({ refresh_token: this.s.refresh_token }) }); const j = await r.json(); if (r.ok && j.access_token) this.setSession(j); else if (r.status === 400 || r.status === 401) { this.s = null; this.save(); } } catch (_) {} },
+  async recover(email) { const r = await fetch(SUPA_URL + '/auth/v1/recover?redirect_to=' + encodeURIComponent(appUrl()), { method: 'POST', headers: this.h(), body: JSON.stringify({ email }) }); if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(authMsg(j)); } },
+  async updatePassword(password) { const r = await fetch(SUPA_URL + '/auth/v1/user', { method: 'PUT', headers: { ...this.h(), Authorization: 'Bearer ' + this.s.access_token }, body: JSON.stringify({ password }) }); const j = await r.json(); if (!r.ok) throw new Error(authMsg(j)); this.s.user = j; this.save(); },
+  async fetchUser() { if (!this.s) return; try { const r = await fetch(SUPA_URL + '/auth/v1/user', { headers: { apikey: SUPA_ANON, Authorization: 'Bearer ' + this.s.access_token } }); if (r.ok) { this.s.user = await r.json(); this.save(); } } catch (_) {} },
+  oauth(provider) { location.href = SUPA_URL + '/auth/v1/authorize?provider=' + provider + '&redirect_to=' + encodeURIComponent(appUrl()); },
+  /* ritorno da un link (OAuth, conferma email, recupero password): i dati stanno nel frammento dell'URL */
+  async handleRedirect() {
+    const h = location.hash || ''; if (!/access_token=|error=|error_description=/.test(h)) return false;
+    const p = new URLSearchParams(h.replace(/^#\/?/, '').replace(/^\?/, ''));
+    if (p.get('error') || p.get('error_description')) { setTimeout(() => toast(authMsg({ msg: p.get('error_description') || p.get('error') })), 600); history.replaceState(null, '', '#/accedi'); return false; }
+    this.setSession({ access_token: p.get('access_token'), refresh_token: p.get('refresh_token'), expires_in: +p.get('expires_in') || 3600, expires_at: +p.get('expires_at') || undefined });
+    await this.fetchUser();
+    this.recovery = p.get('type') === 'recovery';
+    history.replaceState(null, '', this.recovery ? '#/recupero' : '#/home'); return true;
+  },
+};
+auth.load();
 
 /* ---------- Un pensiero al giorno per Martina (solo sul suo telefono, alla prima apertura del giorno) ---------- */
 const LOVE = [
@@ -280,9 +315,10 @@ function render(r, toTop) {
   // toTop solo quando cambia pagina: i ridisegni per un cambio di stato (Pagato/Quota, mese, tab) tengono la posizione
   const keep = toTop ? 0 : window.scrollY;
   r = r || currentRoute || { name: 'home', id: '', q: {} }; currentRoute = r;
-  const pages = { home: pageHome, spese: pageSpese, bilanci: pageBilanci, profilo: pageProfilo, nuova: pageForm, modifica: pageForm, spesa: pageDetail, statistiche: pageStats, attivita: pageActivity, benvenuto: pageWelcome };
+  if (!auth.user() && r.name !== 'accedi' && r.name !== 'recupero') { r = { name: 'accedi', id: '', sub: '', q: {}, back: null }; currentRoute = r; }
+  const pages = { home: pageHome, spese: pageSpese, bilanci: pageBilanci, profilo: pageProfilo, nuova: pageForm, modifica: pageForm, spesa: pageDetail, statistiche: pageStats, attivita: pageActivity, benvenuto: pageWelcome, accedi: pageLogin, recupero: pageRecovery };
   const fn = pages[r.name] || pageHome;
-  const onb = r.name === 'benvenuto';
+  const onb = r.name === 'benvenuto' || r.name === 'accedi' || r.name === 'recupero';
   tabbar.classList.toggle('hide', onb); view.classList.toggle('no-tabbar', onb);
   const tabName = r.name === 'profilo' ? 'profilo' : r.name === 'statistiche' ? 'bilanci' : r.name;
   $$('.tab').forEach((t) => t.classList.toggle('on', t.dataset.tab === tabName));
@@ -630,6 +666,7 @@ function pageProfilo(r) {
     <section class="card"><div class="menu">
       <a href="#/attivita">${icon('i-repeat')}<span>Attività recente</span><span></span>${icon('i-right', 'ic chev')}</a>
       <a href="#/profilo/info">${icon('i-info')}<span>Informazioni sull'app</span><span class="val">v${APP_VERSION}</span>${icon('i-right', 'ic chev')}</a>
+      <button type="button" data-logout>${icon('i-x')}<span>Esci <span class="d">${esc(auth.email() || 'account')}</span></span><span></span>${icon('i-right', 'ic chev')}</button>
     </div></section>
     ${installBanner()}
   </div>`;
@@ -728,6 +765,57 @@ function pageActivity() {
   return `<div class="page slide">${subHead('Attività', '#/spese')}
     <section class="card">${days.length ? `<div class="feed">${days.map((d) => `<div class="day">${esc(relDay(d.k))}</div>${d.items.map((a) => `<a class="ev ${a.type}" href="#/spesa/${a.entryId}"><div class="t">${text(a)}</div><div class="when">${esc(new Date(a.ts).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }))}</div></a>`).join('')}`).join('')}</div>` : emptyBox('Ancora niente', 'Qui compare tutto quello che aggiungete, modificate o saldate.')}</section>
   </div>`;
+}
+
+/* ---------- Schermata di accesso / registrazione ---------- */
+let LG = { mode: 'login', email: '', busy: false, show: false, sent: '' };
+function pageLogin() {
+  const reg = LG.mode === 'register';
+  return `<div class="page onb login">
+    <img class="onb-logo" src="img/logo.png" alt="Divvy">
+    <h1 class="onb-h">${reg ? 'Crea il tuo account' : 'Benvenuto in Divvy!'}</h1><p class="onb-p">${reg ? 'Bastano un\'email e una password: poi ti presentiamo l\'app.' : 'L\'app per condividere le spese in modo semplice e trasparente.'}</p>
+    <div class="onb-art"><img src="img/benvenuto-4.png" alt=""></div>
+    ${LG.sent ? `<div class="login-note">Ti abbiamo mandato un'email a <b>${esc(LG.sent)}</b>: apri il link per confermare, poi accedi da qui.</div>` : ''}
+    <form class="onb-form" data-login-form>
+      <label class="onb-field">${icon('i-mail')}<input id="lg-email" type="email" placeholder="Email" value="${esc(LG.email)}" autocomplete="email" autocapitalize="off" inputmode="email" enterkeyhint="next"></label>
+      <label class="onb-field">${icon('i-lock')}<input id="lg-pass" type="${LG.show ? 'text' : 'password'}" placeholder="Password" autocomplete="${reg ? 'new-password' : 'current-password'}" enterkeyhint="go"><button type="button" class="login-eye" data-eye aria-label="Mostra password">${icon(LG.show ? 'i-eye-off' : 'i-eye')}</button></label>
+      ${reg ? '' : `<div class="login-row"><button type="button" class="login-link" data-forgot>Password dimenticata?</button></div>`}
+      <button class="btn onb-btn login-main" type="submit" ${LG.busy ? 'disabled' : ''}>${reg ? 'Registrati' : 'Accedi'}</button>
+    </form>
+    <div class="login-or"><span>oppure</span></div>
+    <button type="button" class="btn ghost login-oauth" data-oauth="apple">${icon('i-apple')} Continua con Apple</button>
+    <button type="button" class="btn ghost login-oauth" data-oauth="google">${icon('i-google')} Continua con Google</button>
+    <p class="login-foot">${reg ? 'Hai già un account?' : 'Non hai un account?'} <button type="button" class="login-link u" data-toggle-mode>${reg ? 'Accedi' : 'Registrati'}</button></p>
+  </div>`;
+}
+function afterLogin() { OB = { step: 1, name: '', partner: '', house: '', avatar: 0, split: 'equal', pct: 50 }; go(S.settings.onboarded ? '#/home' : '#/benvenuto'); if (sync.enabled()) sync.run(); }
+function bindLogin() {
+  const form = $('[data-login-form]');
+  $('#lg-email').addEventListener('input', (e) => (LG.email = e.target.value.trim()));
+  $('[data-eye]').addEventListener('click', () => { LG.show = !LG.show; const i = $('#lg-pass'); const v = i.value; render(); $('#lg-pass').value = v; });
+  $('[data-toggle-mode]').addEventListener('click', () => { LG.mode = LG.mode === 'register' ? 'login' : 'register'; LG.sent = ''; render(); });
+  $$('[data-oauth]').forEach((b) => b.addEventListener('click', () => auth.oauth(b.dataset.oauth)));
+  const forgot = $('[data-forgot]'); if (forgot) forgot.addEventListener('click', async () => { const em = ($('#lg-email').value || '').trim(); if (!em) { $('#lg-email').focus(); toast('Scrivi prima la tua email'); return; } try { await auth.recover(em); toast('Email inviata: apri il link per scegliere una nuova password'); } catch (e) { toast(e.message); } });
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault(); const em = ($('#lg-email').value || '').trim(); const pw = $('#lg-pass').value || '';
+    if (!em) { $('#lg-email').focus(); return; } if (pw.length < 6) { $('#lg-pass').focus(); toast('La password deve avere almeno 6 caratteri'); return; }
+    LG.busy = true; $('.login-main').disabled = true;
+    try {
+      if (LG.mode === 'register') { const res = await auth.signUp(em, pw); if (res === 'confirm') { LG.sent = em; LG.mode = 'login'; LG.busy = false; render(); return; } }
+      else await auth.signIn(em, pw);
+      LG.busy = false; LG.sent = ''; afterLogin();
+    } catch (err) { LG.busy = false; render(); toast(err.message); }
+  });
+  setTimeout(() => { const i = $('#lg-email'); if (i && !i.value) i.focus({ preventScroll: true }); }, 400);
+}
+function pageRecovery() {
+  return `<div class="page onb login"><img class="onb-logo" src="img/logo.png" alt="Divvy">
+    <h1 class="onb-h">Scegli una nuova password</h1><p class="onb-p">Almeno 6 caratteri. Poi entri subito.</p>
+    <form class="onb-form" data-recovery-form style="margin-top:24px"><label class="onb-field">${icon('i-lock')}<input id="rc-pass" type="password" placeholder="Nuova password" autocomplete="new-password"></label>
+    <button class="btn onb-btn" type="submit">Salva e accedi</button></form></div>`;
+}
+function bindRecovery() {
+  $('[data-recovery-form]').addEventListener('submit', async (e) => { e.preventDefault(); const pw = $('#rc-pass').value || ''; if (pw.length < 6) { toast('Almeno 6 caratteri'); return; } try { await auth.updatePassword(pw); auth.recovery = false; toast('Password aggiornata'); afterLogin(); } catch (err) { toast(err.message); } });
 }
 
 /* ---------- Presentazione per chi apre l'app la prima volta ---------- */
@@ -835,6 +923,8 @@ function bind(r) {
   }
   if (r.name === 'nuova' || r.name === 'modifica') bindForm(r);
   if (r.name === 'benvenuto') bindWelcome();
+  if (r.name === 'accedi') bindLogin();
+  if (r.name === 'recupero') bindRecovery();
   if (r.name === 'profilo') bindProfilo(r);
 }
 
@@ -866,6 +956,7 @@ function bindForm(r) {
 }
 
 function bindProfilo(r) {
+  const lo = $('[data-logout]'); if (lo) lo.addEventListener('click', () => confirmSheet('Uscire dall\'account?', 'Le spese restano salvate: al prossimo accesso le ritrovi.', 'Esci', async () => { await auth.signOut(); LG = { mode: 'login', email: '', busy: false, show: false, sent: '' }; go('#/accedi'); }));
   if (r.sub === 'account') {
     $('#save-account').addEventListener('click', () => {
       $$('[data-name]').forEach((i) => { const m = member(i.dataset.name); const v = i.value.trim(); if (v) m.name = v; });
@@ -1062,12 +1153,18 @@ function toast(text, action) {
 
 /* ---------- Avvio ---------- */
 importSplitwiseOnce();
-showDailyLove();
 materializeRecurring();
-if (!S.settings.onboarded) history.replaceState(null, '', '#/benvenuto');
-route();
+(async () => {
+  await auth.handleRedirect();
+  if (auth.recovery) history.replaceState(null, '', '#/recupero');
+  else if (!auth.user()) history.replaceState(null, '', '#/accedi');
+  else if (!S.settings.onboarded) history.replaceState(null, '', '#/benvenuto');
+  if (auth.user()) showDailyLove();
+  route();
+  auth.refreshIfNeeded().then(() => { if (!auth.user() && currentRoute && currentRoute.name !== 'accedi') render(); });
+})();
 if (sync.enabled()) sync.run();
-document.addEventListener('visibilitychange', () => { if (!document.hidden) { materializeRecurring(); if (sync.enabled()) sync.run(); } });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { auth.refreshIfNeeded(); materializeRecurring(); if (sync.enabled()) sync.run(); } });
 setInterval(() => { if (!document.hidden && sync.enabled()) sync.run(); }, 45000);
 if ('serviceWorker' in navigator) {
   let reloading = false;
