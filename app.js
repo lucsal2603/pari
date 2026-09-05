@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.13.0';
+const APP_VERSION = '1.14.0';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -112,7 +112,7 @@ const auth = {
   email() { const u = this.user(); return (u && u.email) || ''; },
   h(json = true) { const o = { apikey: SUPA_ANON }; if (json) o['Content-Type'] = 'application/json'; return o; },
   setSession(j) { if (j.expires_in && !j.expires_at) j.expires_at = Math.floor(Date.now() / 1000) + j.expires_in; this.s = { access_token: j.access_token, refresh_token: j.refresh_token, expires_at: j.expires_at, user: j.user || null }; this.save(); },
-  async signUp(email, password) { const r = await fetch(SUPA_URL + '/auth/v1/signup', { method: 'POST', headers: this.h(), body: JSON.stringify({ email, password, options: { emailRedirectTo: appUrl() } }) }); const j = await r.json(); if (!r.ok) throw new Error(authMsg(j)); if (j.access_token) { this.setSession(j); return 'ok'; } return 'confirm'; },
+  async signUp(email, password, data) { const r = await fetch(SUPA_URL + '/auth/v1/signup', { method: 'POST', headers: this.h(), body: JSON.stringify({ email, password, data: data || {}, options: { emailRedirectTo: appUrl() } }) }); const j = await r.json(); if (!r.ok) throw new Error(authMsg(j)); if (j.access_token) { this.setSession(j); return 'ok'; } return 'confirm'; },
   async signIn(email, password) { const r = await fetch(SUPA_URL + '/auth/v1/token?grant_type=password', { method: 'POST', headers: this.h(), body: JSON.stringify({ email, password }) }); const j = await r.json(); if (!r.ok) throw new Error(authMsg(j)); this.setSession(j); },
   async signOut() { try { if (this.s) await fetch(SUPA_URL + '/auth/v1/logout', { method: 'POST', headers: { apikey: SUPA_ANON, Authorization: 'Bearer ' + this.s.access_token } }); } catch (_) {} this.s = null; this.save(); },
   async refreshIfNeeded() { if (!this.s || !this.s.refresh_token) return; if (Date.now() < ((this.s.expires_at || 0) * 1000) - 120000) return; try { const r = await fetch(SUPA_URL + '/auth/v1/token?grant_type=refresh_token', { method: 'POST', headers: this.h(), body: JSON.stringify({ refresh_token: this.s.refresh_token }) }); const j = await r.json(); if (r.ok && j.access_token) this.setSession(j); else if (r.status === 400 || r.status === 401) { this.s = null; this.save(); } } catch (_) {} },
@@ -316,10 +316,11 @@ function render(r, toTop) {
   // toTop solo quando cambia pagina: i ridisegni per un cambio di stato (Pagato/Quota, mese, tab) tengono la posizione
   const keep = toTop ? 0 : window.scrollY;
   r = r || currentRoute || { name: 'home', id: '', q: {} }; currentRoute = r;
-  if (!auth.user() && r.name !== 'accedi' && r.name !== 'recupero') { r = { name: 'accedi', id: '', sub: '', q: {}, back: null }; currentRoute = r; }
-  const pages = { home: pageHome, spese: pageSpese, bilanci: pageBilanci, profilo: pageProfilo, nuova: pageForm, modifica: pageForm, spesa: pageDetail, statistiche: pageStats, attivita: pageActivity, benvenuto: pageWelcome, accedi: pageLogin, recupero: pageRecovery };
+  const publicPages = ['accedi', 'registrati', 'recupero', 'legale'];
+  if (!auth.user() && !publicPages.includes(r.name)) { r = { name: 'accedi', id: '', sub: '', q: {}, back: null }; currentRoute = r; }
+  const pages = { home: pageHome, spese: pageSpese, bilanci: pageBilanci, profilo: pageProfilo, nuova: pageForm, modifica: pageForm, spesa: pageDetail, statistiche: pageStats, attivita: pageActivity, benvenuto: pageWelcome, accedi: pageLogin, registrati: pageRegister, recupero: pageRecovery, legale: pageLegal };
   const fn = pages[r.name] || pageHome;
-  const onb = r.name === 'benvenuto' || r.name === 'accedi' || r.name === 'recupero';
+  const onb = ['benvenuto', 'accedi', 'registrati', 'recupero'].includes(r.name) || (r.name === 'legale' && !auth.user());
   tabbar.classList.toggle('hide', onb); view.classList.toggle('no-tabbar', onb);
   const tabName = r.name === 'profilo' ? 'profilo' : r.name === 'statistiche' ? 'bilanci' : r.name;
   $$('.tab').forEach((t) => t.classList.toggle('on', t.dataset.tab === tabName));
@@ -755,6 +756,7 @@ function pageInfo() {
       <div><span class="k">Attività registrate</span><span class="v">${S.activity.length}</span></div>
       <div><span class="k">Spazio usato</span><span class="v">${Math.round((localStorage.getItem(KEY) || '').length / 1024)} KB</span></div>
     </div></section>
+    <section class="card section"><div class="menu"><a href="#/legale/termini">${icon('i-info')}<span>Termini di servizio</span><span></span>${icon('i-right', 'ic chev')}</a><a href="#/legale/privacy">${icon('i-lock')}<span>Informativa sulla privacy</span><span></span>${icon('i-right', 'ic chev')}</a></div></section>
     <div class="section btn-row"><button class="btn soft" id="reload-app">Ricarica l'app</button><button class="btn ghost" id="replay-onb">Rivedi la presentazione</button></div>
   </div>`;
 }
@@ -786,7 +788,7 @@ function pageLogin() {
     <div class="login-or"><span>oppure</span></div>
     <button type="button" class="btn ghost login-oauth" data-oauth="apple">${icon('i-apple')} Continua con Apple</button>
     <button type="button" class="btn ghost login-oauth" data-oauth="google">${icon('i-google')} Continua con Google</button>
-    <p class="login-foot">${reg ? 'Hai già un account?' : 'Non hai un account?'} <button type="button" class="login-link u" data-toggle-mode>${reg ? 'Accedi' : 'Registrati'}</button></p>
+    <p class="login-foot">Non hai un account? <a class="login-link u" href="#/registrati">Registrati</a></p>
   </div>`;
 }
 function afterLogin() { OB = { step: 1, name: '', partner: '', house: '', avatar: 0, split: 'equal', pct: 50 }; go(S.settings.onboarded ? '#/home' : '#/benvenuto'); if (sync.enabled()) sync.run(); }
@@ -794,7 +796,6 @@ function bindLogin() {
   const form = $('[data-login-form]');
   $('#lg-email').addEventListener('input', (e) => (LG.email = e.target.value.trim()));
   $('[data-eye]').addEventListener('click', () => { LG.show = !LG.show; const i = $('#lg-pass'); const v = i.value; render(); $('#lg-pass').value = v; });
-  $('[data-toggle-mode]').addEventListener('click', () => { LG.mode = LG.mode === 'register' ? 'login' : 'register'; LG.sent = ''; render(); });
   $$('[data-oauth]').forEach((b) => b.addEventListener('click', () => auth.oauth(b.dataset.oauth)));
   const forgot = $('[data-forgot]'); if (forgot) forgot.addEventListener('click', async () => { const em = ($('#lg-email').value || '').trim(); if (!em) { $('#lg-email').focus(); toast('Scrivi prima la tua email'); return; } try { await auth.recover(em); toast('Email inviata: apri il link per scegliere una nuova password'); } catch (e) { toast(e.message); } });
   form.addEventListener('submit', async (e) => {
@@ -802,12 +803,55 @@ function bindLogin() {
     if (!em) { $('#lg-email').focus(); return; } if (pw.length < 6) { $('#lg-pass').focus(); toast('La password deve avere almeno 6 caratteri'); return; }
     LG.busy = true; $('.login-main').disabled = true;
     try {
-      if (LG.mode === 'register') { const res = await auth.signUp(em, pw); if (res === 'confirm') { LG.sent = em; LG.mode = 'login'; LG.busy = false; render(); return; } }
-      else await auth.signIn(em, pw);
+      await auth.signIn(em, pw);
       LG.busy = false; LG.sent = ''; afterLogin();
     } catch (err) { LG.busy = false; render(); toast(err.message); }
   });
   setTimeout(() => { const i = $('#lg-email'); if (i && !i.value) i.focus({ preventScroll: true }); }, 400);
+}
+let RG = { email: '', show1: false, show2: false, terms: false, news: false, busy: false };
+function pageRegister() {
+  return `<div class="page onb login reg">
+    <div class="onb-top"><a class="icon-btn onb-back" href="#/accedi" aria-label="Indietro">${icon('i-back')}</a><span></span></div>
+    <img class="onb-logo" src="img/logo.png" alt="Divvy">
+    <h1 class="onb-h">Crea il tuo account</h1><p class="onb-p">Inizia a condividere le spese in pochi secondi.</p>
+    <div class="onb-art"><img src="img/registrati.png" alt=""></div>
+    <form class="onb-form" data-register-form>
+      <label class="onb-field">${icon('i-mail')}<input id="rg-email" type="email" placeholder="Email" value="${esc(RG.email)}" autocomplete="email" autocapitalize="off" inputmode="email" enterkeyhint="next"></label>
+      <label class="onb-field">${icon('i-lock')}<input id="rg-pass" type="${RG.show1 ? 'text' : 'password'}" placeholder="Password" autocomplete="new-password" enterkeyhint="next"><button type="button" class="login-eye" data-eye="1" aria-label="Mostra password">${icon(RG.show1 ? 'i-eye-off' : 'i-eye')}</button></label>
+      <label class="onb-field">${icon('i-lock')}<input id="rg-pass2" type="${RG.show2 ? 'text' : 'password'}" placeholder="Conferma password" autocomplete="new-password" enterkeyhint="go"><button type="button" class="login-eye" data-eye="2" aria-label="Mostra password">${icon(RG.show2 ? 'i-eye-off' : 'i-eye')}</button></label>
+      <label class="reg-check"><input type="checkbox" id="rg-terms" ${RG.terms ? 'checked' : ''}><span class="box"></span><span>Accetto i <a href="#/legale/termini">Termini di servizio</a> e l'<a href="#/legale/privacy">Informativa sulla privacy</a></span></label>
+      <label class="reg-check"><input type="checkbox" id="rg-news" ${RG.news ? 'checked' : ''}><span class="box"></span><span>Voglio ricevere novità e aggiornamenti (opzionale)</span></label>
+      <button class="btn onb-btn login-main" type="submit" ${RG.busy ? 'disabled' : ''}>Crea account ${arrowIc}</button>
+    </form>
+    <div class="login-or"><span>Oppure</span></div>
+    <button type="button" class="btn ghost login-oauth" data-oauth="google">${icon('i-google')} Continua con Google</button>
+    <p class="login-foot">Hai già un account? <a class="login-link" href="#/accedi">Accedi</a></p>
+    <div class="reg-hills" aria-hidden="true"><svg viewBox="0 0 390 120" preserveAspectRatio="none"><ellipse cx="60" cy="150" rx="230" ry="110" fill="#CFE3D5"/><ellipse cx="360" cy="160" rx="240" ry="120" fill="#B9D6C2"/><ellipse cx="180" cy="190" rx="260" ry="110" fill="#9FC7AB"/></svg></div>
+  </div>`;
+}
+function bindRegister() {
+  $('#rg-email').addEventListener('input', (e) => (RG.email = e.target.value.trim()));
+  $$('[data-eye]').forEach((b) => b.addEventListener('click', () => { const p1 = $('#rg-pass').value, p2 = $('#rg-pass2').value; if (b.dataset.eye === '1') RG.show1 = !RG.show1; else RG.show2 = !RG.show2; render(); $('#rg-pass').value = p1; $('#rg-pass2').value = p2; }));
+  $('#rg-terms').addEventListener('change', (e) => (RG.terms = e.target.checked)); $('#rg-news').addEventListener('change', (e) => (RG.news = e.target.checked));
+  $$('[data-oauth]').forEach((b) => b.addEventListener('click', () => auth.oauth(b.dataset.oauth)));
+  $('[data-register-form]').addEventListener('submit', async (e) => {
+    e.preventDefault(); const em = ($('#rg-email').value || '').trim(); const p1 = $('#rg-pass').value || '', p2 = $('#rg-pass2').value || '';
+    if (!em) { $('#rg-email').focus(); return; } if (p1.length < 6) { $('#rg-pass').focus(); toast('La password deve avere almeno 6 caratteri'); return; }
+    if (p1 !== p2) { $('#rg-pass2').focus(); toast('Le due password non coincidono'); return; }
+    if (!RG.terms) { const c = $('#rg-terms').closest('.reg-check'); c.classList.remove('shake'); void c.offsetWidth; c.classList.add('shake'); toast('Accetta i Termini di servizio per continuare'); return; }
+    RG.busy = true; $('.login-main').disabled = true;
+    try { const res = await auth.signUp(em, p1, { newsletter: RG.news, terms_accepted_at: nowISO() }); RG.busy = false; if (res === 'confirm') { LG.sent = em; LG.email = em; go('#/accedi'); } else afterLogin(); }
+    catch (err) { RG.busy = false; render(); toast(err.message); }
+  });
+  setTimeout(() => { const i = $('#rg-email'); if (i && !i.value) i.focus({ preventScroll: true }); }, 400);
+}
+function pageLegal(r) {
+  const privacy = r.sub === 'privacy';
+  return `<div class="page slide"><div class="head"><button class="icon-btn" data-back="${auth.user() ? '#/profilo/info' : '#/registrati'}" aria-label="Indietro">${icon('i-back')}</button><div class="title">${privacy ? 'Privacy' : 'Termini di servizio'}</div><span></span></div>
+    <section class="card legal">${privacy
+      ? `<h2 class="sec-title">Informativa sulla privacy</h2><p><b>Bozza da rivedere prima della pubblicazione.</b></p><p>Divvy salva le spese, i pagamenti e i nomi che inserisci per mostrarli a te e alla persona con cui condividi la casa. I dati stanno sul telefono e, se attivi la sincronizzazione, su un database Supabase in Europa.</p><p>Per l'accesso usiamo la tua email e una password (o l'account Google/Apple). L'email serve solo per farti entrare e per le email di conferma e recupero password.</p><p>Se attivi le notifiche, salviamo l'indirizzo tecnico del tuo telefono per poterle inviare. Non vendiamo né cediamo dati a terzi. Puoi cancellare tutto dal Profilo o scrivendo a lukesalvemini@gmail.com.</p>`
+      : `<h2 class="sec-title">Termini di servizio</h2><p><b>Bozza da rivedere prima della pubblicazione.</b></p><p>Divvy è un'app per tenere il conto delle spese condivise. Il servizio è offerto così com'è, gratuitamente, in fase di prova.</p><p>Sei responsabile di ciò che inserisci e di custodire la tua password. Non usare l'app per scopi illeciti o per dati di altre persone senza il loro consenso.</p><p>Possiamo modificare o sospendere il servizio in qualsiasi momento. Per domande: lukesalvemini@gmail.com.</p>`}</section></div>`;
 }
 function pageRecovery() {
   return `<div class="page onb login"><img class="onb-logo" src="img/logo.png" alt="Divvy">
@@ -925,6 +969,7 @@ function bind(r) {
   if (r.name === 'nuova' || r.name === 'modifica') bindForm(r);
   if (r.name === 'benvenuto') bindWelcome();
   if (r.name === 'accedi') bindLogin();
+  if (r.name === 'registrati') bindRegister();
   if (r.name === 'recupero') bindRecovery();
   if (r.name === 'profilo') bindProfilo(r);
 }
@@ -1158,7 +1203,7 @@ materializeRecurring();
 (async () => {
   await auth.handleRedirect();
   if (auth.recovery) history.replaceState(null, '', '#/recupero');
-  else if (!auth.user()) history.replaceState(null, '', '#/accedi');
+  else if (!auth.user()) { if (!/^#\/(accedi|registrati|legale)/.test(location.hash)) history.replaceState(null, '', '#/accedi'); }
   else if (!S.settings.onboarded) history.replaceState(null, '', '#/benvenuto');
   if (auth.user()) showDailyLove();
   route();
