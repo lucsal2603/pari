@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.36.3';
+const APP_VERSION = '1.37.0';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -1090,11 +1090,11 @@ function levelInfo() { const xp = xpTotal(); let lv = 1; while (xp >= xpFor(lv +
 /* schermata "LEVEL UP" a tutto schermo (immagine di Lucas + livello, XP e barra disegnati sopra) */
 function showLevelUp(li) {
   if ($('#levelup')) return; const el = document.createElement('div'); el.id = 'levelup'; el.className = 'lvl';
-  el.innerHTML = `<div class="lvl-box"><img src="img/levelup.webp" alt=""><div class="lvl-xp" data-no-i18n>${li.xp} / ${li.next} XP</div><div class="lvl-num" data-no-i18n>${li.lv}</div><div class="lvl-fill"><i style="width:0%"></i></div><button type="button" class="lvl-go" aria-label="Continua"></button></div>`;
+  el.innerHTML = `<div class="lvl-bg"></div><div class="lvl-ui"><div class="lvl-bar2" data-no-i18n><span class="lb-l">LV</span><span class="lb-n">${li.lv}</span><span class="lb-track"><i style="width:0%"></i></span><span class="lb-l">XP</span></div><div class="lvl-xp2" data-no-i18n>${li.xp} / ${li.next} XP</div><button type="button" class="lvl-btn" aria-label="Continua"><svg class="ic" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div>`;
   document.body.appendChild(el); try { if (navigator.vibrate) navigator.vibrate([40, 60, 40]); } catch (_) {}
-  requestAnimationFrame(() => requestAnimationFrame(() => { el.classList.add('in'); setTimeout(() => { const f = $('.lvl-fill i', el); if (f) f.style.width = Math.max(4, li.pct) + '%'; }, 500); }));
+  requestAnimationFrame(() => requestAnimationFrame(() => { el.classList.add('in'); setTimeout(() => { const f = $('.lb-track i', el); if (f) f.style.width = Math.max(4, li.pct) + '%'; }, 500); }));
   const close = () => { el.classList.remove('in'); el.classList.add('out'); setTimeout(() => el.remove(), 450); };
-  $('.lvl-go', el).addEventListener('click', close); el.addEventListener('click', (e) => { if (e.target === el) close(); });
+  $('.lvl-btn', el).addEventListener('click', close); el.addEventListener('click', (e) => { if (e.target === el || e.target.classList.contains('lvl-bg')) close(); });
 }
 function levelCheck() {
   let li; try { missionBusy = true; li = levelInfo(); } catch (_) { return; } finally { missionBusy = false; }
