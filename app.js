@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.32.0';
+const APP_VERSION = '1.33.0';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -737,6 +737,7 @@ function pageProfilo(r) {
   if (r.sub === 'notifiche') return pageNotifiche();
   if (r.sub === 'valuta') return pageValuta();
   if (r.sub === 'lingua') return pageLingua();
+  if (r.sub === 'trofei') return pageTrofei();
   if (r.sub === 'info') return pageInfo();
   if (r.sub === 'esporta') return pageExport();
   const together = S.settings.together ? `Insieme dal ${esc(S.settings.together)} <span aria-hidden="true">❤️</span>` : 'Le nostre spese, a metà <span aria-hidden="true">❤️</span>';
@@ -745,6 +746,7 @@ function pageProfilo(r) {
     <div class="profile-head">${r.back ? `<button class="icon-btn profile-back" data-back="${esc(r.back)}" aria-label="Indietro">${icon('i-back')}</button>` : ''}<div class="couple-circle"><img src="img/coppia.png" alt=""></div><div class="n">${esc(S.members[0].name)} &amp; ${esc(S.members[1].name)}</div><div class="s">${together}</div></div>
     <section class="card profile-list"><div class="menu">
       <a href="#/profilo/account">${icon('i-gear')}<span>Impostazioni account</span><span class="val">Io sono ${esc(a.name)}</span>${icon('i-right', 'ic chev')}</a>
+      <a href="#/profilo/trofei">${icon('i-trophy')}<span>I tuoi trofei</span><span class="val" data-no-i18n>${(() => { const t = trophies(); return t.filter((x) => x.ok).length + '/' + t.length; })()}</span>${icon('i-right', 'ic chev')}</a>
       <a href="#/profilo/sezioni">${icon('i-list')}<span>Sezioni</span><span class="val">${groups().length}</span>${icon('i-right', 'ic chev')}</a>
       <a href="#/profilo/categorie">${icon('i-grid')}<span>Categorie</span><span></span>${icon('i-right', 'ic chev')}</a>
       <a href="#/profilo/valuta">${icon('i-coin')}<span>Valuta</span><span class="val">${esc(S.settings.currency || 'EUR')} (${esc(curSymbol())})</span>${icon('i-right', 'ic chev')}</a>
@@ -848,7 +850,7 @@ const langPill = () => `<button type="button" class="lang-pill" data-lang-pick a
 function pickLang(code, before) {
   if (!LANGS().some((l) => l.code === code)) return;
   if (before) before();
-  S.settings.lang = code; if (S.settings.push) { S.settings.pushUpdatedAt = nowISO(); sync.schedule(); } save(); applyLang(); render();
+  S.settings.lang = code; if (code !== 'it') S.settings.usedOtherLang = true; if (S.settings.push) { S.settings.pushUpdatedAt = nowISO(); sync.schedule(); } save(); applyLang(); render();
 }
 function openLangSheet(before) {
   openSheet('Lingua', `<div class="list lang-list">${langListHTML(LANG())}</div>`, (root) => { $$('[data-lang]', root).forEach((b) => b.addEventListener('click', () => { closeSheet(); pickLang(b.dataset.lang, before); })); });
@@ -877,6 +879,98 @@ function openGroupSheet(gid) {
       if (k === 'delete') { const n = active().filter((e) => e.group === g.id).length; confirmSheet(T('Eliminare "{0}"?', g.name), n ? T('Le sue {0} voci restano, ma senza sezione.', n) : 'La sezione è vuota.', 'Elimina', () => { deleteGroup(g.id); speseFilter.group = ''; render(); toast('Sezione eliminata'); }); }
     }));
   });
+}
+/* ---------- I tuoi trofei: 30 obiettivi in 5 famiglie, calcolati dai dati ---------- */
+const TROPHY_CATS = [['tutti', 'Tutti'], ['risparmio', 'Risparmio'], ['costanza', 'Costanza'], ['spese', 'Spese'], ['insieme', 'Insieme'], ['speciali', 'Speciali']];
+let trophyFilter = 'tutti';
+function trophies() {
+  const byTime = (a, b) => (a.date + (a.createdAt || '')).localeCompare(b.date + (b.createdAt || ''));
+  const all = active().slice().sort(byTime); const es = all.filter((e) => e.kind === 'expense'); const pays = all.filter((e) => e.kind === 'payment');
+  const nth = (arr, n) => (arr[n - 1] ? arr[n - 1].date : '');
+  const months = [...new Set(es.map((e) => ym(e.date)))].sort(); const tot = (m) => es.filter((e) => ym(e.date) === m).reduce((x, e) => x + e.amount, 0);
+  const cur = curYM(); const pastMonths = months.filter((m) => m < cur); const lastOf = (m) => { const l = es.filter((e) => ym(e.date) === m).pop(); return l ? l.date : m + '-28'; };
+  // giorni di fila con almeno una spesa
+  const days = [...new Set(es.map((e) => e.date))].sort(); let bestDays = 0, run = 0, prevD = null, bestDaysAt = '';
+  days.forEach((d) => { const t = new Date(d + 'T00:00:00'); run = prevD && (t - prevD) / 86400000 === 1 ? run + 1 : 1; if (run > bestDays) { bestDays = run; bestDaysAt = d; } prevD = t; });
+  // mesi di fila
+  let bestM = 0, runM = 0, bestMAt = ''; months.forEach((m, i) => { runM = i > 0 && shiftYM(months[i - 1], 1) === m ? runM + 1 : 1; if (runM > bestM) { bestM = runM; bestMAt = lastOf(m); } });
+  // settimane diverse in uno stesso mese
+  let bestWeeks = 0, bestWeeksAt = ''; months.forEach((m) => { const w = new Set(es.filter((e) => ym(e.date) === m).map((e) => Math.floor((+e.date.slice(8) - 1) / 7))); if (w.size > bestWeeks) { bestWeeks = w.size; bestWeeksAt = lastOf(m); } });
+  // risparmio: mesi con meno spese del precedente e quanto risparmiato in tutto
+  let saved = 0, spilAt = '', lighterAt = ''; for (let i = 1; i < months.length; i++) { if (shiftYM(months[i - 1], 1) !== months[i]) continue; const d = tot(months[i - 1]) - tot(months[i]); if (d > 0 && months[i] < cur) { saved += d; if (!spilAt) spilAt = lastOf(months[i]); } }
+  pastMonths.forEach((m) => { if (!lighterAt && tot(m) > 0 && tot(m) < 30000) lighterAt = lastOf(m); });
+  const recordAt = (months.find((m) => tot(m) >= 100000) || '') && lastOf(months.find((m) => tot(m) >= 100000));
+  // budget personale: mesi chiusi entro il budget
+  const mb = myBudget().monthly || 0; let kept = 0, keptRun = 0, bestKept = 0, keptAt = '', kept3At = '';
+  if (mb) pastMonths.forEach((m, i) => { const ok = budgetMonth(m).spent <= mb; if (ok) { kept++; if (!keptAt) keptAt = lastOf(m); } keptRun = ok && i > 0 && shiftYM(pastMonths[i - 1], 1) === m ? keptRun + 1 : ok ? 1 : 0; if (keptRun > bestKept) { bestKept = keptRun; if (bestKept >= 3 && !kept3At) kept3At = lastOf(m); } });
+  // insieme
+  const paidBy = {}; es.forEach((e) => { paidBy[e.paidBy] = (paidBy[e.paidBy] || 0) + 1; }); const minPaid = Math.min(...S.members.map((m) => paidBy[m.id] || 0));
+  let halfAt = ''; months.forEach((m) => { if (halfAt) return; const st = monthStats(m); const vals = S.members.map((x) => st.paid[x.id] || 0); if (st.total > 0 && vals.every((v) => v > 0) && Math.abs(vals[0] - vals[1]) / st.total < 0.1) halfAt = lastOf(m); });
+  const payersSet = new Set(pays.map((e) => e.paidBy)); const bothPayAt = payersSet.size >= 2 ? pays.filter((e, i, arr) => arr.slice(0, i + 1).some((x) => x.paidBy !== e.paidBy))[0]?.date || '' : '';
+  let bal = 0, pariAt = ''; all.forEach((e) => { const a = S.members[0].id; bal += (e.paidBy === a ? e.amount : 0) - ((e.owed || {})[a] || 0); if (e.kind === 'payment' && Math.abs(bal) < 1 && !pariAt) pariAt = e.date; });
+  const tripGroup = groups().find((g) => /viagg|vacanz|trip|holiday|urlaub|voyage|vacances|viaje|reise|ferie|\bmare\b|montagna/i.test(g.name)); const tripExp = es.find((e) => e.cat === 'viaggi');
+  const cats = new Set(es.map((e) => e.cat).filter(Boolean)); const scanned = es.filter((e) => e.scanned);
+  const hour = (e) => { try { return new Date(e.createdAt).getHours(); } catch (_) { return 12; } }; const night = es.find((e) => hour(e) < 5); const early = es.find((e) => { const h = hour(e); return h >= 5 && h < 7; });
+  const weekendOk = achievements().find((a) => a.id === 'weekend'); const otherLang = S.settings.usedOtherLang || LANG() !== 'it';
+  const L = [];
+  const add = (id, cat, img, title, done, todo, curV, target, at, fmt) => L.push({ id, cat, img, title, done, todo, cur: Math.min(curV, target), target, ok: curV >= target, at, fmt: fmt || 'count' });
+  // Spese
+  add('primo', 'spese', 'vetta', 'Primo passo', 'Hai aggiunto la tua prima spesa', 'Aggiungi la prima spesa', es.length, 1, nth(es, 1), 'bool');
+  add('dieci', 'spese', 'vetta', 'Dieci alla volta', 'Avete condiviso 10 spese', 'Condividete 10 spese', es.length, 10, nth(es, 10));
+  add('cinquanta', 'spese', 'pesi', 'Peso massimo', 'Avete diviso 50 spese', 'Dividete 50 spese', es.length, 50, nth(es, 50));
+  add('cento', 'spese', '', 'Centenario', 'Avete diviso 100 spese', 'Dividete 100 spese', es.length, 100, nth(es, 100));
+  add('fotografo', 'spese', 'scansione', 'Fotografo di scontrini', 'Il bot ha letto 20 scontrini', 'Scansiona 20 scontrini', scanned.length, 20, nth(scanned, 20));
+  add('categorie', 'spese', '', 'Di tutto un po\'', 'Spese in 8 categorie diverse', 'Usate 8 categorie diverse', cats.size, 8, '');
+  // Risparmio
+  add('spilorcio', 'risparmio', 'moneta', 'Spilorcio', 'Un mese con meno spese del precedente', 'Chiudi un mese spendendo meno del precedente', spilAt ? 1 : 0, 1, spilAt, 'bool');
+  add('budget1', 'risparmio', '', 'Nel budget', 'Un mese chiuso entro il tuo budget', 'Chiudi un mese entro il tuo budget', kept, 1, keptAt, 'bool');
+  add('budget3', 'risparmio', '', 'Tre su tre', 'Tre mesi di fila entro il budget', 'Tre mesi di fila entro il budget', bestKept, 3, kept3At);
+  add('risparmio500', 'risparmio', 'moneta', 'Grande risparmio', 'Risparmiati 500 € rispetto ai mesi prima', 'Risparmia 500 € rispetto ai mesi prima', saved, 50000, '', 'money');
+  add('leggero', 'risparmio', '', 'Mese leggero', 'Un mese sotto i 300 € di spese', 'Chiudi un mese sotto i 300 €', lighterAt ? 1 : 0, 1, lighterAt, 'bool');
+  add('weekend', 'risparmio', 'sdraio', 'Weekend senza extraspese', 'Un weekend senza cene fuori, svaghi e shopping', 'Un weekend senza cene fuori, svaghi e shopping', weekendOk && weekendOk.done ? 1 : 0, 1, '', 'bool');
+  // Costanza
+  add('sette', 'costanza', 'calendario', 'Costanza', '7 giorni consecutivi con una spesa', 'Aggiungi una spesa per 7 giorni di fila', bestDays, 7, bestDaysAt);
+  add('settimane', 'costanza', '', 'Un mese intero', 'Spese in 4 settimane dello stesso mese', 'Spese in 4 settimane dello stesso mese', bestWeeks, 4, bestWeeksAt);
+  add('tremesi', 'costanza', 'calendario', 'Tre mesi di fila', 'Tre mesi consecutivi con spese', 'Usate Divvy per tre mesi di seguito', bestM, 3, bestMAt);
+  add('seimesi', 'costanza', '', 'Sei mesi insieme', 'Sei mesi consecutivi con spese', 'Usate Divvy per sei mesi di seguito', bestM, 6, bestMAt);
+  add('anno', 'costanza', '', 'Un anno di Divvy', 'Dodici mesi consecutivi con spese', 'Usate Divvy per un anno intero', bestM, 12, bestMAt);
+  add('puntuali', 'costanza', '', 'Puntuali', 'Avete registrato 5 pagamenti', 'Registrate 5 pagamenti', pays.length, 5, nth(pays, 5));
+  // Insieme
+  add('pari', 'insieme', 'coppa', 'Tutto in pari', 'Avete azzerato i saldi', 'Mettetevi in pari almeno una volta', pariAt ? 1 : 0, 1, pariAt, 'bool');
+  add('team', 'insieme', '', 'Team perfetto', 'Avete pagato 10 spese a testa', 'Pagate 10 spese a testa', minPaid, 10, '');
+  add('meta', 'insieme', '', 'Metà e metà', 'Un mese in cui avete pagato quasi uguale', 'Un mese in cui pagate quasi uguale', halfAt ? 1 : 0, 1, halfAt, 'bool');
+  add('viaggio', 'insieme', 'mondo', 'Primo viaggio insieme', 'La vostra prima sezione o spesa di viaggio', 'Create una sezione viaggio', tripGroup || tripExp ? 1 : 0, 1, tripExp ? tripExp.date : '', 'bool');
+  add('esploratori', 'insieme', 'mondo', 'Esploratori', 'Avete creato 3 sezioni', 'Create 3 sezioni', groups().length, 3, '');
+  add('turni', 'insieme', '', 'A turno', 'Avete registrato pagamenti tutti e due', 'Registrate un pagamento a testa', payersSet.size, 2, bothPayAt);
+  // Speciali
+  add('record', 'speciali', 'pesi', 'Mese da record', 'Più di 1.000 € di spese in un mese', 'Superate 1.000 € di spese in un mese', recordAt ? 1 : 0, 1, recordAt, 'bool');
+  add('notturno', 'speciali', '', 'Nottambulo', 'Una spesa aggiunta dopo mezzanotte', 'Aggiungi una spesa dopo mezzanotte', night ? 1 : 0, 1, night ? night.date : '', 'bool');
+  add('mattiniero', 'speciali', '', 'Mattiniero', 'Una spesa aggiunta prima delle 7', 'Aggiungi una spesa prima delle 7', early ? 1 : 0, 1, early ? early.date : '', 'bool');
+  add('poliglotta', 'speciali', '', 'Poliglotta', 'Hai usato Divvy in un\'altra lingua', 'Cambia lingua dalle impostazioni', otherLang ? 1 : 0, 1, '', 'bool');
+  const doneSoFar = L.filter((t) => t.ok).length;
+  add('primoobiettivo', 'speciali', 'coppa', 'Piccoli traguardi', 'Hai sbloccato il tuo primo trofeo', 'Sblocca il tuo primo trofeo', doneSoFar, 1, '', 'bool');
+  add('collezionista', 'speciali', '', 'Collezionista', 'Metà dei trofei sbloccati', 'Sblocca 15 trofei', doneSoFar, 15, '');
+  // data di sblocco: dai dati quando si può, altrimenti la prima volta che lo vedo sbloccato (resta sul telefono)
+  const seen = S.settings.trophyAt || {}; let changed = false;
+  L.forEach((t) => { if (!t.ok) return; if (!t.at) { if (!seen[t.id]) { seen[t.id] = todayStr(); changed = true; } t.at = seen[t.id]; } });
+  if (changed) { S.settings.trophyAt = seen; save(); }
+  return L;
+}
+const trophyDate = (d) => { try { const [y, m, dd] = d.split('-').map(Number); return new Date(y, m - 1, dd).toLocaleDateString(LOC(), { day: 'numeric', month: 'short', year: 'numeric' }).replace('.', ''); } catch (_) { return d; } };
+function pageTrofei() {
+  const all = trophies(); const total = all.length; const done = all.filter((t) => t.ok).length; const pct = Math.round(done / total * 100);
+  const list = all.filter((t) => trophyFilter === 'tutti' || t.cat === trophyFilter); const ok = list.filter((t) => t.ok), todo = list.filter((t) => !t.ok);
+  const art = (t) => t.img ? `<img src="img/traguardi/${t.img}.webp" alt="">` : `<span class="tf-ph" aria-hidden="true"></span>`;
+  const prog = (t) => t.fmt === 'bool' ? '' : `<div class="tf-bar"><i style="width:${Math.round(t.cur / t.target * 100)}%"></i></div><div class="tf-num" data-no-i18n>${t.fmt === 'money' ? `${moneyRound(t.cur)} / ${moneyRound(t.target)}` : `${t.cur} / ${t.target}`}</div>`;
+  const card = (t) => `<div class="tf-card${t.ok ? '' : ' locked'}"><div class="tf-art">${art(t)}${t.ok ? '' : `<span class="tf-lock">${icon('i-lock')}</span>`}</div><div class="tf-body"><b class="tf-t">${esc(t.title)}</b><span class="tf-d">${esc(t.ok ? t.done : t.todo)}</span>${t.ok ? `<span class="tf-date" data-no-i18n>${esc(trophyDate(t.at))}</span>` : prog(t)}</div></div>`;
+  return `<div class="page slide tf">${subHead('I tuoi trofei')}
+    <div class="chips tf-chips">${TROPHY_CATS.map(([k, n]) => `<button type="button" class="chip${trophyFilter === k ? ' on' : ''}" data-tf="${k}">${n}</button>`).join('')}</div>
+    <section class="card tf-sum"><span class="tf-sum-ic">${icon('i-trophy')}</span><div class="tf-sum-t"><div><b data-no-i18n>${done} di ${total}</b> trofei sbloccati</div><div class="tf-sum-bar"><div class="tf-bar"><i style="width:${pct}%"></i></div><span data-no-i18n>${pct}%</span></div></div></section>
+    <h2 class="sec-title tf-h">Sbloccati <span data-no-i18n>(${ok.length})</span></h2>
+    ${ok.length ? `<div class="tf-grid">${ok.map(card).join('')}</div>` : `<p class="muted small tf-empty">Ancora nessun trofeo qui: continua così e arriveranno.</p>`}
+    <h2 class="sec-title tf-h">Da sbloccare <span data-no-i18n>(${todo.length})</span></h2>
+    ${todo.length ? `<div class="tf-grid">${todo.map(card).join('')}</div>` : `<p class="muted small tf-empty">Li avete sbloccati tutti!</p>`}
+  </div>`;
 }
 function pageLingua() {
   const cur = LANG();
@@ -1589,6 +1683,7 @@ function bindProfilo(r) {
     const n = $('#sync-now'); if (n) n.addEventListener('click', async () => { toast('Sincronizzo…'); const ok = await sync.run(true); render(); toast(ok ? 'Aggiornato' : 'Errore: ' + (sync.lastError || '')); });
     const off = $('#sync-off'); if (off) off.addEventListener('click', () => { S.settings.sync = { url: SUPA_URL, key: SUPA_ANON, house: '' }; S.settings.lastPull = null; save(); sync.status = 'idle'; render(); toast('Scollegata: i dati restano sul telefono'); });
   }
+  if (r.sub === 'trofei') { $$('[data-tf]').forEach((b) => b.addEventListener('click', () => { trophyFilter = b.dataset.tf; render(); })); }
   if (r.sub === 'lingua') {
     $$('[data-lang]').forEach((b) => b.addEventListener('click', () => { pickLang(b.dataset.lang); toast(T('Lingua: {0}', langInfo().name)); }));
   }
