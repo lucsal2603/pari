@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.43.11';
+const APP_VERSION = '1.43.12';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -1137,24 +1137,72 @@ function achievements() {
 const achNew = () => { const seen = S.settings.seenAch || []; return achievements().some((a) => a.done && !seen.includes(a.id)); };
 /* ---------- Missioni settimanali (da lunedì a domenica, si azzerano ogni settimana) ---------- */
 const weekKey = () => { const d = new Date(); d.setHours(0, 0, 0, 0); const day = (d.getDay() + 6) % 7; d.setDate(d.getDate() - day); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
-function missions() {
+/* ---------- Serbatoio di missioni: ogni settimana ne escono 7 a caso, uguali per tutti i telefoni della stessa casa ---------- */
+const MISSIONS_PER_WEEK = 7;
+const seedRand = (str) => { let h = 2166136261 >>> 0; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } return () => { h = (h + 0x6D2B79F5) >>> 0; let t = h; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
+/* [id, immagine, famiglia (al massimo 2 per settimana), titolo, sottotitolo, valore corrente, obiettivo, tipo] — tutte si completano nell'istante in cui fai l'azione */
+const MISSION_POOL = [
+  ['tre', 'vetta', 'count', 'Tre spese in settimana', 'Aggiungi almeno 3 spese questa settimana.', (d) => d.es.length, 3],
+  ['cinque', 'vetta', 'count', 'Cinque spese in settimana', 'Aggiungete almeno 5 spese da lunedì a domenica.', (d) => d.es.length, 5],
+  ['dieci', 'pesi', 'count', 'Dieci spese in settimana', 'Una settimana piena: 10 spese registrate.', (d) => d.es.length, 10],
+  ['giorni', 'calendario', 'days', 'Tre giorni attivi', 'Spese in almeno 3 giorni diversi della settimana.', (d) => d.days, 3],
+  ['cinquegiorni', 'settimane', 'days', 'Cinque giorni attivi', 'Spese in almeno 5 giorni diversi della settimana.', (d) => d.days, 5],
+  ['fila', 'settimane', 'days', 'Tre giorni di fila', 'Una spesa al giorno per 3 giorni consecutivi.', (d) => d.streak, 3],
+  ['weekend', 'sdraio', 'when', 'Spesa del weekend', 'Registra una spesa di sabato o domenica.', (d) => d.weekend, 1],
+  ['lunedi', 'sveglia', 'when', 'Si parte di lunedì', 'Registra una spesa con la data di lunedì.', (d) => d.monday, 1],
+  ['mattino', 'mattino', 'when', 'Spesa del mattino', 'Aggiungi una spesa prima di mezzogiorno.', (d) => d.morning, 1],
+  ['notte', 'notte', 'when', 'Nottambuli', 'Aggiungi una spesa dopo le 22.', (d) => d.night, 1],
+  ['giornata', 'turno', 'when', 'Fresca di giornata', 'Registra una spesa lo stesso giorno in cui l\'hai fatta.', (d) => d.sameDay, 1],
+  ['categorie', 'categorie', 'cat', 'Tutto in ordine', 'Ogni spesa della settimana con la sua categoria.', (d) => d.allCat, 1, 'bool'],
+  ['trecat', 'categorie', 'cat', 'Tre categorie diverse', 'Spese in almeno 3 categorie diverse.', (d) => d.cats, 3],
+  ['cinquecat', 'collezione', 'cat', 'Cinque categorie diverse', 'Spese in almeno 5 categorie diverse.', (d) => d.cats, 5],
+  ['cibo', 'torta', 'cat', 'A tavola', 'Registra una spesa nella categoria Cibo.', (d) => d.cat('cibo'), 1],
+  ['supermercato', 'moneta', 'cat', 'Due volte al supermercato', 'Due spese nella categoria Spesa.', (d) => d.cat('spesa'), 2],
+  ['casa', 'palloncino', 'cat', 'Casa dolce casa', 'Una spesa nella categoria Casa.', (d) => d.cat('casa'), 1],
+  ['trasporti', 'mondo', 'cat', 'In movimento', 'Una spesa nella categoria Trasporti.', (d) => d.cat('trasporti'), 1],
+  ['salute', 'sei', 'cat', 'Prendersi cura', 'Una spesa nella categoria Salute.', (d) => d.cat('salute'), 1],
+  ['regali', 'compleanno', 'cat', 'Un pensiero', 'Una spesa nella categoria Regali.', (d) => d.cat('regali'), 1],
+  ['scontrino', 'scansione', 'scan', 'Un scontrino letto', 'Fai leggere almeno uno scontrino al bot questa settimana.', (d) => d.scanned, 1],
+  ['duescontrini', 'scontrino', 'scan', 'Due scontrini letti', 'Fai leggere due scontrini al bot questa settimana.', (d) => d.scanned, 2],
+  ['note', 'scontrino', 'notes', 'Con le note', 'Una spesa con una nota scritta.', (d) => d.notes, 1],
+  ['trenote', 'scontrino', 'notes', 'Tre note', 'Tre spese con una nota scritta.', (d) => d.notes, 3],
+  ['piccola', 'moneta', 'amount', 'Piccola spesa', () => T('Registra una spesa fino a {0}.', money(500)), (d) => d.small, 1],
+  ['grande', 'pesi', 'amount', 'Spesa pesante', () => T('Registra una spesa di almeno {0}.', money(5000)), (d) => d.big, 1],
+  ['tonda', 'moneta', 'amount', 'Cifra tonda', 'Una spesa senza centesimi, a cifra tonda.', (d) => d.round, 1],
+  ['centesimi', 'moneta', 'amount', 'Al centesimo', 'Una spesa con i centesimi precisi.', (d) => d.cents, 1],
+  ['budget', 'salvadanaio', 'budget', 'Un budget per te', 'Imposta il tuo budget mensile dal tab Budget.', (d) => d.budget, 1, 'bool'],
+  ['budgetcat', 'tresalvadanai', 'budget', 'Budget per categoria', 'Imposta un budget per almeno una categoria.', (d) => d.budgetCat, 1, 'bool'],
+  ['pari', 'coppa', 'pay', 'Conti in pari', 'Registrate un pagamento o chiudete la settimana in pari.', (d) => (d.pays || d.settled ? 1 : 0), 1, 'bool'],
+  ['pagamento', 'bilancia', 'pay', 'Un pagamento registrato', 'Registra un pagamento dal + o con Metti in pari.', (d) => d.pays, 1],
+  ['offri', 'moneta', 'pay', 'Offri tu', 'Paga tu almeno 3 spese della settimana.', (d) => d.mine, 3],
+  ['quota', 'bilancia', 'pay', 'Divisione su misura', 'Una spesa divisa non a metà.', (d) => d.custom, 1],
+  ['lingua', 'lingue', 'misc', 'Un\'altra lingua', 'Prova l\'app in un\'altra lingua dalle impostazioni.', (d) => d.lang, 1, 'bool'],
+  ['sezione', 'team', 'misc', 'Una nuova sezione', 'Crea una nuova sezione per le tue spese.', (d) => d.groups, 1],
+  ['modifica', 'turno', 'misc', 'Correzione al volo', 'Modifica una spesa già registrata.', (d) => d.edited, 1],
+  ['trofeo', 'coppa', 'misc', 'Un trofeo nuovo', 'Sblocca un trofeo questa settimana.', (d) => d.trophies(), 1],
+];
+function missions(all) {
   const mon = weekKey(); const ds = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   const m0 = new Date(mon + 'T00:00:00'); const sunD = new Date(m0); sunD.setDate(m0.getDate() + 6); const sun = ds(sunD); const sat = ds(new Date(m0.getFullYear(), m0.getMonth(), m0.getDate() + 5));
   const today = todayStr(); const daysLeft = Math.max(0, Math.round((sunD - new Date(today + 'T00:00:00')) / 86400000)) + 1;
   const inWeek = (e) => e.date >= mon && e.date <= sun; const week = active().filter(inWeek); const es = week.filter((e) => e.kind === 'expense'); const pays = week.filter((e) => e.kind === 'payment');
-  const days = new Set(es.map((e) => e.date)).size; const scanned = es.filter((e) => e.scanned).length; const withCat = es.filter((e) => e.cat).length;
-  const extras = es.filter((e) => (e.date === sat || e.date === sun) && ['cibo', 'tempo-libero', 'shopping', 'viaggi'].includes(e.cat)).length; const weekendOver = today > sun;
-  const mid = me().id; const myShare = es.reduce((x, e) => x + ((e.owed || {})[mid] || 0), 0); const mb = myBudget().monthly || 0; const weekBudget = mb ? Math.round(mb / 4.35) : 0;
-  const bal = balances(); const settled = Object.values(bal).every((v) => Math.abs(v) < 1);
-  const L = []; const add = (id, img, title, sub, cur, target, fmt) => L.push({ id, img, title, sub, cur: Math.min(cur, target), target, done: cur >= target, fmt: fmt || 'count' });
-  add('cinque', 'vetta', 'Cinque spese in settimana', 'Aggiungete almeno 5 spese da lunedì a domenica.', es.length, 5);
-  add('giorni', 'calendario', 'Tre giorni attivi', 'Spese in almeno 3 giorni diversi della settimana.', days, 3);
-  add('scontrino', 'scansione', 'Un scontrino letto', 'Fai leggere almeno uno scontrino al bot questa settimana.', scanned, 1);
-  add('categorie', 'categorie', 'Tutto in ordine', 'Ogni spesa della settimana con la sua categoria.', es.length ? (withCat === es.length ? 1 : 0) : 0, 1, 'bool');
-  add('weekend', 'sdraio', 'Weekend leggero', 'Sabato e domenica senza cene fuori, svaghi e shopping.', weekendOver && extras === 0 && es.some((e) => e.date < sat) ? 1 : 0, 1, 'bool');
-  if (weekBudget) add('budget', 'salvadanaio', 'Sotto budget', T('La tua quota della settimana entro {0}.', money(weekBudget)), myShare <= weekBudget && weekendOver ? 1 : 0, 1, 'bool');
-  else add('budget', 'salvadanaio', 'Un budget per te', 'Imposta il tuo budget mensile dal tab Budget.', mb ? 1 : 0, 1, 'bool');
-  add('pari', 'coppa', 'Conti in pari', 'Registrate un pagamento o chiudete la settimana in pari.', pays.length || settled ? 1 : 0, 1, 'bool');
+  const mid = me().id; const dsIso = (iso) => (iso ? ds(new Date(iso)) : ''); const hour = (e) => (e.createdAt ? new Date(e.createdAt).getHours() : 12);
+  const dates = [...new Set(es.map((e) => e.date))].sort(); let streak = 0, run = 0; dates.forEach((dt, k) => { run = k && new Date(dt) - new Date(dates[k - 1]) === 86400000 ? run + 1 : 1; streak = Math.max(streak, run); });
+  const bal = balances(); const b = myBudget();
+  const d = { es, mon, sat, sun, mid, days: dates.length, streak,
+    scanned: es.filter((e) => e.scanned).length, allCat: es.length && es.every((e) => e.cat) ? 1 : 0, cats: new Set(es.filter((e) => e.cat).map((e) => e.cat)).size, cat: (c) => es.filter((e) => e.cat === c).length,
+    notes: es.filter((e) => (e.notes || '').trim()).length, small: es.filter((e) => e.amount <= 500).length, big: es.filter((e) => e.amount >= 5000).length, round: es.filter((e) => e.amount % 100 === 0).length, cents: es.filter((e) => e.amount % 100 !== 0).length,
+    mine: es.filter((e) => e.paidBy === mid).length, custom: es.filter((e) => e.splitMethod && e.splitMethod !== 'equal').length, morning: es.filter((e) => hour(e) < 12).length, night: es.filter((e) => hour(e) >= 22).length,
+    sameDay: es.filter((e) => dsIso(e.createdAt) === e.date).length, weekend: es.filter((e) => e.date === sat || e.date === sun).length, monday: es.filter((e) => e.date === mon).length,
+    edited: week.filter((e) => e.updatedAt && e.createdAt && Date.parse(e.updatedAt) - Date.parse(e.createdAt) > 60000).length,
+    budget: b.monthly ? 1 : 0, budgetCat: Object.values(b.byCat || {}).some((v) => v > 0) ? 1 : 0, settled: Object.values(bal).every((v) => Math.abs(v) < 1) ? 1 : 0, pays: pays.length,
+    lang: S.settings.usedOtherLang || LANG() !== 'it' ? 1 : 0, groups: (S.groups || []).filter((g) => !g.deleted && g.createdAt && dsIso(g.createdAt) >= mon && dsIso(g.createdAt) <= sun).length,
+    trophies: () => { try { return trophies().filter((t) => t.ok && t.at && t.at >= mon && t.at <= sun).length; } catch (_) { return 0; } } };
+  /* estrazione della settimana: stessa per tutta la casa (seme = lunedì + codice casa), al massimo 2 missioni per famiglia */
+  let pick = MISSION_POOL;
+  if (!all) { const rnd = seedRand(mon + '|' + ((S.settings.sync || {}).house || (auth.user() || {}).id || '')); const pool = MISSION_POOL.slice(); for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+    const fam = {}; pick = []; pool.forEach((m) => { if (pick.length >= MISSIONS_PER_WEEK || (fam[m[2]] || 0) >= 2) return; fam[m[2]] = (fam[m[2]] || 0) + 1; pick.push(m); }); }
+  const L = pick.map(([id, img, fam, title, sub, val, target, fmt]) => { let cur = 0; try { cur = val(d) || 0; } catch (_) {} return { id, img, fam, title, sub: typeof sub === 'function' ? sub() : sub, cur: Math.min(cur, target), target, done: cur >= target, fmt: fmt || 'count' }; });
   return { list: L, mon, sun, daysLeft };
 }
 const missionsNew = () => { const w = missions(); const seen = S.settings.seenMissions || {}; const ids = seen.week === w.mon ? (seen.ids || []) : []; return w.list.some((m) => m.done && !ids.includes(m.id)); };
@@ -2122,5 +2170,5 @@ if ('serviceWorker' in navigator) {
     }).catch(() => {});
   });
 }
-window.PARI = { state: () => S, addEntry, balances, monthStats, sync, toast, parseReceipt, scanReceipt, levelInfo, showLevelUp, missions, trophies };
+window.PARI = { state: () => S, addEntry, balances, monthStats, sync, toast, parseReceipt, scanReceipt, levelInfo, showLevelUp, missions, trophies, missionPool: () => MISSION_POOL };
 })();
