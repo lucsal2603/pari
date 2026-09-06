@@ -1,7 +1,7 @@
 /* Divvy — service worker.
    Shell (html/js/css): prima la rete, cache solo se offline → gli aggiornamenti si vedono subito.
    Immagini, icone, font: prima la cache. Supabase: mai toccato. */
-const VERSION = 'pari-v1.38.0';
+const VERSION = 'pari-v1.38.1';
 const SHELL = [
   './', './index.html', './style.css', './app.js', './i18n.js', './img/traguardi/coppa.webp', './img/traguardi/mondo.webp', './img/traguardi/vetta.webp', './img/traguardi/sdraio.webp', './img/traguardi/pesi.webp', './img/traguardi/calendario.webp', './img/traguardi/moneta.webp', './img/traguardi/scontrino.webp', './img/traguardi/categorie.webp', './img/traguardi/torta.webp', './img/traguardi/salvadanaio.webp', './img/traguardi/tresalvadanai.webp', './img/traguardi/palloncino.webp', './img/traguardi/settimane.webp', './img/traguardi/sei.webp', './img/traguardi/compleanno.webp', './img/traguardi/sveglia.webp', './img/traguardi/mattino.webp', './img/traguardi/notte.webp', './img/traguardi/turno.webp', './img/traguardi/bilancia.webp', './img/traguardi/team.webp', './img/traguardi/collezione.webp', './img/traguardi/lingue.webp', './img/traguardi/scansione.webp', './img/scansione.webp', './img/missione.webp', './img/levelup-sfondo.webp', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png', './icons/favicon.png',
