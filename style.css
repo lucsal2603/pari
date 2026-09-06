@@ -826,3 +826,5 @@ body.fixed-screen .view { height: 100dvh; overflow: hidden; padding-bottom: calc
 .ach-quote { margin: 22px 0 8px; background: #E3EEE3; border-radius: 22px; padding: 22px 20px 16px; text-align: center; color: var(--green); animation: rowIn .4s .3s var(--ease-out) both; }
 .ach-quote p { margin: 0; font-family: 'Caveat', 'Manrope', cursive; font-weight: 700; font-size: 27px; line-height: 1.15; }
 .ach-line { display: block; width: 150px; height: 8px; margin: 8px auto 0; color: #6FAE7A; }
+.scan-prev { display: flex; justify-content: center; margin: 0 0 12px; }
+.scan-prev canvas { max-width: 100%; height: auto; border-radius: 12px; box-shadow: 0 1px 0 rgba(0,0,0,.06), 0 6px 18px rgba(0,0,0,.08); background: var(--white); }

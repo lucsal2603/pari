@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.26.0';
+const APP_VERSION = '1.27.0';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -1047,6 +1047,15 @@ const STORES = [
 ];
 const GENERIC = new Set(['Farmacia', 'Parafarmacia', 'Ristorante', 'Pizzeria', 'Trattoria', 'Osteria', 'Bar', 'Caffè', 'Pasticceria', 'Gelateria', 'Sushi', 'Kebab', 'Cinema', 'Parcheggio', 'Hotel', 'B&B', 'Brico']);
 const storeMatch = (text) => { const t = ' ' + text.toLowerCase().replace(/[^a-z0-9&à-ú]+/g, ' ') + ' '; for (const [k, name, c] of STORES) { const kk = k.trim(); if (kk.length <= 4 ? t.includes(' ' + kk + ' ') : t.includes(kk)) return { name, cat: c }; } return null; };
+const CAT_HINTS = [
+  ['salute', /farmacia|parafarmacia|medicin|ricetta|ticket sanit/i], ['trasporti', /carburant|benzin|diesel|gasolio|litri|parcheggio|sosta|pedaggio|autostrad|biglietto|treno|trenitalia|italo|\bbus\b|metro/i],
+  ['cibo', /ristorant|pizzeria|trattoria|osteria|coperto|men[uù]|pizza|caff[eè]|\bbar\b|birra|vino|panin|kebab|sushi|gelat|pasticc|bistrot|pub\b/i], ['viaggi', /hotel|albergo|b&b|pernott|soggiorno|volo|aeroport|camping/i],
+  ['tempo-libero', /cinema|teatro|concerto|museo|palestra|piscina|biglietti|spettacol/i], ['casa', /detersiv|ferrament|brico|arred|lampad|casalingh|bucato/i], ['spesa', /supermerc|ipermerc|discount|latte|pane\b|pasta|frutta|verdura|uova|formagg|carne|surgelat|yogurt|biscott/i],
+];
+const guessCat = (text) => { for (const [c, re] of CAT_HINTS) if (re.test(text)) return c; return ''; };
+const lev = (a, b) => { const m = a.length, n = b.length; if (Math.abs(m - n) > 2) return 9; let prev = Array.from({ length: n + 1 }, (_, i) => i); for (let i = 1; i <= m; i++) { const cur = [i]; for (let j = 1; j <= n; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); prev = cur; } return prev[n]; };
+/* marchi letti con un refuso ("ESSELUNCA", "C0NAD"): parole di almeno 5 lettere a distanza 1 da un marchio noto */
+const storeMatchFuzzy = (text) => { const words = text.toLowerCase().replace(/[^a-z0-9à-ú\s]/g, ' ').split(/\s+/).filter((w) => w.length >= 5); for (const [k, name, c] of STORES) { const kk = k.trim(); if (kk.length < 5 || kk.includes(' ')) continue; for (const w of words) if (lev(w, kk) <= 1) return { name, cat: c }; } return null; };
 const NOISE = /scontrino|documento|commerciale|p\.? ?iva|partita|c\.?f\.|tel\.?|fax|cod\.? ?fisc|via |viale |piazza |corso |cassa|operatore|n\.? ?doc|data|ora |grazie|arrivederci|euro|totale|iva|resto|contanti|carta|bancomat|pagamento|reparto|descrizione|prezzo|qta|art\./i;
 const MONTHS = { gen: 1, feb: 2, mar: 3, apr: 4, mag: 5, giu: 6, lug: 7, ago: 8, set: 9, ott: 10, nov: 11, dic: 12, jan: 1, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, dec: 12 };
 function parseReceipt(text) {
@@ -1054,10 +1063,10 @@ function parseReceipt(text) {
   const whole = lines.join('\n'); const low = whole.toLowerCase();
   const digital = /hai pagato|hai autorizzato|hai inviato|inviato a|hai ricevuto|pagamento (?:a|di|presso|effettuato|con carta|autorizzato)|prelievo o pagamento|transazione|addebito|satispay|revolut|paypal|apple pay|google pay|bonifico|beneficiario|intesa|unicredit|poste ?pay|bancoposta|fineco|n26|hype|mooney|cr[eé]dit agricole|cartaconto|bnl|bper|banco bpm|mediolanum|carta di credito|carta di debito|con la tua carta|movimento|operazione|ore fa|minuti fa/i.test(low);
   if (digital) return parseDigital(lines, whole);
-  const norm = (l) => l.replace(/(\d)[oO](\d)/g, '$10$2').replace(/[oO](?=[.,]\d\d)/g, '0');
+  const norm = (l) => l.replace(/(\d)[oO](?=\d)/g, '$10').replace(/[oO](?=[.,]\d\d)/g, '0').replace(/([.,]\d)[oO]\b/g, '$10').replace(/(\d)[lI|](?=\d)/g, '$11').replace(/[lI|](?=[.,]\d\d)/g, '1').replace(/([.,]\d)[lI|]\b/g, '$11');
   const amountsIn = (l) => { const out = []; const re = /(?:€\s*)?(\d{1,4}(?:[.,]\d{3})?)[.,](\d{2})(?!\d)/g; let m; const s2 = norm(l); while ((m = re.exec(s2))) { const cents = parseInt(m[1].replace(/[.,]/g, ''), 10) * 100 + parseInt(m[2], 10); if (cents > 0 && cents < 1000000) out.push(cents); } return out; };
   // totale: righe con TOTALE (non subtotale/parziale), altrimenti "importo pagato", altrimenti il più grande nella metà bassa
-  let amount = 0; const totLines = lines.filter((l) => /tota\s*l|t0tale|tot\.|totle/i.test(l) && !/sub|parz|sconto|risparm|punti|iva/i.test(l));
+  let amount = 0; const isTot = (l) => /tota\s*l|t0tale|tot\.|totle|importo pagato|da pagare|netto a pagare/i.test(l) && !/sub|parz|sconto|risparm|punti|\biva\b|resto|contant/i.test(l); const totLines = lines.filter(isTot);
   for (const l of totLines) { const a = amountsIn(l); if (a.length) amount = Math.max(amount, ...a); }
   const noPay = (l) => !/resto|contant|bancomat|carta|pagamento|pos\b|cambio/i.test(l);
   if (!amount) for (const l of lines.filter((l) => /pagato|importo/i.test(l) && noPay(l))) { const a = amountsIn(l); if (a.length) { amount = Math.max(amount, ...a); } }
@@ -1065,13 +1074,18 @@ function parseReceipt(text) {
   // data
   let date = ''; for (const l of lines) { const m = norm(l).match(/(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})/); if (m) { let d = +m[1], mo = +m[2], y = +m[3]; if (y < 100) y += 2000; if (d >= 1 && d <= 31 && mo >= 1 && mo <= 12 && y >= 2015 && y <= 2035) { date = `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`; break; } } }
   // negozio e categoria
-  let store = '', cat = ''; const sm = storeMatch(lines.slice(0, 8).join(' ')); if (sm) { store = sm.name; cat = sm.cat; }
+  let store = '', cat = ''; const sm = storeMatch(lines.slice(0, 8).join(' ')) || storeMatchFuzzy(lines.slice(0, 8).join(' ')); if (sm) { store = sm.name; cat = sm.cat; }
+  if (sm && GENERIC.has(sm.name)) { const ln = lines.slice(0, 6).find((l) => l.toLowerCase().includes(sm.name.toLowerCase().replace('è', 'e').slice(0, 5)) && !/\d{3,}/.test(l)); if (ln) store = ln.toLowerCase().replace(/[^a-zà-ú0-9&'. -]/gi, ' ').replace(/\s+/g, ' ').trim().replace(/(^|\s)([a-zà-ú])/g, (x, b, c) => b + c.toUpperCase()).slice(0, 40); }
   if (!store) { const cand = lines.slice(0, 6).find((l) => /[a-zà-ú]{3,}/i.test(l) && !NOISE.test(l) && !/\d{3,}/.test(l)); if (cand) store = cand.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()).slice(0, 40); }
-  return { amount, date, store, cat, lines: lines.length };
+  // voci dello scontrino: righe con un importo in fondo, prima del totale (finiscono nelle note)
+  const items = []; const totIdx = lines.findIndex(isTot); const body = totIdx > 0 ? lines.slice(0, totIdx) : lines;
+  for (const l of body) { if (NOISE.test(l) || /sub|parz|sconto|arrotond|punti|saldo|bollo|cauzion/i.test(l)) continue; const a = amountsIn(l); if (a.length !== 1) continue; const m = norm(l).match(/^\s*(?:\d+\s*[xX×]\s*)?([A-Za-zÀ-ú][A-Za-zÀ-ú0-9'&.\/ -]{2,}?)\s+(?:\d{1,2}%\s+)?(?:€\s*)?\d{1,4}(?:[.,]\d{3})?[.,]\d{2}\s*(?:€|eur)?\s*[A-Za-z%*]?\s*$/i); if (!m) continue; const name = m[1].trim().replace(/\s{2,}/g, ' '); if (name.replace(/[^A-Za-zÀ-ú]/g, '').length < 3) continue; items.push({ name: name.toLowerCase().replace(/(^|\s)([a-zà-ú])/g, (x, b, c) => b + c.toUpperCase()), cents: a[0] }); if (items.length >= 12) break; }
+  if (!cat) cat = guessCat(whole);
+  return { amount, date, store, cat, items, lines: lines.length };
 }
 /* ricevute digitali: screenshot di banca, Satispay, PayPal, notifiche di pagamento */
 function parseDigital(lines, whole) {
-  const norm = (l) => l.replace(/(\d)[oO](\d)/g, '$10$2').replace(/[oO](?=[.,]\d\d)/g, '0');
+  const norm = (l) => l.replace(/(\d)[oO](?=\d)/g, '$10').replace(/[oO](?=[.,]\d\d)/g, '0').replace(/([.,]\d)[oO]\b/g, '$10').replace(/(\d)[lI|](?=\d)/g, '$11').replace(/[lI|](?=[.,]\d\d)/g, '1').replace(/([.,]\d)[lI|]\b/g, '$11');
   const amountsIn = (l) => { const out = []; const re = /[-−]?\s*(?:€|eur)?\s*(\d{1,4}(?:[.,]\d{3})?)[.,](\d{2})(?!\d)\s*(?:€|eur)?/gi; let m; const s2 = norm(l); while ((m = re.exec(s2))) { const cents = parseInt(m[1].replace(/[.,]/g, ''), 10) * 100 + parseInt(m[2], 10); if (cents > 0 && cents < 1000000) out.push({ cents, euro: /€|eur/i.test(m[0]) }); } return out; };
   // importo: prima le righe "hai pagato / importo / pagamento / totale / addebito", poi qualsiasi importo con €, poi il più grande
   let amount = 0; const pri = lines.filter((l) => /hai pagato|hai autorizzato|hai inviato|importo|pagamento|pagato|totale|addebito|transazione|speso|prelievo/i.test(l));
@@ -1083,7 +1097,7 @@ function parseDigital(lines, whole) {
   const mm = flat.match(/\b(?:presso|a favore di|beneficiario|esercente|merchant|pagamento a|pagato a|hai pagato [^\n]*? a|da)\b\s*[:\-]?\s*([A-Za-zÀ-ú0-9&'.\- ]{3,60})/i);
   if (mm) { let x = mm[1].trim().replace(/^\d{2,}\s+/, '').replace(/\s+-\s+.*$/, ''); if (/^[A-ZÀ-Ú0-9]/.test(x)) { const cut = x.search(/\s+[a-zà-ú]+\b/); if (cut > 0) x = x.slice(0, cut); } else x = x.replace(/\s+(il|lo|la|per|di|con|in|alle|€|eur).*$/i, ''); x = x.replace(/[\s.,;:-]+$/, ''); if (/^(?!(?:un|una|carta|conto|banca|te|tu|noi)$)[A-Za-zÀ-ú]/.test(x) && x.replace(/[^A-Za-zÀ-ú]/g, '').length >= 3) store = x; }
   // bonifici e invii (Satispay, PayPal…): la causale fra virgolette è la descrizione migliore, altrimenti chi ha ricevuto i soldi
-  if (!store) { const note = lines.find((l) => /^["“'][^"”']{3,40}["”']$/.test(l)); const rcp = flat.match(/\binviat[oa]\b[^"“]*?\s+a\s+([A-Za-zÀ-ú][A-Za-zÀ-ú' ]{2,40})/i); if (note) store = note.slice(1, -1).trim(); else if (rcp) store = rcp[1].trim().replace(/\s+(riceverà|ricevera|per|il|la).*$/i, ''); }
+  if (!store) { const note = lines.find((l) => /^["“'][^"”']{3,40}["”']$/.test(l)); const rcp = flat.match(/\binviat[oa]\b[^"“]*?\s+a\s+([A-Za-zÀ-ú][A-Za-zÀ-ú' ]{2,60})/i); if (note) store = note.slice(1, -1).trim(); else if (rcp) store = rcp[1].trim().replace(/\s+(riceverà|ricevera|ricever|potrai|per|il|la|id|transazione|nuovo|fine|cronologia|codice|data|ore|alle|oggi|ieri)\b.*$/i, '').split(/\s+/).slice(0, 4).join(' '); }
   const sm = storeMatch(store || whole); if (sm) { cat = sm.cat; if (!store || !GENERIC.has(sm.name)) store = sm.name; }
   if (!store) { const smw = storeMatch(whole); if (smw && !GENERIC.has(smw.name)) { store = smw.name; cat = smw.cat; } }
   if (!store) { const cand = lines.find((l) => /^[A-Z0-9&'. \-]{4,}$/.test(l) && !/[0-9]{3,}/.test(l) && !NOISE.test(l) && !/PAGAMENTO|IMPORTO|TOTALE|EUR|SATISPAY|PAYPAL|REVOLUT|OGGI|IERI/i.test(l)); if (cand) store = cand; }
@@ -1093,6 +1107,7 @@ function parseDigital(lines, whole) {
   if (store && store === store.toUpperCase()) store = store.toLowerCase().replace(/(^|[\s&(-])([a-zà-ú])/g, (a, b, c) => b + c.toUpperCase());
   else if (store && store === store.toLowerCase()) store = store.replace(/(^|\s)([a-zà-ú])/g, (a, b, c) => b + c.toUpperCase());
   if (!cat && store) { const sm2 = storeMatch(store); if (sm2) cat = sm2.cat; }
+  if (!cat) cat = guessCat(store + ' ' + whole);
   // data: gg/mm/aaaa, "5 set 2026", "5 settembre 2026", oggi/ieri
   let date = '';
   for (const l of lines) { const m = norm(l).match(/(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})/); if (m) { let d = +m[1], mo = +m[2], y = +m[3]; if (y < 100) y += 2000; if (d >= 1 && d <= 31 && mo >= 1 && mo <= 12 && y >= 2015 && y <= 2035) { date = `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`; break; } } }
@@ -1105,11 +1120,41 @@ function loadOCR() {
   if (ocrLib) return Promise.resolve(ocrLib);
   return new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js'; sc.onload = () => { ocrLib = window.Tesseract; res(ocrLib); }; sc.onerror = () => rej(new Error('Serve la rete per scaricare il lettore la prima volta')); document.head.appendChild(sc); });
 }
-async function prepareImage(file, mode) {
-  let bmp; try { bmp = await createImageBitmap(file, { imageOrientation: 'from-image' }); } catch (_) { bmp = await createImageBitmap(file); }
+/* geometria della foto, calcolata una sola volta: dov'è il foglio (ritaglio) e di quanto è storto (raddrizzamento) */
+async function analyzeGeometry(bmp) {
+  const SW = 320; const k = Math.min(1, SW / Math.max(bmp.width, bmp.height)); const w = Math.max(8, Math.round(bmp.width * k)), h = Math.max(8, Math.round(bmp.height * k));
+  const c = document.createElement('canvas'); c.width = w; c.height = h; const ctx = c.getContext('2d'); ctx.drawImage(bmp, 0, 0, w, h);
+  const d = ctx.getImageData(0, 0, w, h).data; const n = w * h; const g = new Uint8Array(n); const hist = new Uint32Array(256);
+  for (let i = 0, j = 0; i < n; i++, j += 4) { const v = (d[j] * .3 + d[j + 1] * .59 + d[j + 2] * .11) | 0; g[i] = v; hist[v]++; }
+  // soglia di Otsu: separa foglio chiaro e sfondo scuro
+  let sum = 0; for (let i = 0; i < 256; i++) sum += i * hist[i]; let sumB = 0, wB = 0, best = 0, thr = 128; for (let t = 0; t < 256; t++) { wB += hist[t]; if (!wB) continue; const wF = n - wB; if (!wF) break; sumB += t * hist[t]; const mB = sumB / wB, mF = (sum - sumB) / wF; const v = wB * wF * (mB - mF) * (mB - mF); if (v > best) { best = v; thr = t; } }
+  const rows = new Float32Array(h), cols = new Float32Array(w); for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (g[y * w + x] > thr) { rows[y]++; cols[x]++; }
+  const run = (arr, len, other) => { let bi = -1, bl = 0, i = 0; while (i < len) { if (arr[i] / other > 0.5) { let j = i, gap = 0; while (j < len && (arr[j] / other > 0.5 || gap < Math.max(2, len * 0.03))) { gap = arr[j] / other > 0.5 ? 0 : gap + 1; j++; } j -= gap; if (j - i > bl) { bl = j - i; bi = i; } i = j; } i++; } return bl > 0 ? [bi, bi + bl] : null; };
+  const ry = run(rows, h, w), rx = run(cols, w, h); let crop = null;
+  if (ry && rx) { const area = (ry[1] - ry[0]) * (rx[1] - rx[0]); if (area < n * 0.6 && (ry[1] - ry[0]) > h * 0.25 && (rx[1] - rx[0]) > w * 0.25) { const mx = Math.round(w * 0.02), my = Math.round(h * 0.02); crop = { x: Math.max(0, rx[0] - mx) / k, y: Math.max(0, ry[0] - my) / k, w: Math.min(w, rx[1] + mx) / k, h: Math.min(h, ry[1] + my) / k }; crop.w -= crop.x; crop.h -= crop.y; } }
+  // raddrizzamento: provo vari angoli e tengo quello in cui le righe di testo sono più "compatte"
+  const cx0 = crop ? Math.round(crop.x * k) : 0, cy0 = crop ? Math.round(crop.y * k) : 0, cw = crop ? Math.round(crop.w * k) : w, ch = crop ? Math.round(crop.h * k) : h;
+  let m = 0, cnt = 0; for (let y = cy0; y < cy0 + ch; y++) for (let x = cx0; x < cx0 + cw; x++) { m += g[y * w + x]; cnt++; } m /= Math.max(1, cnt);
+  const pts = []; const darkText = m >= 110; for (let y = cy0; y < cy0 + ch; y++) for (let x = cx0; x < cx0 + cw; x++) { const v = g[y * w + x]; if (darkText ? v < m - 40 : v > m + 40) pts.push(x - cx0 - cw / 2, y - cy0 - ch / 2); }
+  let angle = 0;
+  if (pts.length > 200 && pts.length < cw * ch * 0.5) {
+    const score = (a) => { const r = a * Math.PI / 180, co = Math.cos(r), si = Math.sin(r); const H = new Float32Array(ch + 2); for (let i = 0; i < pts.length; i += 2) { const yy = Math.round(pts[i + 1] * co - pts[i] * si + ch / 2); if (yy >= 0 && yy < ch) H[yy]++; } let sq = 0; for (let i = 0; i < ch; i++) sq += H[i] * H[i]; return sq; };
+    let bestA = 0, bestS = -1; for (let a = -8; a <= 8; a += 1) { const sc = score(a); if (sc > bestS) { bestS = sc; bestA = a; } }
+    for (const a of [bestA - 0.5, bestA + 0.5]) { const sc = score(a); if (sc > bestS) { bestS = sc; bestA = a; } }
+    if (Math.abs(bestA) >= 0.6 && bestS > score(0) * 1.08) angle = bestA;
+  }
+  return { crop, angle, mean: m };
+}
+async function prepareImage(file, mode, quarter, nogeo) {
+  if (!file.__bmp) { try { file.__bmp = await createImageBitmap(file, { imageOrientation: 'from-image' }); } catch (_) { file.__bmp = await createImageBitmap(file); } }
+  const bmp = file.__bmp; if (!file.__geom) { try { file.__geom = await analyzeGeometry(bmp); } catch (_) { file.__geom = { crop: null, angle: 0, mean: 128 }; } }
+  const geo = nogeo ? { crop: null, angle: 0, mean: file.__geom.mean } : file.__geom; const src = geo.crop || { x: 0, y: 0, w: bmp.width, h: bmp.height };
   // foto grandi rimpicciolite, screenshot piccoli (notifiche) ingranditi: il lettore vuole lettere alte almeno 25-30 px
-  const k = Math.min(2, 1800 / Math.max(bmp.width, bmp.height)); const w = Math.round(bmp.width * k), h = Math.round(bmp.height * k);
-  const c = document.createElement('canvas'); c.width = w; c.height = h; const ctx = c.getContext('2d'); ctx.imageSmoothingQuality = 'high'; ctx.drawImage(bmp, 0, 0, w, h);
+  const k = Math.min(2, 1800 / Math.max(src.w, src.h)); const sw = Math.round(src.w * k), sh = Math.round(src.h * k); const q = quarter || 0;
+  const w = q % 2 ? sh : sw, h = q % 2 ? sw : sh;
+  const c = document.createElement('canvas'); c.width = w; c.height = h; const ctx = c.getContext('2d'); ctx.imageSmoothingQuality = 'high';
+  ctx.fillStyle = geo.mean < 110 ? '#000' : '#fff'; ctx.fillRect(0, 0, w, h);
+  ctx.translate(w / 2, h / 2); ctx.rotate((q * 90 - geo.angle) * Math.PI / 180); ctx.drawImage(bmp, src.x, src.y, src.w, src.h, -sw / 2, -sh / 2, sw, sh); ctx.setTransform(1, 0, 0, 1, 0, 0);
   const img = ctx.getImageData(0, 0, w, h); const d = img.data; const n = w * h; const g = new Uint8ClampedArray(n); let sum = 0;
   for (let i = 0, j = 0; i < n; i++, j += 4) { const v = d[j] * .3 + d[j + 1] * .59 + d[j + 2] * .11; g[i] = v; sum += v; }
   const mean = sum / n; const dark = mean < 110;
@@ -1126,36 +1171,55 @@ async function prepareImage(file, mode) {
   }
   ctx.putImageData(img, 0, 0); c.__mean = mean; return c;
 }
+let ocrWorker = null, ocrIdle = null;
+async function getWorker(T, onProgress) {
+  clearTimeout(ocrIdle);
+  if (!ocrWorker) { ocrWorker = await T.createWorker('ita', 1, { logger: (m) => onProgress && onProgress(m) }); await ocrWorker.setParameters({ preserve_interword_spaces: '1' }); }
+  ocrProgress = onProgress; return ocrWorker;
+}
+let ocrProgress = null;
+/* il lettore resta pronto 90 s dopo l'ultima lettura: la seconda foto di fila parte subito */
+const releaseWorker = () => { clearTimeout(ocrIdle); ocrIdle = setTimeout(async () => { const w = ocrWorker; ocrWorker = null; if (w) { try { await w.terminate(); } catch (_) {} } }, 90000); };
 async function scanReceipt(file) {
-  const root = $('#sheet-root');
-  openSheet('Lettura dello scontrino', `<div class="scan-box"><div class="scan-t" id="scan-t">Preparo la foto…</div><div class="scan-bar"><i id="scan-bar"></i></div><p class="small muted" style="margin:10px 0 0">La lettura avviene sul telefono: la foto non viene inviata da nessuna parte.</p></div>`);
+  openSheet('Lettura dello scontrino', `<div class="scan-box"><div class="scan-prev" id="scan-prev"></div><div class="scan-t" id="scan-t">Preparo la foto…</div><div class="scan-bar"><i id="scan-bar"></i></div><p class="small muted" style="margin:10px 0 0">La lettura avviene sul telefono: la foto non viene inviata da nessuna parte.</p></div>`);
   const setP = (t, p) => { const el = $('#scan-t'); if (el) el.textContent = T(t); const b = $('#scan-bar'); if (b) b.style.width = Math.round(p * 100) + '%'; };
+  let pass = 0;
   try {
     setP('Scarico il lettore…', .05);
-    const T = await loadOCR();
-    let pass = 0; const worker = await T.createWorker('ita', 1, { logger: (m) => { if (m.status === 'recognizing text') setP((pass ? `Rileggo (${pass + 1}ª volta)… ` : 'Leggo lo scontrino… ') + Math.round(m.progress * 100) + '%', .2 + Math.min(.75, (pass + m.progress) * .2)); else if (/load|init/i.test(m.status)) setP('Preparo il lettore…', .1); } });
-    await worker.setParameters({ preserve_interword_spaces: '1' });
-    // più passaggi con pre-elaborazioni diverse: mi fermo appena trovo importo e negozio, altrimenti tengo il migliore
+    const Tess = await loadOCR();
+    const worker = await getWorker(Tess, (m) => { if (m.status === 'recognizing text') setP((pass ? `Rileggo (${pass + 1}ª volta)… ` : 'Leggo lo scontrino… ') + Math.round(m.progress * 100) + '%', .2 + Math.min(.75, (pass + m.progress) * .18)); else if (/load|init/i.test(m.status)) setP('Preparo il lettore…', .1); });
+    // primo passaggio in scala di grigi (foglio ritagliato e raddrizzato), poi soglia adattiva nelle due polarità, poi contrasto forzato;
+    // se il testo resta illeggibile provo la foto girata di 90° e 270°. Mi fermo appena trovo importo e negozio.
     const first = await prepareImage(file, 'gray'); const darkShot = first.__mean < 128;
-    const modes = ['gray', darkShot ? 'adaptive-light' : 'adaptive-dark', darkShot ? 'adaptive-dark' : 'adaptive-light', 'boost'];
+    const pv = $('#scan-prev'); if (pv) { const t = document.createElement('canvas'); const kk = Math.min(1, 240 / first.width, 120 / first.height); t.width = Math.round(first.width * kk); t.height = Math.round(first.height * kk); t.getContext('2d').drawImage(first, 0, 0, t.width, t.height); pv.appendChild(t); }
+    const plan = [['gray', '4', 0], [darkShot ? 'adaptive-light' : 'adaptive-dark', '4', 0], [darkShot ? 'adaptive-dark' : 'adaptive-light', '4', 0], ['gray', '4', 0, true], ['boost', '6', 0], ['gray', '4', 1], ['gray', '4', 3]];
+    const alnum = (t) => (t.match(/[A-Za-z0-9]/g) || []).length;
     const score = (x, conf) => (x.amount ? 2 : 0) + (x.store ? 1 : 0) + (x.date ? .3 : 0) + (conf || 0) / 200;
-    let r = null, txt = '', best = -1;
-    for (pass = 0; pass < modes.length; pass++) {
-      const cv = pass === 0 ? first : await prepareImage(file, modes[pass]);
-      const { data } = await worker.recognize(cv); const t = data.text || ''; const x = parseReceipt(t); const sc = score(x, data.confidence);
-      if (sc > best) { best = sc; txt = t; r = r ? { ...x, store: x.store || r.store, date: x.date || r.date, cat: x.cat || r.cat } : x; } else if (r) { r = { ...r, store: r.store || x.store, date: r.date || x.date, cat: r.cat || x.cat }; }
+    let r = null, txt = '', best = -1, seenText = 0;
+    for (pass = 0; pass < plan.length; pass++) {
+      const [mode, psm, quarter, nogeo] = plan[pass];
+      if (quarter && seenText >= 20) break; // le rotazioni servono solo se la foto è illeggibile
+      if (nogeo && !(file.__geom && file.__geom.crop)) continue; // senza ritaglio: solo se un ritaglio c'era
+      await worker.setParameters({ tessedit_pageseg_mode: psm });
+      const cv = pass === 0 ? first : await prepareImage(file, mode, quarter, nogeo);
+      const { data } = await worker.recognize(cv); const t = data.text || ''; const x = parseReceipt(t); const sc = score(x, data.confidence); seenText = Math.max(seenText, alnum(t));
+      window.PARI && (window.PARI.lastConf = data.confidence, window.PARI.lastPasses = pass + 1);
+      if (sc > best) { best = sc; txt = t; r = r ? { ...x, store: x.store || r.store, date: x.date || r.date, cat: x.cat || r.cat, items: (x.items && x.items.length) ? x.items : r.items } : x; } else if (r) { r = { ...r, store: r.store || x.store, date: r.date || x.date, cat: r.cat || x.cat, items: (r.items && r.items.length) ? r.items : x.items }; }
       if (r.amount && r.store) break;
     }
-    await worker.terminate(); window.PARI && (window.PARI.lastOCR = txt); closeSheet();
+    releaseWorker(); window.PARI && (window.PARI.lastOCR = txt, window.PARI.lastParsed = r, window.PARI.lastGeom = file.__geom); closeSheet();
     if (!r.amount && !r.store) { toast('Non riesco a leggere lo scontrino: prova con più luce e inquadratura dritta'); return; }
     F.scanned = true;
     if (r.store) { F.desc = r.store; const d = $('#desc'); if (d) d.value = r.store; }
     if (r.amount) { F.amount = moneyPlain(r.amount); const a = $('#amount'); if (a) { a.value = F.amount; a.dispatchEvent(new Event('input', { bubbles: true })); } }
     if (r.date) { F.date = r.date; const dt = $('#date'); if (dt) dt.value = r.date; }
     if (r.cat) { F.cat = r.cat; $$('.cat-circle').forEach((x) => x.classList.toggle('on', x.dataset.cat === F.cat)); const cn = $('#cat-name'); if (cn) cn.textContent = T(catOf(F.cat).name); }
-    $$('.scan-fill').forEach((x) => x.classList.remove('scan-fill')); ['#desc', '#amount', '#date'].forEach((sel) => { const el = $(sel); if (el && el.value) el.classList.add('scan-fill'); });
-    toast(r.amount ? `Letto: ${r.store || 'scontrino'} · ${money(r.amount)}. Controlla e conferma` : 'Ho trovato il negozio ma non il totale: scrivilo tu');
-  } catch (e) { closeSheet(); console.warn('ocr', e); toast(e.message && /rete/.test(e.message) ? e.message : 'Lettura non riuscita: riprova con una foto più nitida'); }
+    // le voci dello scontrino finiscono nelle note, se sono vuote
+    const items = (r.items || []).filter((it) => !r.amount || it.cents <= r.amount);
+    if (items.length >= 2 && !(F.notes || '').trim()) { F.notes = items.map((it) => `${it.name} ${moneyPlain(it.cents)}`).join(' · '); const nt = $('#notes'); if (nt) nt.value = F.notes; }
+    $$('.scan-fill').forEach((x) => x.classList.remove('scan-fill')); ['#desc', '#amount', '#date', '#notes'].forEach((sel) => { const el = $(sel); if (el && el.value) el.classList.add('scan-fill'); });
+    toast(r.amount ? T('Letto: {0} · {1}. Controlla e conferma', T(r.store || 'scontrino'), money(r.amount)) + (items.length >= 2 ? ' ' + T('({0} voci nelle note)', items.length) : '') : 'Ho trovato il negozio ma non il totale: scrivilo tu');
+  } catch (e) { releaseWorker(); closeSheet(); console.warn('ocr', e); toast(e.message && /rete/.test(e.message) ? e.message : 'Lettura non riuscita: riprova con una foto più nitida'); }
 }
 
 /* ---------- Conferma dopo aver aggiunto una spesa o un pagamento ---------- */
