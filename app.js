@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.25.1';
+const APP_VERSION = '1.26.0';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -353,7 +353,7 @@ function materializeRecurring() {
 const view = $('#view'); const tabbar = $('#tabbar');
 let prevHash = '', curHash = location.hash || '#/home', viaTab = false;
 tabbar.addEventListener('click', () => { viaTab = true; });
-const tabOf = (h) => { const n = (h || '').slice(2).split(/[/?]/)[0] || 'home'; return { spesa: 'spese', modifica: 'spese', attivita: 'spese', statistiche: 'bilanci', nuova: 'home' }[n] || n; };
+const tabOf = (h) => { const n = (h || '').slice(2).split(/[/?]/)[0] || 'home'; return { spesa: 'spese', modifica: 'spese', attivita: 'spese', statistiche: 'bilanci', nuova: 'home', traguardi: 'home' }[n] || n; };
 function route() {
   prevHash = curHash; curHash = location.hash || '#/home';
   const hash = location.hash || '#/home';
@@ -378,7 +378,7 @@ function render(r, toTop) {
   r = r || currentRoute || { name: 'home', id: '', q: {} }; currentRoute = r;
   const publicPages = ['accedi', 'registrati', 'recupero', 'legale', 'conferma'];
   if (!auth.user() && !publicPages.includes(r.name)) { r = { name: 'accedi', id: '', sub: '', q: {}, back: null }; currentRoute = r; }
-  const pages = { home: pageHome, spese: pageSpese, bilanci: pageBilanci, profilo: pageProfilo, nuova: pageForm, modifica: pageForm, spesa: pageDetail, statistiche: pageStats, attivita: pageActivity, benvenuto: pageWelcome, accedi: pageLogin, registrati: pageRegister, recupero: pageRecovery, legale: pageLegal, conferma: pageConfirm, fatto: pageDone };
+  const pages = { home: pageHome, spese: pageSpese, bilanci: pageBilanci, profilo: pageProfilo, nuova: pageForm, modifica: pageForm, spesa: pageDetail, statistiche: pageStats, attivita: pageActivity, traguardi: pageTraguardi, benvenuto: pageWelcome, accedi: pageLogin, registrati: pageRegister, recupero: pageRecovery, legale: pageLegal, conferma: pageConfirm, fatto: pageDone };
   const fn = pages[r.name] || pageHome;
   const onb = ['benvenuto', 'accedi', 'registrati', 'recupero', 'conferma', 'fatto'].includes(r.name) || (r.name === 'legale' && !auth.user());
   document.body.classList.toggle('fixed-screen', ['accedi', 'registrati', 'recupero', 'conferma', 'benvenuto', 'fatto'].includes(r.name));
@@ -390,7 +390,7 @@ function render(r, toTop) {
   bind(r); initSwipes();
   const reveal = () => { $$('.chart').forEach((c) => c.classList.add('in')); $$('[data-w]').forEach((el) => (el.style.width = el.dataset.w)); };
   // finita l'animazione d'ingresso, tolgo il transform così la barra del titolo può restare fissa in alto
-  $$('.page').forEach((pg) => pg.addEventListener('animationend', () => pg.classList.add('settled'), { once: true }));
+  $$('.page').forEach((pg) => pg.addEventListener('animationend', (e) => { if (e.target === pg) pg.classList.add('settled'); }));
   requestAnimationFrame(() => requestAnimationFrame(reveal)); setTimeout(reveal, 80);
 }
 
@@ -468,7 +468,7 @@ function pageHome() {
   const pa = st.total ? Math.round((va / st.total) * 100) : 0, pb = st.total ? 100 - pa : 0;
   const syncCls = !sync.enabled() ? 'off' : sync.status === 'busy' ? 'busy' : sync.status === 'err' ? 'err' : '';
   return `<div class="page">
-    <div class="head left"><div class="greet">Ciao ${esc(a.name)}! <span aria-hidden="true">👋</span></div><label class="icon-btn scan-home" title="Fotografa uno scontrino" aria-label="Fotografa uno scontrino">${icon('i-camera')}<input type="file" accept="image/*" id="scan-home" hidden></label></div>
+    <div class="head left"><div class="greet">Ciao ${esc(a.name)}! <span aria-hidden="true">👋</span></div><a class="icon-btn trophy-btn${achNew() ? ' has-new' : ''}" href="#/traguardi" aria-label="Piccoli traguardi" data-trophy>${icon('i-trophy')}</a></div>
     <section class="card hero${sent.even ? ' even' : sent.sign === '+' ? ' owed' : ' owe'}">
       <div class="k">Saldo totale</div>
       <div class="amt">${sent.even ? money(0) : sent.sign + ' ' + money(sent.amount)}</div>
@@ -697,7 +697,7 @@ function submitForm() {
   if (F.kind === 'payment' && F.paidBy === F.to) { toast('Chi paga e chi riceve devono essere diversi'); return; }
   if (!validateSplit()) { toast('Controlla la divisione'); return; }
   const owed = computeOwed();
-  const data = { kind: F.kind, desc: F.kind === 'payment' ? 'Pagamento' : F.desc.trim(), amount, date: F.date || todayStr(), cat: F.kind === 'payment' ? '' : F.cat, paidBy: F.paidBy, splitMethod: F.kind === 'payment' ? 'exact' : F.splitMethod, splitInput: F.splitMethod === 'equal' ? {} : { ...F.splitInput }, owed, notes: F.notes.trim(), group: F.group || null };
+  const data = { kind: F.kind, scanned: !!F.scanned, desc: F.kind === 'payment' ? 'Pagamento' : F.desc.trim(), amount, date: F.date || todayStr(), cat: F.kind === 'payment' ? '' : F.cat, paidBy: F.paidBy, splitMethod: F.kind === 'payment' ? 'exact' : F.splitMethod, splitInput: F.splitMethod === 'equal' ? {} : { ...F.splitInput }, owed, notes: F.notes.trim(), group: F.group || null };
   const wasKind = F.kind;
   if (F.group) { S.settings.lastGroup = F.group; }
   if (F.id) { const id = F.id; F = null; updateEntry(id, data); toast('Modifiche salvate'); go('#/spesa/' + id); return; }
@@ -855,6 +855,54 @@ function pageInfo() {
 }
 
 /* ---------- ATTIVITÀ ---------- */
+/* ---------- Piccoli traguardi (si calcolano da spese e saldi, uguali per tutti e due) ---------- */
+const prevYM = (ymStr) => { const [y, m] = ymStr.split('-').map(Number); const d = new Date(y, m - 2, 1); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); };
+const monthOnly = (ymStr) => { const [y, m] = ymStr.split('-').map(Number); return new Date(y, m - 1, 1).toLocaleDateString(LOC(), { month: 'long' }); };
+const cap = (t) => t ? t.charAt(0).toUpperCase() + t.slice(1) : t;
+const moneyRound = (cents) => { try { return new Intl.NumberFormat(LOC(), { style: 'currency', currency: S.settings.currency || 'EUR', currencyDisplay: 'narrowSymbol', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.round((cents || 0) / 100)); } catch (_) { return money(cents); } };
+function achievements() {
+  const es = active().filter((e) => e.kind === 'expense'); const cur = curYM(); const prev = prevYM(cur);
+  const tot = (y) => es.filter((e) => ym(e.date) === y).reduce((s, e) => s + e.amount, 0);
+  const bal = balances(); const owe = Object.values(bal).reduce((s, v) => s + Math.max(0, v), 0); const settled = active().length > 0 && owe < 1;
+  const monthTot = tot(cur), prevTot = tot(prev); const less = prevTot > 0 && monthTot < prevTot;
+  // ultimo weekend concluso (sabato + domenica prima di oggi)
+  const now = new Date(); now.setHours(0, 0, 0, 0); const dow = now.getDay(); const sun = new Date(now); sun.setDate(now.getDate() - (dow === 0 ? 7 : dow)); const sat = new Date(sun); sat.setDate(sun.getDate() - 1);
+  const ds = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  const extras = es.filter((e) => (e.date === ds(sat) || e.date === ds(sun)) && ['cibo', 'tempo-libero', 'shopping', 'viaggi'].includes(e.cat));
+  const weekendOk = extras.length === 0 && es.some((e) => e.date < ds(sat));
+  const n = es.length;
+  const tripGroup = groups().find((g) => /viagg|vacanz|trip|holiday|urlaub|voyage|vacances|viaje|reise|ferie|\bmare\b|montagna/i.test(g.name)); const tripExp = es.find((e) => e.cat === 'viaggi');
+  const months = [...new Set(es.map((e) => ym(e.date)))].sort();
+  const record = months.map((m) => [m, tot(m)]).filter(([, t]) => t >= 100000).sort((a, b) => b[1] - a[1])[0];
+  let streak = false; for (let i = 0; i + 2 < months.length; i++) if (prevYM(months[i + 1]) === months[i] && prevYM(months[i + 2]) === months[i + 1]) { streak = true; break; }
+  const scanned = es.some((e) => e.scanned);
+  const pm = monthOnly(prev); const rispetto = LANG() === 'it' && /^[aeiou]/i.test(pm) ? 'Rispetto ad {0}.' : 'Rispetto a {0}.';
+  return [
+    { id: 'pari', hero: true, done: settled, img: 'coppa', title: settled ? 'Tutto in pari!' : 'Manca poco!', sub: settled ? 'Avete sistemato tutti i saldi. Grande!' : T('Vi separano {0}: saldate per sbloccare il trofeo.', money(owe)), cta: settled ? 'Continua così!' : 'Registra pagamento', href: settled ? '#/home' : '#/bilanci' },
+    { id: 'meno', done: less, img: '', title: less ? T('Avete speso {0} in meno questo mese!', moneyRound(prevTot - monthTot)) : 'Meno del mese scorso', sub: less ? T(rispetto, pm) : 'Spendete meno del mese scorso per sbloccarlo.' },
+    { id: 'weekend', done: weekendOk, img: 'sdraio', title: 'Weekend senza extraspese!', sub: weekendOk ? 'Avete mantenuto il budget del weekend.' : 'Un weekend senza cene fuori, svaghi e shopping e si sblocca.' },
+    { id: 'dieci', done: n >= 10, img: 'vetta', title: '10 spese condivise', sub: n >= 10 ? T('Avete già {0} spese insieme.', n) : 10 - n === 1 ? "Aggiungete un'altra spesa per sbloccare questo traguardo." : T('Aggiungete altre {0} spese per sbloccare questo traguardo.', 10 - n) },
+    { id: 'viaggio', done: !!(tripGroup || tripExp), img: 'mondo', title: 'Primo viaggio insieme', sub: tripGroup ? T('La sezione «{0}» è il vostro primo viaggio.', tripGroup.name) : tripExp ? 'Avete già una spesa di viaggio.' : 'Create una sezione viaggio per sbloccare questo traguardo.' },
+    { id: 'record', done: !!record, img: 'pesi', title: 'Mese da record', sub: record ? T('{0}: {1} di spese.', cap(monthName(record[0])), money(record[1])) : T('Superate {0} di spese in un mese.', moneyRound(100000)) },
+    { id: 'tre', done: streak, img: '', title: 'Tre mesi di fila', sub: streak ? 'Tre mesi consecutivi con spese: che costanza!' : 'Usate Divvy per tre mesi di seguito.' },
+    { id: 'scontrino', done: scanned, img: '', title: 'Primo scontrino letto', sub: scanned ? 'Il bot ha letto il vostro primo scontrino.' : 'Fotografate uno scontrino dal + per sbloccarlo.' },
+  ];
+}
+const achNew = () => { const seen = S.settings.seenAch || []; return achievements().some((a) => a.done && !seen.includes(a.id)); };
+function pageTraguardi() {
+  const list = achievements(); const hero = list[0]; const others = list.slice(1); const done = list.filter((a) => a.done).length;
+  const seen = new Set(S.settings.seenAch || []); let changed = false; list.forEach((a) => { if (a.done && !seen.has(a.id)) { seen.add(a.id); changed = true; } }); if (changed) { S.settings.seenAch = [...seen]; save(); }
+  // le illustrazioni che mancano restano un riquadro vuoto: Lucas le manda lui
+  const art = (a) => a.img ? `<img class="ach-art" src="img/traguardi/${a.img}.webp" alt="">` : `<div class="ach-art ach-ph" aria-hidden="true"></div>`;
+  return `<div class="page ach pop">
+    <div class="head"><button class="icon-btn soft" data-back="#/home" aria-label="Indietro">${icon('i-back')}</button><div class="title">Piccoli traguardi</div><button type="button" class="icon-btn" data-ach-info aria-label="Informazioni">${icon('i-info')}</button></div>
+    <p class="ach-sub">Ogni spesa è un passo in più.<br>Ecco i vostri traguardi!</p>
+    <section class="ach-hero${hero.done ? '' : ' locked'}">${art(hero)}<div class="ach-hero-t"><h2>${esc(hero.title)}</h2><p>${esc(hero.sub)}</p><a class="btn ach-cta" href="${hero.href}">${esc(hero.cta)}</a></div></section>
+    <div class="ach-row"><h3>Altri traguardi</h3><span class="ach-count" data-no-i18n>${done} / ${list.length}</span></div>
+    <div class="ach-list stagger">${others.map((a, i) => `<div class="ach-card${a.done ? ' done' : ' locked'}" style="--i:${i}">${art(a)}<div class="ach-t"><b>${esc(a.title)}</b><span>${esc(a.sub)}</span></div><span class="ach-st">${icon(a.done ? 'i-check' : 'i-lock')}</span></div>`).join('')}</div>
+    <div class="ach-quote"><p>“Grandi obiettivi si raggiungono anche con piccole spese.”</p><svg class="ach-line" viewBox="0 0 200 10" aria-hidden="true"><path d="M3 6 C 50 1, 110 9, 197 4" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/></svg></div>
+  </div>`;
+}
 function pageActivity() {
   const days = []; S.activity.forEach((a) => { const k = a.ts.slice(0, 10); let d = days.find((x) => x.k === k); if (!d) { d = { k, items: [] }; days.push(d); } d.items.push(a); });
   const text = (a) => { const who = member(a.by).name; const amt = money(a.amount); const d = esc(a.desc || ''); switch (a.type) { case 'add': return `<b>${esc(who)}</b> ha aggiunto <b>${d}</b> (${amt})`; case 'edit': return `<b>${esc(who)}</b> ha modificato <b>${d}</b> (${amt})`; case 'delete': return `<b>${esc(who)}</b> ha eliminato <b>${d}</b> (${amt})`; case 'restore': return `<b>${esc(who)}</b> ha ripristinato <b>${d}</b>`; case 'settle': return `<b>${esc(who)}</b> ha registrato un pagamento di <b>${amt}</b>`; default: return d; } };
@@ -1100,6 +1148,7 @@ async function scanReceipt(file) {
     }
     await worker.terminate(); window.PARI && (window.PARI.lastOCR = txt); closeSheet();
     if (!r.amount && !r.store) { toast('Non riesco a leggere lo scontrino: prova con più luce e inquadratura dritta'); return; }
+    F.scanned = true;
     if (r.store) { F.desc = r.store; const d = $('#desc'); if (d) d.value = r.store; }
     if (r.amount) { F.amount = moneyPlain(r.amount); const a = $('#amount'); if (a) { a.value = F.amount; a.dispatchEvent(new Event('input', { bubbles: true })); } }
     if (r.date) { F.date = r.date; const dt = $('#date'); if (dt) dt.value = r.date; }
@@ -1249,11 +1298,12 @@ function installBanner() {
 
 /* ---------- Bind eventi per pagina ---------- */
 function bind(r) {
+  $$('[data-ach-info]').forEach((b) => b.addEventListener('click', () => openSheet('Come funzionano i traguardi', `<p class="muted" style="margin:6px 0 14px;line-height:1.5">I traguardi si sbloccano da soli in base alle spese e ai saldi del gruppo. Sono uguali per tutti e due: quando uno di voi ne sblocca uno, lo vede anche l'altro.</p>`)));
+  const tb = $('[data-trophy]'); if (tb) tb.addEventListener('click', () => { tb.classList.add('tap'); });
   $$('[data-back]').forEach((b) => b.addEventListener('click', () => { if (r.name === 'nuova' || r.name === 'modifica') F = null; back(b.dataset.back); }));
   if (r.name === 'fatto') { const l = $('.done-link'); if (l) l.addEventListener('click', () => { F = null; }); }
   $$('[data-month]').forEach((b) => b.addEventListener('click', () => { const d = +b.dataset.month; S.ui.month = d === 0 ? curYM() : shiftYM(S.ui.month, d); save(); render(); const l = $('.monthnav .label'); if (l) l.classList.add('swap'); }));
   $$('[data-year]').forEach((b) => b.addEventListener('click', () => { S.ui.month = String(+S.ui.month.slice(0, 4) + +b.dataset.year) + S.ui.month.slice(4); save(); render(); }));
-  const sh = $('#scan-home'); if (sh) sh.addEventListener('change', () => { const f = sh.files && sh.files[0]; if (!f) return; pendingScan = f; F = null; go('#/nuova'); });
   $$('[data-install-hide]').forEach((b) => b.addEventListener('click', () => { sessionStorage.setItem('pari:install-hide', '1'); b.closest('.install').remove(); }));
   bindSeg($('[data-seg="homeMode"]'), (v) => { S.ui.homeMode = v; save(); render(); });
   bindSeg($('[data-seg="balTab"]'), (v) => { S.ui.balTab = +v; save(); render(); });

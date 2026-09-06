@@ -84,3 +84,7 @@ Nella console del browser `PARI.state()` mostra i dati, `PARI.addEntry({...})` n
 ## Lingue
 
 L'interfaccia è in italiano, inglese, spagnolo, francese e tedesco (Profilo → Lingua, bandierine con i colori). La scelta vale solo per il telefono su cui la fai: i dizionari sono in `i18n.js`, con le scritte italiane come chiavi e `{0}`/`{1}` per nomi e importi; le pagine vengono tradotte dopo il disegno, quindi per una scritta nuova basta aggiungerla al dizionario. Date e importi seguono il formato della lingua. Le notifiche push arrivano nella lingua del telefono che le riceve (la funzione `notify` la legge dalla riga `push`).
+
+## Piccoli traguardi
+
+Dal trofeo in alto a destra nella Home si apre la pagina dei traguardi (`#/traguardi`): otto obiettivi calcolati da spese e saldi (tutto in pari, meno del mese scorso, weekend senza extra, 10 spese, primo viaggio, mese da record, tre mesi di fila, primo scontrino letto). Sono uguali per tutti e due i telefoni perché nascono dagli stessi dati; il pallino giallo sul trofeo segnala un traguardo sbloccato non ancora visto. Le illustrazioni stanno in `img/traguardi/` (WebP con trasparenza): dove manca l'immagine resta un riquadro bianco.

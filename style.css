@@ -781,3 +781,48 @@ body.fixed-screen .view { height: 100dvh; overflow: hidden; padding-bottom: calc
 .lang-pill:active { opacity: .7; }
 .onb-back + .lang-pill { margin-left: 2px; }
 .lang-list .row { padding-left: 4px; }
+
+/* ---------- Piccoli traguardi ---------- */
+.trophy-btn { background: var(--green); color: var(--white); }
+.trophy-btn .ic { width: 22px; height: 22px; }
+.trophy-btn:active { background: var(--green-2); }
+.trophy-btn.has-new::after { content: ''; position: absolute; top: 3px; right: 3px; width: 10px; height: 10px; border-radius: 50%; background: #F2C230; box-shadow: 0 0 0 2px var(--bg); }
+.trophy-btn.tap { animation: trophyTap .45s var(--ease-out); }
+@keyframes trophyTap { 0% { transform: scale(1) rotate(0); } 30% { transform: scale(1.18) rotate(-12deg); } 60% { transform: scale(1.1) rotate(10deg); } 100% { transform: scale(1) rotate(0); } }
+.page.ach.pop { animation: achPop .42s cubic-bezier(.2, .9, .3, 1.15) both; transform-origin: 88% 0; }
+@keyframes achPop { from { opacity: 0; transform: scale(.72) translateY(-10px); } to { opacity: 1; transform: none; } }
+.ach .head .title { font-size: 21px; }
+.ach .icon-btn.soft { background: #E3EEE3; color: var(--green); }
+.ach-sub { text-align: center; color: var(--muted); font-size: 15px; line-height: 1.35; margin: -6px 0 16px; }
+.ach-hero { position: relative; display: grid; grid-template-columns: 44% 1fr; gap: 10px; align-items: center; background: #E3EEE3; border-radius: 22px; padding: 18px 16px 18px 10px; margin-bottom: 22px; overflow: hidden; }
+.ach-hero .ach-art { width: 100%; max-width: 170px; height: auto; margin: 0 auto; animation: achArt .7s .12s cubic-bezier(.2, .9, .3, 1.3) both; }
+@keyframes achArt { from { opacity: 0; transform: scale(.5) rotate(-8deg); } to { opacity: 1; transform: none; } }
+.ach-hero-t { text-align: center; }
+.ach-hero-t h2 { font-size: 27px; font-weight: 800; color: var(--green); letter-spacing: -.02em; line-height: 1.05; margin: 0 0 8px; }
+.ach-hero-t p { margin: 0 0 14px; color: var(--muted); font-size: 14.5px; line-height: 1.35; }
+.ach-cta { display: inline-flex; padding: 12px 22px; border-radius: 999px; font-size: 15px; min-height: 0; width: auto; }
+.ach-hero.locked .ach-art { filter: grayscale(1); opacity: .55; }
+.ach-hero.locked { background: #ECEAE5; }
+.ach-hero.locked h2 { color: var(--ink); }
+.ach-row { display: flex; align-items: baseline; justify-content: space-between; margin: 0 2px 10px; }
+.ach-row h3 { font-size: 19px; font-weight: 800; margin: 0; letter-spacing: -.01em; }
+.ach-count { color: var(--muted); font-weight: 700; font-size: 15px; }
+.ach-list { display: flex; flex-direction: column; gap: 12px; }
+.ach-card { display: grid; grid-template-columns: 96px 1fr 44px; align-items: center; gap: 12px; background: #E3EEE3; border-radius: 20px; padding: 14px 12px 14px 10px; }
+.ach-card .ach-art { width: 96px; height: 84px; object-fit: contain; }
+.ach-ph { width: 96px; height: 84px; border-radius: 16px; background: var(--white); }
+.ach-hero .ach-ph { width: 100%; max-width: 170px; height: 140px; margin: 0 auto; }
+.ach-t { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.ach-t b { font-size: 16.5px; font-weight: 800; color: var(--green); line-height: 1.2; letter-spacing: -.01em; }
+.ach-t span { font-size: 13.5px; color: var(--muted); line-height: 1.3; }
+.ach-st { width: 44px; height: 44px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: #CFE2D2; color: var(--green); }
+.ach-st .ic { width: 20px; height: 20px; }
+.ach-card.locked { background: #ECEAE5; }
+.ach-card.locked .ach-art { filter: grayscale(1); opacity: .6; }
+.ach-card.locked .ach-t b { color: #7A7F7B; }
+.ach-card.locked .ach-t span { color: #9A9E9A; }
+.ach-card.locked .ach-st { background: #DBD9D3; color: #8F938F; }
+.ach-card.locked .ach-st .ic { width: 18px; height: 18px; }
+.ach-quote { margin: 22px 0 8px; background: #E3EEE3; border-radius: 22px; padding: 22px 20px 16px; text-align: center; color: var(--green); animation: rowIn .4s .3s var(--ease-out) both; }
+.ach-quote p { margin: 0; font-family: 'Caveat', 'Manrope', cursive; font-weight: 700; font-size: 27px; line-height: 1.15; }
+.ach-line { display: block; width: 150px; height: 8px; margin: 8px auto 0; color: #6FAE7A; }
