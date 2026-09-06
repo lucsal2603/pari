@@ -645,8 +645,9 @@ html[data-ob-dir="back"] ::view-transition-new(onb-stage) { animation-name: obIn
 .done-amt { font-size: clamp(20px, 2.8vh, 26px); font-weight: 800; letter-spacing: -.02em; color: var(--ink); white-space: nowrap; }
 .done-actions { width: 100%; margin-top: clamp(24px, 5vh, 60px); animation: fadeUp .5s var(--ease-out) .45s both; }
 .done-link { display: block; text-align: center; margin-top: 16px; color: var(--green); font-weight: 700; font-size: 16px; }
-.done-sq { position: absolute; bottom: -6px; width: 120px; height: 90px; pointer-events: none; opacity: .9; }
-.done-sq.l { left: -14px; } .done-sq.r { right: -14px; }
+.done-sq { position: absolute; bottom: -34px; width: 168px; height: 126px; pointer-events: none; opacity: .9; overflow: visible; z-index: 0; }
+.done-sq.l { left: -52px; } .done-sq.r { right: -52px; }
+.done-actions, .done-card { position: relative; z-index: 1; }
 @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } }
 
 /* accesso */
@@ -985,8 +986,8 @@ body.fixed-screen .view { height: 100dvh; overflow: hidden; padding-bottom: calc
 .ach-t b .xp-tag { margin-left: 4px; }
 .tf-body .xp-tag { align-self: center; margin: 1px 0 2px; }
 
-.done-xp { margin: -4px 0 10px; text-align: center; }
-.done-xp .xp-tag { font-size: 13px; padding: 4px 12px; }
+.done-amt { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+.done-amt .xp-tag { font-size: 11px; padding: 2px 8px; }
 
 /* ---------- Classifica ---------- */
 .cl-loading { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 30px 0; color: var(--muted); font-weight: 600; }
