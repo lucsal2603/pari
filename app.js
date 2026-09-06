@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.28.1';
+const APP_VERSION = '1.29.0';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -353,6 +353,19 @@ function materializeRecurring() {
 const view = $('#view'); const tabbar = $('#tabbar');
 let prevHash = '', curHash = location.hash || '#/home', viaTab = false;
 tabbar.addEventListener('click', () => { viaTab = true; });
+/* il + della barra: il pallino verde si gonfia dal basso fino a coprire lo schermo, poi si scopre la pagina Nuova spesa */
+tabbar.addEventListener('click', (e) => {
+  const fab = e.target.closest('.fab'); if (!fab) return;
+  if (currentRoute && currentRoute.name === 'nuova') { e.preventDefault(); return; }
+  if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  e.preventDefault();
+  const r = fab.getBoundingClientRect(); const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+  const d = Math.ceil(2 * Math.hypot(Math.max(cx, innerWidth - cx), Math.max(cy, innerHeight - cy))) + 8;
+  const ov = document.createElement('div'); ov.className = 'plus-reveal'; ov.style.cssText = `left:${cx - r.width / 2}px;top:${cy - r.height / 2}px;width:${r.width}px;height:${r.height}px;--s:${(d / r.width).toFixed(2)}`;
+  document.body.appendChild(ov); document.body.classList.add('plus-revealing'); fab.classList.add('pressed');
+  requestAnimationFrame(() => requestAnimationFrame(() => ov.classList.add('grow')));
+  setTimeout(() => { viaTab = true; location.hash = '#/nuova'; setTimeout(() => { ov.classList.add('fade'); fab.classList.remove('pressed'); setTimeout(() => { ov.remove(); document.body.classList.remove('plus-revealing'); }, 340); }, 80); }, 400);
+});
 const tabOf = (h) => { const n = (h || '').slice(2).split(/[/?]/)[0] || 'home'; return { spesa: 'spese', modifica: 'spese', attivita: 'spese', statistiche: 'bilanci', nuova: 'home', traguardi: 'home' }[n] || n; };
 function route() {
   prevHash = curHash; curHash = location.hash || '#/home';

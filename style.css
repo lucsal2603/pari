@@ -834,3 +834,10 @@ body.fixed-screen .view { height: 100dvh; overflow: hidden; padding-bottom: calc
 .ach-line { display: block; width: 150px; height: 8px; margin: 8px auto 0; color: #6FAE7A; }
 .scan-prev { display: flex; justify-content: center; margin: 0 0 12px; }
 .scan-prev canvas { max-width: 100%; height: auto; border-radius: 12px; box-shadow: 0 1px 0 rgba(0,0,0,.06), 0 6px 18px rgba(0,0,0,.08); background: var(--white); }
+
+/* ---------- Il + si espande a coprire lo schermo ---------- */
+.plus-reveal { position: fixed; z-index: 80; border-radius: 50%; background: var(--green); transform: scale(1); transform-origin: center; transition: transform .46s cubic-bezier(.45, 0, .2, 1), opacity .32s ease; pointer-events: none; will-change: transform, opacity; }
+.plus-reveal.grow { transform: scale(var(--s, 40)); }
+.plus-reveal.fade { opacity: 0; }
+.plus-revealing .page { animation: none; }
+.fab.pressed { transform: scale(.9); }
