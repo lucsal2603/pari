@@ -842,3 +842,6 @@ body.fixed-screen .view { height: 100dvh; overflow: hidden; padding-bottom: calc
 .plus-revealing .page { animation: none; }
 .fab.pressed { transform: scale(.9); }
 
+
+.group-menu .row.danger .title, .group-menu .row.danger .cat-ic { color: var(--red); }
+.group-menu .row.danger .cat-ic { background: var(--red-soft); }

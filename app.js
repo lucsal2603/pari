@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.29.3';
+const APP_VERSION = '1.30.0';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -373,6 +373,7 @@ function route() {
   const [path, qs] = hash.slice(2).split('?');
   const parts = path.split('/'); const q = Object.fromEntries(new URLSearchParams(qs || ''));
   let r = { name: parts[0] || 'home', id: parts[1] || '', sub: parts[1] || '', q };
+  if (r.name === 'statistiche') statsGroup = q.sezione !== undefined ? q.sezione : '';
   if (r.name === 'spese' && q.sezione !== undefined) { speseFilter.group = q.sezione; speseFilter.q = ''; speseFilter.cat = ''; }
   if (r.name === 'join') { const code = decodeURIComponent(r.id || ''); if (auth.user()) { if (applyJoin(code)) toast('Sei nel gruppo: le spese si sincronizzano'); history.replaceState(null, '', onboardingDone() ? '#/home' : '#/benvenuto'); r = { name: onboardingDone() ? 'home' : 'benvenuto', id: '', sub: '', q: {} }; } else { try { localStorage.setItem(JOIN_KEY, code); } catch (_) {} history.replaceState(null, '', '#/accedi'); r = { name: 'accedi', id: '', sub: '', q: {} }; } }
   // arrivati da un link (non dalla barra in basso) e da un'altra area: mostro il tasto indietro
@@ -510,9 +511,10 @@ function pageHome() {
 
 /* ---------- SPESE ---------- */
 let speseFilter = { q: '', cat: '', group: '' };
+let statsGroup = '';
 function pageSpese(r) {
   return `<div class="page">
-    <div class="head left${r.back ? ' with-back' : ''}">${r.back ? `<button class="icon-btn" data-back="${esc(r.back)}" aria-label="Indietro">${icon('i-back')}</button>` : ''}<div class="title">${speseFilter.group && groups().find((g) => g.id === speseFilter.group) ? esc(groups().find((g) => g.id === speseFilter.group).name) : 'Spese'}</div><span></span></div>
+    <div class="head left${r.back ? ' with-back' : ''}">${r.back ? `<button class="icon-btn" data-back="${esc(r.back)}" aria-label="Indietro">${icon('i-back')}</button>` : ''}<div class="title">${speseFilter.group && groups().find((g) => g.id === speseFilter.group) ? esc(groups().find((g) => g.id === speseFilter.group).name) : 'Spese'}</div>${speseFilter.group && groups().find((g) => g.id === speseFilter.group) ? `<button type="button" class="icon-btn" data-group-menu="${esc(speseFilter.group)}" aria-label="Gestisci la sezione">${icon('i-edit')}</button>` : `<a class="icon-btn" href="#/statistiche" aria-label="Statistiche">${icon('i-chart')}</a>`}</div>
     <label class="search">${icon('i-search')}<input id="q" type="search" placeholder="Cerca una spesa…" value="${esc(speseFilter.q)}" autocomplete="off"></label>
     ${groups().length ? `<div class="chips" id="group-chips"><button class="chip${!speseFilter.group ? ' on' : ''}" data-group="">Tutte le sezioni</button>${groups().map((g) => `<button class="chip${speseFilter.group === g.id ? ' on' : ''}" data-group="${g.id}">${esc(g.name)}</button>`).join('')}</div>` : ''}
     <div class="chips" id="chips"><button class="chip${!speseFilter.cat ? ' on' : ''}" data-cat="">Tutte</button>${CATS.map((c) => `<button class="chip${speseFilter.cat === c.id ? ' on' : ''}" data-cat="${c.id}">${icon(c.icon)}${esc(c.name)}</button>`).join('')}</div>
@@ -568,7 +570,7 @@ function pageBilanci(r) {
 
 /* ---------- STATISTICHE ---------- */
 function pageStats() {
-  const range = S.ui.statsRange; const m = S.ui.month; const es = rangeEntries(range, m); const st = aggregate(es);
+  const range = S.ui.statsRange; const m = S.ui.month; const sg = statsGroup && groups().find((g) => g.id === statsGroup); const es = rangeEntries(range, m).filter((e) => !sg || e.group === sg.id); const st = aggregate(es);
   const a = me(), b = other();
   const monthsInRange = range === 'mese' ? 1 : range === '3mesi' ? 3 : 12;
   const [y, mm] = m.split('-').map(Number);
@@ -578,7 +580,7 @@ function pageStats() {
   const label = range === 'mese' ? monthName(m) : range === '3mesi' ? `${monthShort(shiftYM(m, -2))} – ${monthName(m)}` : 'Anno ' + m.slice(0, 4);
   const maxP = Math.max(st.paid[a.id], st.paid[b.id], 1);
   return `<div class="page slide">
-    <div class="head"><button class="icon-btn" data-back="#/bilanci" aria-label="Indietro">${icon('i-back')}</button><div class="title">Statistiche</div><span></span></div>
+    <div class="head"><button class="icon-btn" data-back="#/bilanci" aria-label="Indietro">${icon('i-back')}</button><div class="title">${sg ? esc(sg.name) : 'Statistiche'}</div><span></span></div>
     ${segHTML([{ v: 'mese', t: 'Mese' }, { v: '3mesi', t: '3 mesi' }, { v: 'anno', t: 'Anno' }], ['mese', '3mesi', 'anno'].indexOf(range), 'dark', 'statsRange')}
     ${range === 'anno' ? `<div class="monthnav"><button class="icon-btn" data-year="-1" aria-label="Anno precedente">${icon('i-left')}</button><span class="label">${esc(label)}</span><button class="icon-btn" data-year="1" aria-label="Anno successivo">${icon('i-right')}</button></div>` : monthNav(m)}
     <section class="card"><div class="stat-rows">
@@ -844,6 +846,31 @@ function pickLang(code, before) {
 }
 function openLangSheet(before) {
   openSheet('Lingua', `<div class="list lang-list">${langListHTML(LANG())}</div>`, (root) => { $$('[data-lang]', root).forEach((b) => b.addEventListener('click', () => { closeSheet(); pickLang(b.dataset.lang, before); })); });
+}
+/* foglio della sezione (matita in alto a destra nelle Spese): rinomina, statistiche, metti in pari, elimina */
+function renameGroupSheet(g, after) {
+  openSheet('Rinomina sezione', `<div class="field" style="margin-top:0"><input class="input" id="rn" type="text" value="${esc(g.name)}"></div><div class="btn-row" style="margin-top:14px"><button class="btn soft" data-c="no">Annulla</button><button class="btn" data-c="ok">Salva</button></div>`, (sh) => { $('[data-c="no"]', sh).addEventListener('click', () => closeSheet()); $('[data-c="ok"]', sh).addEventListener('click', () => { renameGroup(g.id, $('#rn', sh).value); closeSheet(); render(); if (after) after(); }); setTimeout(() => { const i = $('#rn', sh); if (i) { i.focus(); i.select(); } }, 250); });
+}
+function openGroupSheet(gid) {
+  const g = groups().find((x) => x.id === gid); if (!g) return;
+  const row = (k, ic, t, cls) => `<button type="button" class="row${cls ? ' ' + cls : ''}" data-ga="${k}"><span class="cat-ic">${icon(ic)}</span><span class="main"><span class="title">${t}</span></span><span class="right">${icon('i-right', 'ic chev')}</span></button>`;
+  openSheet(g.name, `<div class="list group-menu">${row('rename', 'i-edit', 'Rinomina')}${row('stats', 'i-chart', 'Statistiche della sezione')}${row('settle', 'i-balance', 'Metti in pari')}${row('delete', 'i-trash', 'Elimina la sezione', 'danger')}</div>`, (sh) => {
+    $$('[data-ga]', sh).forEach((b) => b.addEventListener('click', () => {
+      const k = b.dataset.ga;
+      if (k === 'rename') { renameGroupSheet(g); return; }
+      if (k === 'stats') { closeSheet(); go('#/statistiche?sezione=' + encodeURIComponent(g.id)); return; }
+      if (k === 'settle') {
+        const bal = groupBalance(g.id); const cred = S.members.find((m) => (bal[m.id] || 0) > 0), deb = S.members.find((m) => (bal[m.id] || 0) < 0); const amt = cred ? bal[cred.id] : 0;
+        if (!cred || !deb || amt < 1) { closeSheet(); toast('Siete già in pari in questa sezione'); return; }
+        confirmSheet(T('Mettere in pari «{0}»?', g.name), T('{0} paga {1} a {2}. Il saldo della sezione torna a zero.', deb.name, money(amt), cred.name), 'Registra', () => {
+          const e = addEntry({ kind: 'payment', desc: 'Pagamento', amount: amt, date: todayStr(), cat: '', paidBy: deb.id, to: cred.id, splitMethod: 'exact', splitInput: {}, owed: { [cred.id]: amt }, notes: '', group: g.id });
+          go('#/fatto/' + e.id);
+        });
+        return;
+      }
+      if (k === 'delete') { const n = active().filter((e) => e.group === g.id).length; confirmSheet(T('Eliminare "{0}"?', g.name), n ? T('Le sue {0} voci restano, ma senza sezione.', n) : 'La sezione è vuota.', 'Elimina', () => { deleteGroup(g.id); speseFilter.group = ''; render(); toast('Sezione eliminata'); }); }
+    }));
+  });
 }
 function pageLingua() {
   const cur = LANG();
@@ -1389,6 +1416,7 @@ function bind(r) {
   $$('[data-settle]').forEach((b) => b.addEventListener('click', () => { const [from, to] = b.dataset.settle.split(':'); F = null; go(`#/nuova?tipo=pagamento&da=${from}&a=${to}`); }));
 
   if (r.name === 'spese') {
+    $$('[data-group-menu]').forEach((b) => b.addEventListener('click', () => openGroupSheet(b.dataset.groupMenu)));
     const q = $('#q'); let t; q.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => { speseFilter.q = q.value; $('#spese-list').innerHTML = speseList(); initSwipes(); }, 120); });
     $('#chips').addEventListener('click', (ev) => { const c = ev.target.closest('.chip'); if (!c) return; speseFilter.cat = c.dataset.cat; $$('#chips .chip').forEach((x) => x.classList.toggle('on', x === c)); $('#spese-list').innerHTML = speseList(); initSwipes(); });
     const gc = $('#group-chips'); if (gc) gc.addEventListener('click', (ev) => { const c = ev.target.closest('.chip'); if (!c) return; speseFilter.group = c.dataset.group; $$('#group-chips .chip').forEach((x) => x.classList.toggle('on', x === c)); const g = groups().find((x) => x.id === speseFilter.group); $('.head .title').textContent = g ? g.name : 'Spese'; $('#spese-list').innerHTML = speseList(); initSwipes(); });
