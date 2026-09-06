@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.43.3';
+const APP_VERSION = '1.43.4';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -756,6 +756,7 @@ function pageProfilo(r) {
       <a href="#/profilo/sezioni">${icon('i-list')}<span>Sezioni</span><span class="val">${groups().length}</span>${icon('i-right', 'ic chev')}</a>
       <a href="#/profilo/categorie">${icon('i-grid')}<span>Categorie</span><span></span>${icon('i-right', 'ic chev')}</a>
       <a href="#/profilo/valuta">${icon('i-coin')}<span>Valuta</span><span class="val">${esc(S.settings.currency || 'EUR')} (${esc(curSymbol())})</span>${icon('i-right', 'ic chev')}</a>
+      <a href="#/home" data-start-tour>${icon('i-play')}<span>Tutorial</span><span class="val">Rivedi il giro dell'app</span>${icon('i-right', 'ic chev')}</a>
       <a href="#/profilo/lingua">${icon('i-globe')}<span>Lingua</span><span class="val" data-no-i18n><i class="flag ${esc(langInfo().flag)} mini" aria-hidden="true"></i>${esc(langInfo().name)}</span>${icon('i-right', 'ic chev')}</a>
       <a href="#/profilo/esporta">${icon('i-download')}<span>Esporta dati</span><span></span>${icon('i-right', 'ic chev')}</a>
       <a href="#/profilo/notifiche">${icon('i-heart')}<span>Notifiche</span><span class="val">${S.settings.push && Notification?.permission === 'granted' ? 'attive' : 'non attive'}</span>${icon('i-right', 'ic chev')}</a>
@@ -1205,7 +1206,7 @@ function levelCheck() {
 function scheduleMissionCheck() { if (missionBusy) return; clearTimeout(missionTimer); missionTimer = setTimeout(missionCheck, 350); }
 function missionNext() {
   if (missionShowing || !missionQueue.length) return;
-  if (typeof TOUR !== 'undefined' && TOUR) { setTimeout(missionNext, 2500); return; } // durante il tour guidato gli avvisi aspettano const it = missionQueue.shift(); missionShowing = true;
+  if (typeof TOUR !== 'undefined' && TOUR) { setTimeout(missionNext, 2500); return; } /* durante il tour guidato gli avvisi aspettano */ const it = missionQueue.shift(); missionShowing = true;
   const el = document.createElement('a'); el.className = 'mban' + (it.trophy ? ' trophy' : ''); el.href = it.trophy ? '#/profilo/trofei' : '#/missioni';
   el.innerHTML = `<img src="img/missione.webp" alt=""><span class="mban-h">${esc(T(it.trophy ? 'Trofeo sbloccato!' : 'Missione completata!'))}</span><span class="mban-s">${esc(T('Hai sbloccato:'))}</span><span class="mban-t" data-no-i18n>${esc(T(it.title))}</span>`; document.body.appendChild(el);
   try { if (navigator.vibrate) navigator.vibrate(30); } catch (_) {}
@@ -1838,6 +1839,7 @@ function bindForm(r) {
 
 function bindProfilo(r) {
   const lo = $('[data-logout]'); if (lo) lo.addEventListener('click', () => confirmSheet('Uscire dall\'account?', 'Le spese restano salvate: al prossimo accesso le ritrovi.', 'Esci', async () => { await auth.signOut(); LG = { mode: 'login', email: '', busy: false, show: false, sent: '' }; go('#/accedi'); }));
+  const tourBtn = $('[data-start-tour]'); if (tourBtn) tourBtn.addEventListener('click', (e) => { e.preventDefault(); go('#/home'); setTimeout(startTour, 400); });
   if (r.sub === 'account') {
     const ct = $('[data-couple-toggle]'); if (ct) ct.addEventListener('click', () => { S.settings.boardCouple = !S.settings.boardCouple; ct.setAttribute('aria-checked', S.settings.boardCouple); save(); boardPush(true); render(); });
     $('#save-account').addEventListener('click', () => {
