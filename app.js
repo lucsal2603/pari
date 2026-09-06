@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.34.0';
+const APP_VERSION = '1.35.0';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -145,7 +145,7 @@ function load() {
     return st; } } catch (e) { console.warn('stato corrotto', e); }
   return defaultState();
 }
-function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { toast('Memoria piena: impossibile salvare'); } }
+function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { toast('Memoria piena: impossibile salvare'); }  if (typeof scheduleMissionCheck === 'function') scheduleMissionCheck(); }
 const me = () => S.members.find((m) => m.id === S.settings.me) || S.members[0];
 const other = () => S.members.find((m) => m.id !== me().id) || S.members[1];
 const member = (id) => S.members.find((m) => m.id === id) || { id, name: '?', color: '#999' };
@@ -1067,6 +1067,25 @@ function pageMissioni() {
     <div class="ach-quote"><p>“Piccole missioni, grandi abitudini.”</p><svg class="ach-line" viewBox="0 0 200 10" aria-hidden="true"><path d="M3 6 C 50 1, 110 9, 197 4" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/></svg></div>
   </div>`;
 }
+/* ---------- Avviso "Missione completata!" che scende dall'alto (missioni della settimana e trofei) ---------- */
+var missionSnap = null, missionTimer = null, missionBusy = false, missionShowing = false, missionQueue = []; // var: save() può girare già all'avvio, prima di questa riga
+function missionState() { missionBusy = true; try { const w = missions(); const t = trophies(); return [...w.list.filter((x) => x.done).map((x) => [w.mon + ':' + x.id, x.title, false]), ...t.filter((x) => x.ok).map((x) => ['t:' + x.id, x.title, true])]; } finally { missionBusy = false; } }
+function missionCheck() {
+  if (!auth.user()) return; let all; try { all = missionState(); } catch (_) { return; }
+  if (!missionSnap) { missionSnap = new Set(all.map((x) => x[0])); return; } // al primo giro prendo solo nota di quelle già fatte
+  all.forEach(([id, title, trophy]) => { if (!missionSnap.has(id)) { missionSnap.add(id); missionQueue.push({ title, trophy }); } });
+  missionNext();
+}
+function scheduleMissionCheck() { if (missionBusy) return; clearTimeout(missionTimer); missionTimer = setTimeout(missionCheck, 350); }
+function missionNext() {
+  if (missionShowing || !missionQueue.length) return; const it = missionQueue.shift(); missionShowing = true;
+  const el = document.createElement('a'); el.className = 'mban' + (it.trophy ? ' trophy' : ''); el.href = it.trophy ? '#/profilo/trofei' : '#/missioni';
+  el.innerHTML = `<img src="img/missione.webp" alt="Missione completata"><span class="mban-t" data-no-i18n>${esc(T(it.title))}</span>`; document.body.appendChild(el);
+  try { if (navigator.vibrate) navigator.vibrate(30); } catch (_) {}
+  requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('in')));
+  const hide = () => { el.classList.remove('in'); setTimeout(() => { el.remove(); missionShowing = false; missionNext(); }, 650); };
+  const tm = setTimeout(hide, 4200); el.addEventListener('click', () => { clearTimeout(tm); hide(); });
+}
 function pageTraguardi() {
   const list = achievements(); const hero = list[0]; const others = list.slice(1); const done = list.filter((a) => a.done).length;
   const seen = new Set(S.settings.seenAch || []); let changed = false; list.forEach((a) => { if (a.done && !seen.has(a.id)) { seen.add(a.id); changed = true; } }); if (changed) { S.settings.seenAch = [...seen]; save(); }
@@ -1930,6 +1949,7 @@ materializeRecurring();
   else if (!onboardingDone()) history.replaceState(null, '', '#/benvenuto');
   if (auth.user()) { applyPendingJoin(); if (restoreHouseFromAccount() && sync.enabled()) sync.run(true); rememberHouse(); showDailyLove(); }
   route();
+  setTimeout(missionCheck, 800);
   auth.refreshIfNeeded().then(() => { if (!auth.user() && currentRoute && currentRoute.name !== 'accedi') render(); });
   hideSplash();
 })();

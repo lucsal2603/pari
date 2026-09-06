@@ -929,3 +929,9 @@ body.fixed-screen .view { height: 100dvh; overflow: hidden; padding-bottom: calc
 .ach-prog i { display: block; height: 100%; border-radius: 3px; background: var(--green); }
 .ach-num { font-size: 12px; font-weight: 700; color: var(--muted); margin-top: 3px; }
 .ach-card.locked .ach-prog i { background: #8F938F; }
+
+/* ---------- Avviso "Missione completata!" ---------- */
+.mban { position: fixed; top: calc(var(--sat) + 6px); left: 50%; width: min(96vw, 560px); z-index: 90; transform: translate(-50%, -160%); transition: transform .6s cubic-bezier(.34, 1.35, .4, 1); filter: drop-shadow(0 12px 22px rgba(0, 0, 0, .18)); will-change: transform; }
+.mban.in { transform: translate(-50%, 0); }
+.mban img { display: block; width: 100%; height: auto; }
+.mban .mban-t { position: absolute; left: 49.6%; top: 61%; width: 41.5%; height: 17%; display: flex; align-items: center; justify-content: center; text-align: center; padding: 0 3%; font-weight: 800; color: #1E6B3A; font-size: clamp(11px, 3.6vw, 18px); line-height: 1.1; letter-spacing: -.01em; overflow: hidden; }
