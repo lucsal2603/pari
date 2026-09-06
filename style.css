@@ -1027,3 +1027,7 @@ img.cl-av, img.clp-av { object-fit: cover; background: var(--white); }
 img.clp-av { width: 44px; height: 44px; border-radius: 50%; flex: none; margin-bottom: 3px; }
 .clp1 img.clp-av { width: 52px; height: 52px; }
 img.cl-av { width: 40px; height: 40px; border-radius: 50%; }
+
+/* ---------- Sezione: con chi è condivisa ---------- */
+.shared-with { display: inline-flex; align-items: center; gap: 8px; margin: -6px 0 12px; padding: 5px 12px 5px 5px; border-radius: 999px; background: var(--card); border: 1px solid var(--line); font-size: 13px; font-weight: 700; color: var(--ink-2); }
+.shared-with .avatar { width: 26px; height: 26px; }
