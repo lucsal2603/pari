@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.28.0';
+const APP_VERSION = '1.28.1';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -649,7 +649,7 @@ function pageForm(r) {
   return `<div class="page up">
     <div class="head"><button class="icon-btn" data-back="${editing ? '#/spesa/' + editing.id : '#/home'}" aria-label="Annulla">${icon('i-x')}</button><div class="title">${editing ? (isPay ? 'Modifica pagamento' : 'Modifica spesa') : (isPay ? 'Nuovo pagamento' : 'Nuova spesa')}</div><button class="icon-btn green" id="save-top" aria-label="Salva">${icon('i-check')}</button></div>
     <form id="f" novalidate>
-      ${isPay ? '' : `<div class="scan-card"><img class="scan-mascot" src="img/traguardi/scontrino.webp" alt=""><div class="scan-txt"><b>Leggi lo scontrino</b><span>Foto, screenshot o notifica di pagamento: compilo io i campi.</span><div class="scan-acts"><label class="scan-pill main">${icon('i-camera')}<span>Fotografa</span><input type="file" accept="image/*" capture="environment" id="scan-cam" hidden></label><label class="scan-pill">${icon('i-image')}<span>Galleria</span><input type="file" accept="image/*" id="scan-gal" hidden></label></div></div></div>`}
+      ${isPay ? '' : `<div class="scan-card"><img class="scan-mascot" src="img/scansione.webp" alt=""><div class="scan-txt"><b>Leggi lo scontrino</b><span>Foto, screenshot o notifica di pagamento: compilo io i campi.</span><div class="scan-acts"><label class="scan-pill main">${icon('i-camera')}<span>Fotografa</span><input type="file" accept="image/*" capture="environment" id="scan-cam" hidden></label><label class="scan-pill">${icon('i-image')}<span>Galleria</span><input type="file" accept="image/*" id="scan-gal" hidden></label></div></div></div>`}
       ${isPay ? '' : `<div class="field"><label for="desc">Descrizione</label><input id="desc" type="text" placeholder="Cena pizza" value="${esc(F.desc)}" autocomplete="off" enterkeyhint="next"></div>`}
       <div class="field"><label for="amount">Importo</label><div class="money-input"><span class="cur">${esc(curSymbol())}</span><input id="amount" type="text" inputmode="decimal" placeholder="${esc(moneyPlain(0))}" value="${esc(F.amount)}" autocomplete="off"></div><div class="hint err" id="amount-err" hidden>Inserisci un importo valido.</div></div>
       ${isPay

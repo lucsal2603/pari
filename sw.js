@@ -1,9 +1,9 @@
 /* Divvy — service worker.
    Shell (html/js/css): prima la rete, cache solo se offline → gli aggiornamenti si vedono subito.
    Immagini, icone, font: prima la cache. Supabase: mai toccato. */
-const VERSION = 'pari-v1.28.0';
+const VERSION = 'pari-v1.28.1';
 const SHELL = [
-  './', './index.html', './style.css', './app.js', './i18n.js', './img/traguardi/coppa.webp', './img/traguardi/mondo.webp', './img/traguardi/vetta.webp', './img/traguardi/sdraio.webp', './img/traguardi/pesi.webp', './img/traguardi/calendario.webp', './img/traguardi/moneta.webp', './img/traguardi/scontrino.webp', './manifest.webmanifest',
+  './', './index.html', './style.css', './app.js', './i18n.js', './img/traguardi/coppa.webp', './img/traguardi/mondo.webp', './img/traguardi/vetta.webp', './img/traguardi/sdraio.webp', './img/traguardi/pesi.webp', './img/traguardi/calendario.webp', './img/traguardi/moneta.webp', './img/traguardi/scontrino.webp', './img/scansione.webp', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png', './icons/favicon.png',
   './img/luca.png', './img/martina.png', './img/luca-avatar.png', './img/martina-avatar.png', './img/coppia.png', './img/nessuna-spesa.png', './img/luca-deve.png', './img/martina-deve.png', './img/logo.png', './img/benvenuto.png', './img/benvenuto-2.png', './img/benvenuto-3.png', './img/benvenuto-4.png', './img/registrati.png', './img/conferma.png', './img/invito.png', './img/avatar-1.png', './img/avatar-2.png', './img/avatar-3.png', './img/avatar-4.png', './img/avatar-5.png', './img/fatto.png'
 ];
