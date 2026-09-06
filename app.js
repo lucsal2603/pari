@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.30.0';
+const APP_VERSION = '1.30.1';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -423,7 +423,7 @@ function entryRow(e, i) {
     <span class="cat-ic${isPay ? ' pay' : ''}">${icon(isPay ? 'c-pagamento' : c.icon)}</span>
     <span class="main"><span class="title">${esc(isPay ? `${payer.name} ha pagato ${to ? to.name : ''}` : e.desc)}</span><span class="sub">${esc(relDay(e.date))}${isPay ? '' : ' · ' + esc(payer.id === me().id ? 'hai pagato tu' : payer.name + ' ha pagato')}${e.recurringOf || e.recurring ? ' · ricorrente' : ''}${groups().length > 1 ? ' · ' + esc(groupName(e)) : ''}</span></span>
     <span class="right"><span class="money ${mine.cls}">${mine.big}</span><span class="by muted">${mine.small}</span></span>
-  </a><button type="button" class="swipe-del" aria-label="Elimina">${icon('i-trash')}<span>Elimina</span></button></div>`;
+  </a><button type="button" class="swipe-edit" aria-label="Modifica">${icon('i-edit')}<span>Modifica</span></button><button type="button" class="swipe-del" aria-label="Elimina">${icon('i-trash')}<span>Elimina</span></button></div>`;
 }
 /* La mia parte di una voce: quanto ricevo (ho pagato io) o quanto devo (ha pagato l'altro) */
 function myShare(e) {
@@ -1594,32 +1594,38 @@ function updateSyncDot() { const d = $('.sync-dot'); if (!d) return; d.className
 
 /* ---------- Trascina a sinistra per eliminare ---------- */
 let openSwipe = null;
-function closeSwipe(w) { if (!w) return; w.classList.remove('open'); const r = $('.row', w); if (r) r.style.transform = ''; const d = $('.swipe-del', w); if (d) { d.style.width = '0px'; d.classList.remove('wide'); } if (openSwipe === w) openSwipe = null; }
+function closeSwipe(w) { if (!w) return; w.classList.remove('open'); w.classList.remove('open-r'); const r = $('.row', w); if (r) r.style.transform = ''; const d = $('.swipe-del', w); if (d) { d.style.width = '0px'; d.classList.remove('wide'); } const ed = $('.swipe-edit', w); if (ed) { ed.style.width = '0px'; ed.classList.remove('wide'); } if (openSwipe === w) openSwipe = null; }
 function initSwipes() {
   const W = 96;
   $$('.swipe').forEach((w) => {
-    const row = $('.row', w); if (!row) return; const del = $('.swipe-del', w);
+    const row = $('.row', w); if (!row) return; const del = $('.swipe-del', w); const edit = $('.swipe-edit', w);
     let down = false, drag = false, moved = false, x0 = 0, y0 = 0, x = 0;
     // la zona rossa copre tutto lo spazio fra il bordo trascinato e il bordo destro fermo
     const GAP = 8; // spazio fra il bordo della riga trascinata e il rosso
-    const setX = (v) => { row.style.transform = v ? `translateX(${v}px)` : ''; if (del) { del.style.width = Math.max(0, -v - GAP) + 'px'; del.classList.toggle('wide', -v > 150); } };
+    // verso sinistra si scopre il rosso (elimina), verso destra il verde (modifica)
+    const setX = (v) => { row.style.transform = v ? `translateX(${v}px)` : ''; if (del) { del.style.width = Math.max(0, -v - GAP) + 'px'; del.classList.toggle('wide', -v > 150); } if (edit) { edit.style.width = Math.max(0, v - GAP) + 'px'; edit.classList.toggle('wide', v > 150); } };
     row.addEventListener('pointerdown', (e) => { if (e.pointerType === 'mouse' && e.button !== 0) return; down = true; drag = false; x0 = e.clientX; y0 = e.clientY; });
     row.addEventListener('pointermove', (e) => {
       if (!down) return; const ddx = e.clientX - x0, ddy = e.clientY - y0;
       if (!drag) { if (Math.abs(ddx) > 8 && Math.abs(ddx) > Math.abs(ddy) * 1.2) { drag = true; moved = true; w.classList.add('dragging'); try { row.setPointerCapture(e.pointerId); } catch (_) {} if (openSwipe && openSwipe !== w) closeSwipe(openSwipe); } else return; }
-      const base = w.classList.contains('open') ? -W : 0; x = base + ddx;
-      if (x > 0) x = x / 4; const lim = -w.offsetWidth * 0.92; if (x < lim) x = lim; // si può trascinare fino quasi al bordo
+      const base = w.classList.contains('open') ? -W : w.classList.contains('open-r') ? W : 0; x = base + ddx;
+      const lim = w.offsetWidth * 0.92; if (x < -lim) x = -lim; if (x > lim) x = lim; // si può trascinare fino quasi al bordo, in entrambi i versi
       setX(x);
     });
     const end = () => { if (!down) return; down = false; if (!drag) return; drag = false; w.classList.remove('dragging');
-      if (x < -w.offsetWidth * 0.6) { setX(-w.offsetWidth); const id = w.dataset.id; setTimeout(() => { closeSwipe(w); deleteEntry(id); toast('Eliminata', { label: 'Annulla', fn: () => restoreEntry(id) }); }, 120); } // trascinamento lungo: elimina subito
+      if (x > w.offsetWidth * 0.6) { setX(w.offsetWidth); const id = w.dataset.id; setTimeout(() => { closeSwipe(w); go('#/modifica/' + id); }, 120); } // trascinamento lungo a destra: modifica subito
+      else if (x > W / 2) { w.classList.add('open-r'); openSwipe = w; setX(W); }
+      else if (x < -w.offsetWidth * 0.6) { setX(-w.offsetWidth); const id = w.dataset.id; setTimeout(() => { closeSwipe(w); deleteEntry(id); toast('Eliminata', { label: 'Annulla', fn: () => restoreEntry(id) }); }, 120); } // trascinamento lungo: elimina subito
       else if (x < -W / 2) { w.classList.add('open'); openSwipe = w; setX(-W); } else closeSwipe(w); setTimeout(() => (moved = false), 60); };
     row.addEventListener('pointerup', end); row.addEventListener('pointercancel', end);
-    row.addEventListener('click', (e) => { if (moved) { e.preventDefault(); e.stopPropagation(); return; } if (w.classList.contains('open')) { e.preventDefault(); e.stopPropagation(); closeSwipe(w); } }, true);
+    row.addEventListener('click', (e) => { if (moved) { e.preventDefault(); e.stopPropagation(); return; } if (w.classList.contains('open') || w.classList.contains('open-r')) { e.preventDefault(); e.stopPropagation(); closeSwipe(w); } }, true);
+    if (edit) edit.addEventListener('click', (e) => { e.stopPropagation(); const id = w.dataset.id; closeSwipe(w); go('#/modifica/' + id); });
     $('.swipe-del', w).addEventListener('click', (e) => { e.stopPropagation(); const id = w.dataset.id; closeSwipe(w); deleteEntry(id); toast('Eliminata', { label: 'Annulla', fn: () => restoreEntry(id) }); });
   });
 }
 document.addEventListener('pointerdown', (e) => { if (openSwipe && !openSwipe.contains(e.target)) closeSwipe(openSwipe); }, true);
+// col mouse (desktop) il trascinamento di un link farebbe partire il drag nativo e interromperebbe lo swipe
+document.addEventListener('dragstart', (e) => { if (e.target && e.target.closest && e.target.closest('.swipe')) e.preventDefault(); });
 /* riga sottile sotto la barra del titolo solo quando c'è contenuto che le scorre sotto */
 window.addEventListener('scroll', () => { const h = document.querySelector('.page > .head'); if (h) h.classList.toggle('stuck', window.scrollY > 4); }, { passive: true });
 
