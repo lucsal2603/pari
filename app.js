@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.41.1';
+const APP_VERSION = '1.41.2';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -1197,7 +1197,8 @@ function budgetMonth(ymStr) {
 }
 function setBudget(cents) { const b = { ...myBudget(), byCat: { ...(myBudget().byCat || {}) } }; b.monthly = Math.max(0, Math.round(cents || 0)); b.updatedAt = nowISO(); S.budget = S.budget || {}; S.budget[me().id] = b; save(); sync.schedule(); }
 function setCatBudget(cat, cents) { const b = { ...myBudget(), byCat: { ...(myBudget().byCat || {}) } }; if (cents > 0) b.byCat[cat] = Math.round(cents); else delete b.byCat[cat]; b.updatedAt = nowISO(); S.budget = S.budget || {}; S.budget[me().id] = b; save(); sync.schedule(); }
-const budgetCls = (pct) => (pct > 100 ? 'over' : pct >= 80 ? 'warn' : 'ok');
+/* colori della barra del budget: verde, GIALLO quando ci si avvicina (dal 70%), ROSSO quando è quasi al massimo (dal 90%) */
+const budgetCls = (pct) => (pct >= 90 ? 'over' : pct >= 70 ? 'warn' : 'ok');
 function homeBudgetLine(m) {
   const b = myBudget().monthly || 0; if (!b) return '';
   const bm = budgetMonth(m); const pct = Math.round(bm.spent / b * 100);
@@ -1583,7 +1584,7 @@ function pageDone(r) {
     <h1 class="done-h">${isPay ? 'Pagamento registrato!' : 'Pagamento aggiunto!'}<svg class="done-line" viewBox="0 0 220 12" preserveAspectRatio="none"><path d="M3 8 C 60 2, 150 2, 217 7" fill="none" stroke="#A9D3B6" stroke-width="5" stroke-linecap="round"/></svg></h1>
     <p class="done-p">Tutto ok, l'abbiamo salvato.</p>
     <div class="done-card"><span class="cat-ic${isPay ? ' pay' : ''}">${icon(isPay ? 'c-pagamento' : c.icon)}</span><div class="done-txt"><b>${esc(isPay ? 'Pagamento' : e.desc)}</b><span>${sub}</span><span>${esc(dateShort(e.date))} ${esc(String(e.date).slice(0, 4))} • ${esc(payer.name)}</span></div><span class="done-amt">${esc(curSymbol())} ${esc(moneyPlain(e.amount))}<em class="xp-tag got" data-no-i18n>+${entryXp(e)} XP</em></span></div>
-    ${!isPay && (myBudget().monthly || 0) > 0 ? (() => { const bm = budgetMonth(ym(e.date)); const pct = Math.round(bm.spent / bm.budget * 100); return `<div class="done-budget${pct > 100 ? ' over' : pct >= 80 ? ' warn' : ''}"><span>${esc(T('Il tuo budget: {0} su {1} ({2}%)', money(bm.spent), money(bm.budget), pct))}</span><i class="db-bar"><b style="width:${Math.min(100, pct)}%"></b></i></div>`; })() : ''}
+    ${!isPay && (myBudget().monthly || 0) > 0 ? (() => { const bm = budgetMonth(ym(e.date)); const pct = Math.round(bm.spent / bm.budget * 100); return `<div class="done-budget ${budgetCls(pct)}"><span>${esc(T('Il tuo budget: {0} su {1} ({2}%)', money(bm.spent), money(bm.budget), pct))}</span><i class="db-bar"><b style="width:${Math.min(100, pct)}%"></b></i></div>`; })() : ''}
     <div class="done-actions"><a class="btn onb-btn" href="#/home">Perfetto!</a><a class="done-link" href="#/nuova${isPay ? '?tipo=pagamento' : ''}">${isPay ? 'Registra un altro pagamento' : 'Aggiungi un altro pagamento'}</a></div>
     <svg class="done-sq l" viewBox="0 0 120 90" aria-hidden="true"><path d="M8 70 C 25 20, 45 25, 40 55 C 36 80, 60 85, 75 35" fill="none" stroke="#B9D9C4" stroke-width="7" stroke-linecap="round"/></svg>
     <svg class="done-sq r" viewBox="0 0 120 90" aria-hidden="true"><path d="M10 60 C 30 20, 50 35, 55 60 C 60 85, 85 80, 110 30" fill="none" stroke="#B9D9C4" stroke-width="7" stroke-linecap="round"/></svg>
