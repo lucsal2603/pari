@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.33.3';
+const APP_VERSION = '1.33.4';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -937,19 +937,19 @@ function trophies() {
   add('puntuali', 'costanza', 'sveglia', 'Puntuali', 'Avete registrato 5 pagamenti', 'Registrate 5 pagamenti', pays.length, 5, nth(pays, 5));
   // Insieme
   add('pari', 'insieme', 'coppa', 'Tutto in pari', 'Avete azzerato i saldi', 'Mettetevi in pari almeno una volta', pariAt ? 1 : 0, 1, pariAt, 'bool');
-  add('team', 'insieme', '', 'Team perfetto', 'Avete pagato 10 spese a testa', 'Pagate 10 spese a testa', minPaid, 10, '');
-  add('meta', 'insieme', '', 'Metà e metà', 'Un mese in cui avete pagato quasi uguale', 'Un mese in cui pagate quasi uguale', halfAt ? 1 : 0, 1, halfAt, 'bool');
+  add('team', 'insieme', 'team', 'Team perfetto', 'Avete pagato 10 spese a testa', 'Pagate 10 spese a testa', minPaid, 10, '');
+  add('meta', 'insieme', 'bilancia', 'Metà e metà', 'Un mese in cui avete pagato quasi uguale', 'Un mese in cui pagate quasi uguale', halfAt ? 1 : 0, 1, halfAt, 'bool');
   add('viaggio', 'insieme', 'mondo', 'Primo viaggio insieme', 'La vostra prima sezione o spesa di viaggio', 'Create una sezione viaggio', tripGroup || tripExp ? 1 : 0, 1, tripExp ? tripExp.date : '', 'bool');
   add('esploratori', 'insieme', 'mondo', 'Esploratori', 'Avete creato 3 sezioni', 'Create 3 sezioni', groups().length, 3, '');
-  add('turni', 'insieme', '', 'A turno', 'Avete registrato pagamenti tutti e due', 'Registrate un pagamento a testa', payersSet.size, 2, bothPayAt);
+  add('turni', 'insieme', 'turno', 'A turno', 'Avete registrato pagamenti tutti e due', 'Registrate un pagamento a testa', payersSet.size, 2, bothPayAt);
   // Speciali
   add('record', 'speciali', 'pesi', 'Mese da record', 'Più di 1.000 € di spese in un mese', 'Superate 1.000 € di spese in un mese', recordAt ? 1 : 0, 1, recordAt, 'bool');
-  add('notturno', 'speciali', '', 'Nottambulo', 'Una spesa aggiunta dopo mezzanotte', 'Aggiungi una spesa dopo mezzanotte', night ? 1 : 0, 1, night ? night.date : '', 'bool');
-  add('mattiniero', 'speciali', '', 'Mattiniero', 'Una spesa aggiunta prima delle 7', 'Aggiungi una spesa prima delle 7', early ? 1 : 0, 1, early ? early.date : '', 'bool');
-  add('poliglotta', 'speciali', '', 'Poliglotta', 'Hai usato Divvy in un\'altra lingua', 'Cambia lingua dalle impostazioni', otherLang ? 1 : 0, 1, '', 'bool');
+  add('notturno', 'speciali', 'notte', 'Nottambulo', 'Una spesa aggiunta dopo mezzanotte', 'Aggiungi una spesa dopo mezzanotte', night ? 1 : 0, 1, night ? night.date : '', 'bool');
+  add('mattiniero', 'speciali', 'mattino', 'Mattiniero', 'Una spesa aggiunta prima delle 7', 'Aggiungi una spesa prima delle 7', early ? 1 : 0, 1, early ? early.date : '', 'bool');
+  add('poliglotta', 'speciali', 'lingue', 'Poliglotta', 'Hai usato Divvy in un\'altra lingua', 'Cambia lingua dalle impostazioni', otherLang ? 1 : 0, 1, '', 'bool');
   const doneSoFar = L.filter((t) => t.ok).length;
   add('primoobiettivo', 'speciali', 'coppa', 'Piccoli traguardi', 'Hai sbloccato il tuo primo trofeo', 'Sblocca il tuo primo trofeo', doneSoFar, 1, '', 'bool');
-  add('collezionista', 'speciali', '', 'Collezionista', 'Metà dei trofei sbloccati', 'Sblocca 15 trofei', doneSoFar, 15, '');
+  add('collezionista', 'speciali', 'collezione', 'Collezionista', 'Metà dei trofei sbloccati', 'Sblocca 15 trofei', doneSoFar, 15, '');
   // data di sblocco: dai dati quando si può, altrimenti la prima volta che lo vedo sbloccato (resta sul telefono)
   const seen = S.settings.trophyAt || {}; let changed = false;
   L.forEach((t) => { if (!t.ok) return; if (!t.at) { if (!seen[t.id]) { seen[t.id] = todayStr(); changed = true; } t.at = seen[t.id]; } });
