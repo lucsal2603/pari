@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.33.4';
+const APP_VERSION = '1.33.5';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -915,7 +915,7 @@ function trophies() {
   const L = [];
   const add = (id, cat, img, title, done, todo, curV, target, at, fmt) => L.push({ id, cat, img, title, done, todo, cur: Math.min(curV, target), target, ok: curV >= target, at, fmt: fmt || 'count' });
   // Spese
-  add('primo', 'spese', 'vetta', 'Primo passo', 'Hai aggiunto la tua prima spesa', 'Aggiungi la prima spesa', es.length, 1, nth(es, 1), 'bool');
+  add('primo', 'spese', 'scontrino', 'Primo passo', 'Hai aggiunto la tua prima spesa', 'Aggiungi la prima spesa', es.length, 1, nth(es, 1), 'bool');
   add('dieci', 'spese', 'vetta', 'Dieci alla volta', 'Avete condiviso 10 spese', 'Condividete 10 spese', es.length, 10, nth(es, 10));
   add('cinquanta', 'spese', 'pesi', 'Peso massimo', 'Avete diviso 50 spese', 'Dividete 50 spese', es.length, 50, nth(es, 50));
   add('cento', 'spese', 'torta', 'Centenario', 'Avete diviso 100 spese', 'Dividete 100 spese', es.length, 100, nth(es, 100));
