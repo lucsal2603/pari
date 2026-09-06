@@ -1034,16 +1034,22 @@ img.cl-av { width: 40px; height: 40px; border-radius: 50%; }
 .shared-with { display: inline-flex; align-items: center; gap: 8px; margin: -6px 0 12px; padding: 5px 12px 5px 5px; border-radius: 999px; background: var(--card); border: 1px solid var(--line); font-size: 13px; font-weight: 700; color: var(--ink-2); }
 .shared-with .avatar { width: 26px; height: 26px; }
 
-/* ---------- Tutorial ---------- */
-.page.tut { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 100%; }
-.tut .tut-anim { flex: 1 1 0; min-height: 140px; display: flex; align-items: center; justify-content: center; margin: 6px 0 10px; }
-.tut .onb-btn { margin-top: auto; margin-bottom: calc(var(--sab) + 10px); }
-.tut .tut-anim img, .tut .tut-anim video { max-width: min(78vw, 320px); max-height: 100%; object-fit: contain; animation: tutIn .5s var(--ease-out) both; }
-.tut .tut-ph { width: min(60vw, 240px); height: min(60vw, 240px); border-radius: 28px; background: var(--white); border: 1px solid var(--line); }
-.tut .tut-h { text-align: center; }
-.tut .tut-p { text-align: center; margin-bottom: 14px; }
-.tut .onb-dots { margin: 4px 0 18px; }
-.tut .onb-btn { width: 100%; }
-.tut[data-step] .tut-h, .tut[data-step] .tut-p { animation: tutIn .45s var(--ease-out) both; }
-.tut[data-step] .tut-p { animation-delay: .06s; }
-@keyframes tutIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+/* ---------- Tour guidato dentro l'app ---------- */
+.tour { position: fixed; inset: 0; z-index: 92; pointer-events: auto; opacity: 0; transition: opacity .3s ease; }
+.tour.in { opacity: 1; }
+.tour-hl { position: fixed; box-shadow: 0 0 0 9999px rgba(10, 30, 22, .62); border-radius: 22px; transition: left .45s var(--ease-out), top .45s var(--ease-out), width .45s var(--ease-out), height .45s var(--ease-out), border-radius .45s ease; pointer-events: none; outline: 3px solid rgba(255, 216, 77, .9); outline-offset: 0; }
+.tour-card { position: fixed; left: 16px; right: 16px; background: var(--card); border-radius: 22px; padding: 16px 16px 14px; box-shadow: 0 16px 40px rgba(0, 0, 0, .35); display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; transition: top .45s var(--ease-out); }
+.tour-card::before { content: ''; position: absolute; left: 50%; top: -9px; width: 18px; height: 18px; background: var(--card); transform: translateX(-50%) rotate(45deg); border-radius: 3px; }
+.tour-card.top::before { top: auto; bottom: -9px; }
+.tour-anim { height: 112px; display: flex; align-items: center; justify-content: center; }
+.tour-anim img { max-height: 112px; max-width: 200px; object-fit: contain; }
+.tour-ph { width: 96px; height: 96px; border-radius: 22px; background: var(--white); border: 1px solid var(--line); }
+.tour-t { font-size: 18px; font-weight: 800; letter-spacing: -.01em; }
+.tour-p { margin: 0; font-size: 14px; color: var(--muted); line-height: 1.4; }
+.tour-row { width: 100%; display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
+.tour-skip { font-weight: 700; color: var(--muted); font-size: 14px; padding: 8px 6px; }
+.tour-dots { display: flex; gap: 5px; }
+.tour-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--line-2); }
+.tour-dots i.on { background: var(--green); width: 16px; border-radius: 3px; }
+.tour[data-step] .tour-anim, .tour[data-step] .tour-t, .tour[data-step] .tour-p { animation: tutIn .4s var(--ease-out) both; }
+@keyframes tutIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }

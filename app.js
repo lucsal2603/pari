@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.42.1';
+const APP_VERSION = '1.43.0';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -397,10 +397,10 @@ function render(r, toTop) {
   r = r || currentRoute || { name: 'home', id: '', q: {} }; currentRoute = r;
   const publicPages = ['accedi', 'registrati', 'recupero', 'legale', 'conferma'];
   if (!auth.user() && !publicPages.includes(r.name)) { r = { name: 'accedi', id: '', sub: '', q: {}, back: null }; currentRoute = r; }
-  const pages = { home: pageHome, spese: pageSpese, bilanci: pageBilanci, profilo: pageProfilo, nuova: pageForm, modifica: pageForm, spesa: pageDetail, statistiche: pageStats, attivita: pageActivity, traguardi: pageMissioni, missioni: pageMissioni, tutorial: pageTutorial, budget: pageBudget, benvenuto: pageWelcome, accedi: pageLogin, registrati: pageRegister, recupero: pageRecovery, legale: pageLegal, conferma: pageConfirm, fatto: pageDone };
+  const pages = { home: pageHome, spese: pageSpese, bilanci: pageBilanci, profilo: pageProfilo, nuova: pageForm, modifica: pageForm, spesa: pageDetail, statistiche: pageStats, attivita: pageActivity, traguardi: pageMissioni, missioni: pageMissioni, budget: pageBudget, benvenuto: pageWelcome, accedi: pageLogin, registrati: pageRegister, recupero: pageRecovery, legale: pageLegal, conferma: pageConfirm, fatto: pageDone };
   const fn = pages[r.name] || pageHome;
-  const onb = ['benvenuto', 'tutorial', 'accedi', 'registrati', 'recupero', 'conferma', 'fatto'].includes(r.name) || (r.name === 'legale' && !auth.user());
-  document.body.classList.toggle('fixed-screen', ['accedi', 'registrati', 'recupero', 'conferma', 'benvenuto', 'tutorial', 'fatto'].includes(r.name));
+  const onb = ['benvenuto', 'accedi', 'registrati', 'recupero', 'conferma', 'fatto'].includes(r.name) || (r.name === 'legale' && !auth.user());
+  document.body.classList.toggle('fixed-screen', ['accedi', 'registrati', 'recupero', 'conferma', 'benvenuto', 'fatto'].includes(r.name));
   tabbar.classList.toggle('hide', onb); view.classList.toggle('no-tabbar', onb);
   const tabName = r.name === 'profilo' ? 'profilo' : r.name === 'statistiche' || r.name === 'bilanci' ? 'home' : r.name;
   $$('.tab').forEach((t) => t.classList.toggle('on', t.dataset.tab === tabName));
@@ -1027,29 +1027,48 @@ function pageClassifica() {
     <div id="cl-body">${on ? `<div class="cl-loading"><span class="spin"></span>Carico la classifica…</div>` : `<section class="card" style="padding:18px"><p class="muted small" style="margin:0 0 12px">La classifica confronta il livello di tutti gli utenti di Divvy. Serve il codice casa.</p><a class="btn" href="#/profilo/sync">Backup e sincronizzazione</a></section>`}</div>
   </div>`;
 }
-/* ---------- Tutorial veloce al primo accesso (dopo la presentazione), con la mascotte animata a ogni passo ---------- */
+/* ---------- Tour guidato dentro l'app (primo accesso): la schermata cambia da sola, la mascotte animata spiega ---------- */
 const TUT_STEPS = [
-  { id: 'ciao', title: 'Ciao, sono Divvy!', text: 'Ti faccio vedere l\'app in un minuto. Poi sei libero di esplorare.' },
-  { id: 'spesa', title: 'Aggiungi una spesa col +', text: 'Descrizione, importo e categoria: paghi tu e si divide a metà con {0}.' },
-  { id: 'scontrino', title: 'Fotografa lo scontrino', text: 'Nel + trovi "Leggi lo scontrino": leggo importo, negozio e voci, anche da uno screenshot della banca.' },
-  { id: 'saldi', title: 'Chi deve cosa', text: 'In Home vedi il saldo con {0}. Con "Metti in pari" registri il pagamento in un tocco.' },
-  { id: 'budget', title: 'Il tuo budget', text: 'Nel tab Budget decidi quanto vuoi spendere al mese: ti dico quanto resta e a che ritmo vai.' },
-  { id: 'missioni', title: 'Missioni, trofei e livelli', text: 'Ogni spesa dà XP. Con le missioni settimanali e i trofei sali di livello e scali la classifica.' },
-  { id: 'pronto', title: 'Tutto pronto!', text: 'Attiva le notifiche per sapere subito quando {0} aggiunge qualcosa. Buon divertimento!' },
+  { id: 'ciao', hash: '#/home', target: null, title: 'Ciao, sono Divvy!', text: 'Ti faccio fare un giro veloce dell\'app: ti mostro dove sta ogni cosa.' },
+  { id: 'spesa', hash: '#/home', target: '#tabbar .fab', title: 'Aggiungi una spesa col +', text: 'Da qui aggiungi una spesa: paghi tu e si divide a metà con {0}.' },
+  { id: 'scontrino', hash: '#/nuova', target: '.scan-card', title: 'Fotografa lo scontrino', text: 'Qui mi fai leggere lo scontrino o uno screenshot della banca: compilo io i campi.' },
+  { id: 'saldi', hash: '#/home', target: '.home-actions', title: 'Chi deve cosa', text: 'Qui vedi il saldo con {0}. Con "Metti in pari" registri il pagamento in un tocco.' },
+  { id: 'budget', hash: '#/budget', target: '.bg-hero', title: 'Il tuo budget', text: 'Qui decidi quanto vuoi spendere al mese: ti dico quanto resta e a che ritmo vai.' },
+  { id: 'missioni', hash: '#/home', target: '.trophy-btn', title: 'Missioni, trofei e livelli', text: 'Da qui apri le missioni della settimana: ogni spesa dà XP e sali di livello.' },
+  { id: 'pronto', hash: '#/profilo', target: 'a[href="#/profilo/notifiche"]', title: 'Tutto pronto!', text: 'Attiva le notifiche qui per sapere quando {0} aggiunge qualcosa. Buon divertimento!' },
 ];
-let TUT = { step: 0 };
+let TOUR = null;
 const tutorialDone = () => { const u = auth.user(); if (!u) return true; return !!((u.user_metadata || {}).tutorial) || S.settings.tutorialDoneFor === u.id; };
-function tutorialFinish() { const u = auth.user(); if (u) { S.settings.tutorialDoneFor = u.id; try { auth.updateMeta({ tutorial: true }); } catch (_) {} } save(); TUT = { step: 0 }; go('#/home'); }
-function pageTutorial() {
-  const i = Math.max(0, Math.min(TUT_STEPS.length - 1, TUT.step)); const st = TUT_STEPS[i]; const last = i === TUT_STEPS.length - 1; const p = other().name;
-  return `<div class="page onb steps tut" data-step="${i}">
-    <div class="onb-top"><span></span><button type="button" class="onb-skip" data-tut-skip>Salta</button></div>
-    <div class="tut-anim"><img src="img/tutorial/${st.id}.webp" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'), { className: 'tut-ph' }))"></div>
-    <h1 class="onb-h tut-h">${esc(st.title)}</h1>
-    <p class="onb-p tut-p">${esc(T(st.text, p))}</p>
-    <div class="onb-dots">${TUT_STEPS.map((_, k) => `<i class="${k === i ? 'on' : ''}"></i>`).join('')}</div>
-    <button type="button" class="btn onb-btn" data-tut-next>${last ? 'Inizia' : 'Avanti'} ${arrowIc}</button>
-  </div>`;
+function tutorialFinish() { const u = auth.user(); if (u) { S.settings.tutorialDoneFor = u.id; try { auth.updateMeta({ tutorial: true }); } catch (_) {} } save(); }
+function startTour() {
+  if (TOUR) return; if (!auth.user()) return;
+  const el = document.createElement('div'); el.className = 'tour'; el.innerHTML = `<div class="tour-hl"></div><div class="tour-card"><div class="tour-anim"></div><b class="tour-t"></b><p class="tour-p"></p><div class="tour-row"><button type="button" class="tour-skip">Salta</button><span class="tour-dots"></span><button type="button" class="btn sm tour-next">Avanti</button></div></div>`;
+  document.body.appendChild(el); TOUR = { el, i: -1 };
+  $('.tour-skip', el).addEventListener('click', endTour); $('.tour-next', el).addEventListener('click', () => tourStep(TOUR.i + 1));
+  TOUR.onScroll = () => tourPlace(); window.addEventListener('resize', TOUR.onScroll); window.addEventListener('scroll', TOUR.onScroll, { passive: true });
+  requestAnimationFrame(() => el.classList.add('in')); tourStep(0);
+}
+function endTour() { if (!TOUR) return; const t = TOUR; TOUR = null; window.removeEventListener('resize', t.onScroll); window.removeEventListener('scroll', t.onScroll); t.el.classList.remove('in'); setTimeout(() => t.el.remove(), 300); tutorialFinish(); if (location.hash !== '#/home') go('#/home'); }
+function tourStep(i) {
+  if (!TOUR) return; if (i >= TUT_STEPS.length) { endTour(); return; }
+  TOUR.i = i; const st = TUT_STEPS[i]; const el = TOUR.el; const last = i === TUT_STEPS.length - 1;
+  $('.tour-anim', el).innerHTML = `<img src="img/tutorial/${st.id}.webp" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'), { className: 'tour-ph' }))">`;
+  $('.tour-t', el).textContent = T(st.title); $('.tour-p', el).textContent = T(st.text, other().name);
+  $('.tour-dots', el).innerHTML = TUT_STEPS.map((_, k) => `<i class="${k === i ? 'on' : ''}"></i>`).join(''); $('.tour-next', el).textContent = T(last ? 'Inizia' : 'Avanti');
+  el.classList.remove('placed'); el.dataset.step = i;
+  // cambio schermata da solo, poi punto l'elemento
+  const after = () => { TOUR && TOUR.i === i && tourPlace(true); };
+  if (location.hash !== st.hash) { go(st.hash); setTimeout(after, 380); } else setTimeout(after, 60);
+}
+function tourPlace(first) {
+  if (!TOUR) return; const st = TUT_STEPS[TOUR.i]; const el = TOUR.el; const hl = $('.tour-hl', el); const card = $('.tour-card', el);
+  const tg = st.target ? document.querySelector(st.target) : null;
+  if (tg && first) { try { tg.scrollIntoView({ block: 'center', behavior: 'instant' }); } catch (_) { tg.scrollIntoView(); } }
+  const W = window.innerWidth, H = window.innerHeight;
+  if (tg) { const r = tg.getBoundingClientRect(); const pad = 8; hl.style.cssText = `left:${r.left - pad}px;top:${r.top - pad}px;width:${r.width + pad * 2}px;height:${r.height + pad * 2}px;border-radius:${Math.min(22, r.height / 2 + pad)}px;opacity:1`;
+    const ch = card.offsetHeight || 260; const below = r.bottom + 14 + ch < H - 12; card.classList.toggle('top', !below); card.style.top = below ? (r.bottom + 14) + 'px' : Math.max(12, r.top - 14 - ch) + 'px'; card.style.transform = ''; }
+  else { hl.style.cssText = `left:${W / 2}px;top:${H / 2}px;width:0;height:0;opacity:1`; card.classList.remove('top'); card.style.top = '50%'; card.style.transform = 'translateY(-50%)'; }
+  el.classList.add('placed');
 }
 function pageLingua() {
   const cur = LANG();
@@ -1690,8 +1709,7 @@ function obGo(step, dir) {
 }
 function obFinish() {
   S.settings.onboarded = true; const u = auth.user(); if (u) { S.settings.onboardedFor = u.id; auth.updateMeta({ onboarded: true }); } save(); const nm = me().name; OB = { step: 1, name: '', partner: '', house: '', avatar: -1, split: 'equal', pct: 50 };
-  if (!tutorialDone()) { TUT = { step: 0 }; go('#/tutorial'); return; }
-  go('#/home');
+  go('#/home'); if (!tutorialDone()) setTimeout(startTour, 700);
   if (!sync.enabled()) toast(`Per condividere con ${other().name}: Profilo → Backup e sincronizzazione`); else if (!S.settings.push) toast('Attiva gli avvisi da Profilo → Notifiche'); else toast(`Divvy è pronta, ${nm}`);
 }
 function bindWelcome() {
@@ -1762,10 +1780,6 @@ function bind(r) {
   if (r.name === 'budget') {
     $$('[data-set-budget]').forEach((b) => b.addEventListener('click', () => budgetSheet('Budget mensile', myBudget().monthly || 0, (v) => setBudget(v))));
     $$('[data-cat-budget]').forEach((b) => b.addEventListener('click', () => { const c = catOf(b.dataset.catBudget); budgetSheet(T('Budget per {0}', T(c.name)), (myBudget().byCat || {})[c.id] || 0, (v) => setCatBudget(c.id, v), T('Conta la tua quota delle spese, non il totale.')); }));
-  }
-  if (r.name === 'tutorial') {
-    const tn = $('[data-tut-next]'); if (tn) tn.addEventListener('click', () => { if (TUT.step >= TUT_STEPS.length - 1) { tutorialFinish(); return; } TUT.step++; render(currentRoute, true); });
-    const ts = $('[data-tut-skip]'); if (ts) ts.addEventListener('click', tutorialFinish);
   }
   if (r.name === 'spese') {
     $$('[data-group-menu]').forEach((b) => b.addEventListener('click', () => openGroupSheet(b.dataset.groupMenu)));
@@ -1872,7 +1886,7 @@ function bindProfilo(r) {
     const off = $('#push-off'); if (off) off.addEventListener('click', async () => { await disablePush(); render(); toast('Notifiche disattivate'); });
   }
   if (r.sub === 'info') { $('#replay-onb').addEventListener('click', () => { OB = { step: 1, name: '', partner: '', house: '', avatar: AVATAR_IMGS.indexOf(((me().avatar || {}).img) || ''), split: (S.settings.split || {}).mode === 'custom' ? 'custom' : 'equal', pct: ((S.settings.split || {}).pct || {})[me().id] || 50 }; go('#/benvenuto'); }); }
-  if (r.sub === 'info') { const rt = $('#replay-tut'); if (rt) rt.addEventListener('click', () => { TUT = { step: 0 }; go('#/tutorial'); }); }
+  if (r.sub === 'info') { const rt = $('#replay-tut'); if (rt) rt.addEventListener('click', () => { go('#/home'); setTimeout(startTour, 400); }); }
   if (r.sub === 'info') $('#reload-app').addEventListener('click', () => { navigator.serviceWorker?.getRegistration().then((reg) => reg && reg.update()); try { sessionStorage.setItem('pari:nosplash', '1'); } catch (_) {} location.reload(); });
 }
 
@@ -2066,9 +2080,9 @@ materializeRecurring();
   if (auth.recovery) history.replaceState(null, '', '#/recupero');
   else if (!auth.user()) { if (!/^#\/(accedi|registrati|legale|conferma|join)/.test(location.hash)) history.replaceState(null, '', '#/accedi'); }
   else if (!onboardingDone()) history.replaceState(null, '', '#/benvenuto');
-  else if (!tutorialDone() && !/^#\/(tutorial|legale)/.test(location.hash)) history.replaceState(null, '', '#/tutorial');
   if (auth.user()) { applyPendingJoin(); if (restoreHouseFromAccount() && sync.enabled()) sync.run(true); rememberHouse(); showDailyLove(); }
   route();
+  if (auth.user() && onboardingDone() && !tutorialDone()) setTimeout(startTour, 1500); // tour guidato al primo accesso
   setTimeout(missionCheck, 1200); // all'apertura annuncio le missioni completate nel frattempo
   // prova voluta da Lucas: al prossimo accesso (entro la data) l'avviso scende una volta anche se non c'è niente di nuovo
   // richiesta di Lucas (6/9 sera): la schermata LEVEL UP a OGNI accesso; per tornare alla normalità mettere LEVELUP_EVERY_OPEN a false
