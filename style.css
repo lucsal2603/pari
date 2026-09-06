@@ -1021,3 +1021,8 @@ body.fixed-screen .view { height: 100dvh; overflow: hidden; padding-bottom: calc
 .cl-main > span { font-size: 12.5px; color: var(--muted); font-weight: 600; }
 .cl-me { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: var(--green); color: #fff; font-style: normal; font-size: 10.5px; font-weight: 800; vertical-align: 2px; }
 .cl-xp { font-weight: 800; color: var(--green); font-size: 14px; white-space: nowrap; }
+
+img.cl-av, img.clp-av { object-fit: cover; background: var(--white); }
+img.clp-av { width: 44px; height: 44px; border-radius: 50%; flex: none; margin-bottom: 3px; }
+.clp1 img.clp-av { width: 52px; height: 52px; }
+img.cl-av { width: 40px; height: 40px; border-radius: 50%; }

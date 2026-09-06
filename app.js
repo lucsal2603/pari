@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.40.0';
+const APP_VERSION = '1.40.2';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -142,6 +142,8 @@ function load() {
     if ((s.settings || {}).onboarded === undefined) st.settings.onboarded = !!(st.settings.sync && st.settings.sync.house);
     // telefoni che usavano l'app prima delle lingue: restano in italiano
     if ((s.settings || {}).lang === undefined) st.settings.lang = 'it';
+    // in classifica come coppia: vero solo per i telefoni di Luca e Martina (quelli con l'import da Splitwise); gli altri utenti sono singoli
+    if ((s.settings || {}).boardCouple === undefined) st.settings.boardCouple = !!(s.settings || {}).splitwiseImported;
     return st; } } catch (e) { console.warn('stato corrotto', e); }
   return defaultState();
 }
@@ -774,6 +776,7 @@ function pageAccount() {
     <div class="field"><div class="lbl">Su questo telefono io sono</div>${segHTML(S.members.map((m) => ({ v: m.id, t: m.name })), S.members.findIndex((m) => m.id === S.settings.me), '', 'me')}<div class="hint">Sul telefono di ${esc(other().name)} va scelto l'altro nome: così "Ciao" e i saldi sono dal suo punto di vista.</div></div>
     </section>
     <h2 class="sec-title section">Coppia</h2>
+    <section class="card"><div class="toggle"><div><div class="t">In classifica come coppia</div><div class="d">${esc(T('Un\'unica voce «{0}» con l\'esperienza di tutti e due.', S.members[0].name + ' e ' + S.members[1].name))}</div></div><button type="button" class="switch" role="switch" aria-checked="${!!S.settings.boardCouple}" data-couple-toggle></button></div></section>
     <section class="card"><div class="field" style="margin:0"><label for="together">Insieme dal (anno o data)</label><input id="together" type="text" value="${esc(S.settings.together)}" placeholder="2023" inputmode="numeric"><div class="hint">Compare nel profilo. Lascia vuoto per non mostrarlo.</div></div>
     <div class="field"><div class="lbl">Valuta</div><a class="input" href="#/profilo/valuta" style="display:flex;align-items:center;justify-content:space-between">${esc(currencyName(S.settings.currency || 'EUR'))} (${esc(curSymbol())}) ${icon('i-right', 'ic muted')}</a></div></section>
     <div class="section"><button class="btn" id="save-account">Salva</button></div>
@@ -977,18 +980,21 @@ function pageTrofei() {
 }
 /* ---------- Classifica: ogni casa pubblica livello ed XP in una riga condivisa (house "__board__", id = codice casa) ---------- */
 const BOARD_HOUSE = '__board__';
-const boardName = () => me().name;
-const boardId = () => S.settings.sync.house + ':' + me().id;
+const boardName = () => asCouple() ? `${S.members[0].name} e ${S.members[1].name}` : me().name;
+const boardAvatarSrc = () => { if (asCouple()) return 'img/coppia.png'; const a = (me().avatar || {}).img; return a ? 'img/' + a : (me().id === 'm1' ? 'img/luca-avatar.png' : 'img/martina-avatar.png'); };
+const boardAv = (src, cls) => src ? `<img class="${cls}" src="${esc(src)}" alt="">` : `<span class="${cls}">${icon('i-user')}</span>`;
+const boardId = () => asCouple() ? S.settings.sync.house : S.settings.sync.house + ':' + me().id;
 async function boardPush(force) {
   if (!sync.enabled()) return; const st = S.settings.sync; let li; try { li = levelInfo(); } catch (_) { return; }
   const last = S.settings.boardPushed || {}; const now = Date.now();
   if (!force && last.xp === li.xp && last.lv === li.lv && last.name === boardName()) return;
   if (!force && last.at && now - last.at < 60000 && last.lv === li.lv) return; // al massimo una volta al minuto, salvo cambio di livello
   try {
-    const rows = [{ house: BOARD_HOUSE, id: boardId(), kind: 'board', data: { name: boardName(), level: li.lv, xp: li.xp, avatar: (me().avatar || {}).img || '' }, updated_at: nowISO(), deleted: false }];
-    if (!S.settings.boardMigrated) rows.push({ house: BOARD_HOUSE, id: st.house, kind: 'board', data: {}, updated_at: nowISO(), deleted: true }); // via la vecchia riga di coppia
+    const rows = [{ house: BOARD_HOUSE, id: boardId(), kind: 'board', data: { name: boardName(), level: li.lv, xp: li.xp, avatar: boardAvatarSrc() }, updated_at: nowISO(), deleted: false }];
+    // cambiando modalità (coppia/singolo) tolgo le righe dell'altra modalità
+    const mode = asCouple() ? 'couple' : 'single'; if (S.settings.boardMode !== mode) { (asCouple() ? [st.house + ':m1', st.house + ':m2'] : [st.house]).forEach((id) => rows.push({ house: BOARD_HOUSE, id, kind: 'board', data: {}, updated_at: nowISO(), deleted: true })); }
     const r = await fetch(st.url + '/rest/v1/pari_rows?on_conflict=house,id', { method: 'POST', headers: sync.headers(), body: JSON.stringify(rows) });
-    if (r.ok) S.settings.boardMigrated = true;
+    if (r.ok) S.settings.boardMode = mode;
     if (r.ok) { S.settings.boardPushed = { xp: li.xp, lv: li.lv, name: boardName(), at: now }; missionBusy = true; try { save(); } finally { missionBusy = false; } }
   } catch (_) {}
 }
@@ -996,17 +1002,17 @@ async function boardFetch() {
   if (!sync.enabled()) return null; const st = S.settings.sync;
   const r = await fetch(st.url + '/rest/v1/pari_rows?house=eq.' + encodeURIComponent(BOARD_HOUSE) + '&kind=eq.board&deleted=eq.false&select=id,data,updated_at&limit=500', { headers: sync.headers() });
   if (!r.ok) throw new Error(await errText(r));
-  const rows = (await r.json()).map((x) => ({ id: x.id, name: (x.data && x.data.name) || '?', lv: +((x.data && x.data.level) || 1), xp: +((x.data && x.data.xp) || 0), at: x.updated_at })).sort((a, b) => b.xp - a.xp || a.name.localeCompare(b.name));
+  const rows = (await r.json()).map((x) => ({ id: x.id, name: (x.data && x.data.name) || '?', lv: +((x.data && x.data.level) || 1), xp: +((x.data && x.data.xp) || 0), av: (x.data && x.data.avatar) || '', at: x.updated_at })).sort((a, b) => b.xp - a.xp || a.name.localeCompare(b.name));
   const myId = boardId(); const mine = rows.findIndex((x) => x.id === myId); const li = levelInfo();
-  if (mine < 0) { rows.push({ id: myId, name: boardName(), lv: li.lv, xp: li.xp, me: true }); rows.sort((a, b) => b.xp - a.xp || a.name.localeCompare(b.name)); }
-  rows.forEach((x, i) => { x.pos = i + 1; if (x.id === myId) { x.me = true; x.lv = li.lv; x.xp = li.xp; } });
+  if (mine < 0) { rows.push({ id: myId, name: boardName(), lv: li.lv, xp: li.xp, av: boardAvatarSrc(), me: true }); rows.sort((a, b) => b.xp - a.xp || a.name.localeCompare(b.name)); }
+  rows.forEach((x, i) => { x.pos = i + 1; if (x.id === myId) { x.me = true; x.lv = li.lv; x.xp = li.xp; x.av = boardAvatarSrc(); } });
   const pos = rows.findIndex((x) => x.me) + 1; S.settings.boardPos = pos; S.settings.boardTotal = rows.length; missionBusy = true; try { save(); } finally { missionBusy = false; }
   return { rows, pos, total: rows.length };
 }
-function boardRow(x) { return `<div class="cl-row${x.me ? ' me' : ''}"><span class="cl-pos" data-no-i18n>${x.pos <= 3 ? ['🥇', '🥈', '🥉'][x.pos - 1] : x.pos}</span><span class="cl-av">${icon('i-user')}</span><span class="cl-main"><b>${esc(x.name)}${x.me ? ` <em class="cl-me">Tu</em>` : ''}</b><span data-no-i18n>LV ${x.lv}</span></span><span class="cl-xp" data-no-i18n>${x.xp} XP</span></div>`; }
+function boardRow(x) { return `<div class="cl-row${x.me ? ' me' : ''}"><span class="cl-pos" data-no-i18n>${x.pos <= 3 ? ['🥇', '🥈', '🥉'][x.pos - 1] : x.pos}</span>${boardAv(x.av, 'cl-av')}<span class="cl-main"><b>${esc(x.name)}${x.me ? ` <em class="cl-me">Tu</em>` : ''}</b><span data-no-i18n>LV ${x.lv}</span></span><span class="cl-xp" data-no-i18n>${x.xp} XP</span></div>`; }
 function boardHTML(b) {
   const top = b.rows.slice(0, 20); const podium = [top[1], top[0], top[2]];
-  const step = (x, n) => x ? `<div class="clp clp${n}${x.me ? ' me' : ''}"><span class="clp-av">${icon('i-user')}</span><b>${esc(x.name)}</b><span class="clp-lv" data-no-i18n>LV ${x.lv}</span><span class="clp-xp" data-no-i18n>${x.xp} XP</span><i data-no-i18n>${n}</i></div>` : `<div class="clp clp${n} empty"><i data-no-i18n>${n}</i></div>`;
+  const step = (x, n) => x ? `<div class="clp clp${n}${x.me ? ' me' : ''}">${boardAv(x.av, 'clp-av')}<b>${esc(x.name)}</b><span class="clp-lv" data-no-i18n>LV ${x.lv}</span><span class="clp-xp" data-no-i18n>${x.xp} XP</span><i data-no-i18n>${n}</i></div>` : `<div class="clp clp${n} empty"><i data-no-i18n>${n}</i></div>`;
   const meOut = b.pos > 20 ? b.rows.find((x) => x.me) : null;
   return `<section class="cl-podium">${step(podium[0], 2)}${step(podium[1], 1)}${step(podium[2], 3)}</section>
     <div class="ach-row"><h3>I 20 utenti con il livello più alto</h3><span class="ach-count" data-no-i18n>${b.total}</span></div>
@@ -1134,7 +1140,8 @@ const xpFor = (n) => { let t = 0; for (let k = 2; k <= n; k++) t += Math.round(6
 const XP = { expense: 10, payment: 15, category: 5, scanned: 20, mission: 40, trophy: 100 };
 const entryXp = (e) => (e.kind === 'payment' ? XP.payment : XP.expense) + (e.kind === 'expense' && e.cat ? XP.category : 0) + (e.scanned ? XP.scanned : 0);
 /* XP PERSONALI: ogni persona ha il suo livello (Lucas: l'app sarà per singoli, solo lui e Martina condividono un account) */
-function xpTotal() { const mid = me().id; let xp = 0; active().forEach((e) => { if (e.paidBy === mid) xp += entryXp(e); }); xp += (S.settings.missionsDone || 0) * XP.mission; xp += trophies().filter((t) => t.ok).length * XP.trophy; return xp; }
+const asCouple = () => !!S.settings.boardCouple;
+function xpTotal() { const mid = me().id; let xp = 0; active().forEach((e) => { if (asCouple() || e.paidBy === mid) xp += entryXp(e); }); xp += (S.settings.missionsDone || 0) * XP.mission; xp += trophies().filter((t) => t.ok).length * XP.trophy; return xp; }
 function levelInfo() { const xp = xpTotal(); let lv = 1; while (xp >= xpFor(lv + 1)) lv++; const base = xpFor(lv), next = xpFor(lv + 1); return { xp, lv, base, next, pct: Math.max(0, Math.min(100, Math.round((xp - base) / (next - base) * 100))) }; }
 /* schermata "LEVEL UP" a tutto schermo (immagine di Lucas + livello, XP e barra disegnati sopra) */
 function showLevelUp(li) {
@@ -1785,6 +1792,7 @@ function bindForm(r) {
 function bindProfilo(r) {
   const lo = $('[data-logout]'); if (lo) lo.addEventListener('click', () => confirmSheet('Uscire dall\'account?', 'Le spese restano salvate: al prossimo accesso le ritrovi.', 'Esci', async () => { await auth.signOut(); LG = { mode: 'login', email: '', busy: false, show: false, sent: '' }; go('#/accedi'); }));
   if (r.sub === 'account') {
+    const ct = $('[data-couple-toggle]'); if (ct) ct.addEventListener('click', () => { S.settings.boardCouple = !S.settings.boardCouple; ct.setAttribute('aria-checked', S.settings.boardCouple); save(); boardPush(true); render(); });
     $('#save-account').addEventListener('click', () => {
       $$('[data-name]').forEach((i) => { const m = member(i.dataset.name); const v = i.value.trim(); if (v) m.name = v; });
       $$('[data-color]').forEach((i) => (member(i.dataset.color).color = i.value));
