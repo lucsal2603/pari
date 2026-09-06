@@ -1037,6 +1037,7 @@ img.cl-av { width: 40px; height: 40px; border-radius: 50%; }
 /* ---------- Tour guidato dentro l'app ---------- */
 .tour { position: fixed; inset: 0; z-index: 92; pointer-events: auto; opacity: 0; transition: opacity .3s ease; touch-action: none; overscroll-behavior: contain; }
 body.touring { overflow: hidden; overscroll-behavior: none; }
+body.touring .page { animation: none; } /* durante il tour la pagina appare subito, insieme alla card */
 .tour.in { opacity: 1; }
 .tour-hl { position: fixed; box-shadow: 0 0 0 9999px rgba(10, 30, 22, .62); border-radius: 22px; transition: left .45s var(--ease-out), top .45s var(--ease-out), width .45s var(--ease-out), height .45s var(--ease-out), border-radius .45s ease; pointer-events: none; outline: 3px solid rgba(255, 216, 77, .9); outline-offset: 0; }
 .tour-card { position: fixed; left: 16px; right: 16px; background: var(--card); border-radius: 22px; padding: 16px 16px 14px; box-shadow: 0 16px 40px rgba(0, 0, 0, .35); display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; transition: top .45s var(--ease-out); }

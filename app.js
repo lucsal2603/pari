@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.43.10';
+const APP_VERSION = '1.43.11';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -407,6 +407,7 @@ function render(r, toTop) {
   view.innerHTML = fn(r); translateDom(view);
   window.scrollTo(0, keep);
   bind(r); initSwipes();
+  if (typeof TOUR !== 'undefined' && TOUR && TOUR.pending != null) tourApply(); /* la card del tour cambia nello stesso istante della pagina */
   const reveal = () => { $$('.chart').forEach((c) => c.classList.add('in')); $$('[data-w]').forEach((el) => (el.style.width = el.dataset.w)); };
   // finita l'animazione d'ingresso, tolgo il transform così la barra del titolo può restare fissa in alto
   $$('.page').forEach((pg) => pg.addEventListener('animationend', (e) => { if (e.target === pg) pg.classList.add('settled'); }));
@@ -1054,14 +1055,17 @@ function startTour() {
 function endTour() { if (!TOUR) return; const t = TOUR; TOUR = null; window.removeEventListener('resize', t.onScroll); window.removeEventListener('scroll', t.onScroll); document.removeEventListener('keydown', t.onKey); document.body.classList.remove('touring'); t.el.classList.remove('in'); setTimeout(() => t.el.remove(), 300); tutorialFinish(); if (location.hash !== '#/home') go('#/home'); }
 function tourStep(i) {
   if (!TOUR) return; if (i >= TUT_STEPS.length) { endTour(); return; }
-  TOUR.i = i; const st = TUT_STEPS[i]; const el = TOUR.el; const last = i === TUT_STEPS.length - 1;
+  TOUR.i = i; const st = TUT_STEPS[i];
+  /* se serve cambiare schermata, la card si aggiorna dentro render(), nello stesso istante della pagina; il timer è solo una rete di sicurezza */
+  if (location.hash !== st.hash) { TOUR.pending = i; go(st.hash); setTimeout(() => { if (TOUR && TOUR.pending === i) tourApply(); }, 600); }
+  else tourApply();
+}
+function tourApply() {
+  if (!TOUR) return; const i = TOUR.i; const st = TUT_STEPS[i]; const el = TOUR.el; const last = i === TUT_STEPS.length - 1; TOUR.pending = null;
   $('.tour-anim', el).innerHTML = `<img src="img/tutorial/${st.id}.webp" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'), { className: 'tour-ph' }))">`;
   $('.tour-t', el).textContent = T(st.title); $('.tour-p', el).textContent = T(st.text, other().name);
   $('.tour-dots', el).innerHTML = TUT_STEPS.map((_, k) => `<i class="${k === i ? 'on' : ''}"></i>`).join(''); $('.tour-next', el).textContent = T(last ? 'Inizia' : 'Avanti');
-  el.classList.remove('placed'); el.dataset.step = i;
-  // cambio schermata da solo, poi punto l'elemento
-  const after = () => { TOUR && TOUR.i === i && tourPlace(true); };
-  if (location.hash !== st.hash) { go(st.hash); setTimeout(after, 380); } else setTimeout(after, 60);
+  el.dataset.step = i; tourPlace(true);
 }
 function tourPlace(first) {
   if (!TOUR) return; const st = TUT_STEPS[TOUR.i]; const el = TOUR.el; const hl = $('.tour-hl', el); const card = $('.tour-card', el);
