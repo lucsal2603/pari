@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.38.2';
+const APP_VERSION = '1.39.0';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -977,15 +977,18 @@ function pageTrofei() {
 }
 /* ---------- Classifica: ogni casa pubblica livello ed XP in una riga condivisa (house "__board__", id = codice casa) ---------- */
 const BOARD_HOUSE = '__board__';
-const boardName = () => `${S.members[0].name} & ${S.members[1].name}`;
+const boardName = () => me().name;
+const boardId = () => S.settings.sync.house + ':' + me().id;
 async function boardPush(force) {
   if (!sync.enabled()) return; const st = S.settings.sync; let li; try { li = levelInfo(); } catch (_) { return; }
   const last = S.settings.boardPushed || {}; const now = Date.now();
   if (!force && last.xp === li.xp && last.lv === li.lv && last.name === boardName()) return;
   if (!force && last.at && now - last.at < 60000 && last.lv === li.lv) return; // al massimo una volta al minuto, salvo cambio di livello
   try {
-    const row = { house: BOARD_HOUSE, id: st.house, kind: 'board', data: { name: boardName(), level: li.lv, xp: li.xp, members: S.members.length, avatar: (S.members[0].avatar || {}).img || '' }, updated_at: nowISO(), deleted: false };
-    const r = await fetch(st.url + '/rest/v1/pari_rows?on_conflict=house,id', { method: 'POST', headers: sync.headers(), body: JSON.stringify([row]) });
+    const rows = [{ house: BOARD_HOUSE, id: boardId(), kind: 'board', data: { name: boardName(), level: li.lv, xp: li.xp, avatar: (me().avatar || {}).img || '' }, updated_at: nowISO(), deleted: false }];
+    if (!S.settings.boardMigrated) rows.push({ house: BOARD_HOUSE, id: st.house, kind: 'board', data: {}, updated_at: nowISO(), deleted: true }); // via la vecchia riga di coppia
+    const r = await fetch(st.url + '/rest/v1/pari_rows?on_conflict=house,id', { method: 'POST', headers: sync.headers(), body: JSON.stringify(rows) });
+    if (r.ok) S.settings.boardMigrated = true;
     if (r.ok) { S.settings.boardPushed = { xp: li.xp, lv: li.lv, name: boardName(), at: now }; missionBusy = true; try { save(); } finally { missionBusy = false; } }
   } catch (_) {}
 }
@@ -994,27 +997,27 @@ async function boardFetch() {
   const r = await fetch(st.url + '/rest/v1/pari_rows?house=eq.' + encodeURIComponent(BOARD_HOUSE) + '&kind=eq.board&deleted=eq.false&select=id,data,updated_at&limit=500', { headers: sync.headers() });
   if (!r.ok) throw new Error(await errText(r));
   const rows = (await r.json()).map((x) => ({ id: x.id, name: (x.data && x.data.name) || '?', lv: +((x.data && x.data.level) || 1), xp: +((x.data && x.data.xp) || 0), at: x.updated_at })).sort((a, b) => b.xp - a.xp || a.name.localeCompare(b.name));
-  const mine = rows.findIndex((x) => x.id === st.house); const li = levelInfo();
-  if (mine < 0) { rows.push({ id: st.house, name: boardName(), lv: li.lv, xp: li.xp, me: true }); rows.sort((a, b) => b.xp - a.xp || a.name.localeCompare(b.name)); }
-  rows.forEach((x, i) => { x.pos = i + 1; if (x.id === st.house) { x.me = true; x.lv = li.lv; x.xp = li.xp; } });
+  const myId = boardId(); const mine = rows.findIndex((x) => x.id === myId); const li = levelInfo();
+  if (mine < 0) { rows.push({ id: myId, name: boardName(), lv: li.lv, xp: li.xp, me: true }); rows.sort((a, b) => b.xp - a.xp || a.name.localeCompare(b.name)); }
+  rows.forEach((x, i) => { x.pos = i + 1; if (x.id === myId) { x.me = true; x.lv = li.lv; x.xp = li.xp; } });
   const pos = rows.findIndex((x) => x.me) + 1; S.settings.boardPos = pos; S.settings.boardTotal = rows.length; missionBusy = true; try { save(); } finally { missionBusy = false; }
   return { rows, pos, total: rows.length };
 }
-function boardRow(x) { return `<div class="cl-row${x.me ? ' me' : ''}"><span class="cl-pos" data-no-i18n>${x.pos <= 3 ? ['🥇', '🥈', '🥉'][x.pos - 1] : x.pos}</span><span class="cl-av">${icon('i-users')}</span><span class="cl-main"><b>${esc(x.name)}${x.me ? ` <em class="cl-me">Tu</em>` : ''}</b><span data-no-i18n>LV ${x.lv}</span></span><span class="cl-xp" data-no-i18n>${x.xp} XP</span></div>`; }
+function boardRow(x) { return `<div class="cl-row${x.me ? ' me' : ''}"><span class="cl-pos" data-no-i18n>${x.pos <= 3 ? ['🥇', '🥈', '🥉'][x.pos - 1] : x.pos}</span><span class="cl-av">${icon('i-user')}</span><span class="cl-main"><b>${esc(x.name)}${x.me ? ` <em class="cl-me">Tu</em>` : ''}</b><span data-no-i18n>LV ${x.lv}</span></span><span class="cl-xp" data-no-i18n>${x.xp} XP</span></div>`; }
 function boardHTML(b) {
   const top = b.rows.slice(0, 20); const podium = [top[1], top[0], top[2]];
-  const step = (x, n) => x ? `<div class="clp clp${n}${x.me ? ' me' : ''}"><span class="clp-av">${icon('i-users')}</span><b>${esc(x.name)}</b><span class="clp-lv" data-no-i18n>LV ${x.lv}</span><span class="clp-xp" data-no-i18n>${x.xp} XP</span><i data-no-i18n>${n}</i></div>` : `<div class="clp clp${n} empty"><i data-no-i18n>${n}</i></div>`;
+  const step = (x, n) => x ? `<div class="clp clp${n}${x.me ? ' me' : ''}"><span class="clp-av">${icon('i-user')}</span><b>${esc(x.name)}</b><span class="clp-lv" data-no-i18n>LV ${x.lv}</span><span class="clp-xp" data-no-i18n>${x.xp} XP</span><i data-no-i18n>${n}</i></div>` : `<div class="clp clp${n} empty"><i data-no-i18n>${n}</i></div>`;
   const meOut = b.pos > 20 ? b.rows.find((x) => x.me) : null;
   return `<section class="cl-podium">${step(podium[0], 2)}${step(podium[1], 1)}${step(podium[2], 3)}</section>
-    <div class="ach-row"><h3>I 20 gruppi con il livello più alto</h3><span class="ach-count" data-no-i18n>${b.total}</span></div>
-    <section class="card list-card"><div class="cl-list">${top.slice(3).map(boardRow).join('') || `<p class="muted small" style="margin:12px 16px">Ancora pochi gruppi in classifica: invita altre coppie!</p>`}</div></section>
+    <div class="ach-row"><h3>I 20 utenti con il livello più alto</h3><span class="ach-count" data-no-i18n>${b.total}</span></div>
+    <section class="card list-card"><div class="cl-list">${top.slice(3).map(boardRow).join('') || `<p class="muted small" style="margin:12px 16px">Ancora pochi utenti in classifica: invita i tuoi amici!</p>`}</div></section>
     ${meOut ? `<div class="ach-row"><h3>La tua posizione</h3></div><section class="card list-card"><div class="cl-list">${boardRow(meOut)}</div></section>` : ''}`;
 }
 function pageClassifica() {
   const on = sync.enabled(); const pos = S.settings.boardPos;
   return `<div class="page slide cl">${subHead('Classifica')}
     <p class="ach-sub">${on ? (pos ? esc(T('Sei al posto {0} su {1}', pos, S.settings.boardTotal || pos)) : 'Chi ha più XP sale sul podio.') : 'Attiva la sincronizzazione per entrare in classifica.'}</p>
-    <div id="cl-body">${on ? `<div class="cl-loading"><span class="spin"></span>Carico la classifica…</div>` : `<section class="card" style="padding:18px"><p class="muted small" style="margin:0 0 12px">La classifica confronta il livello di tutte le coppie che usano Divvy. Serve il codice casa.</p><a class="btn" href="#/profilo/sync">Backup e sincronizzazione</a></section>`}</div>
+    <div id="cl-body">${on ? `<div class="cl-loading"><span class="spin"></span>Carico la classifica…</div>` : `<section class="card" style="padding:18px"><p class="muted small" style="margin:0 0 12px">La classifica confronta il livello di tutti gli utenti di Divvy. Serve il codice casa.</p><a class="btn" href="#/profilo/sync">Backup e sincronizzazione</a></section>`}</div>
   </div>`;
 }
 function pageLingua() {
@@ -1130,7 +1133,8 @@ function missionCheck() {
 const xpFor = (n) => { let t = 0; for (let k = 2; k <= n; k++) t += Math.round(60 * Math.pow(1.18, k - 2)); return t; }; // livello 2 a 60 XP, poi ogni livello chiede il 18% in più (3 = 131, 4 = 215, 5 = 314, 10 = 1146)
 const XP = { expense: 10, payment: 15, category: 5, scanned: 20, mission: 40, trophy: 100 };
 const entryXp = (e) => (e.kind === 'payment' ? XP.payment : XP.expense) + (e.kind === 'expense' && e.cat ? XP.category : 0) + (e.scanned ? XP.scanned : 0);
-function xpTotal() { let xp = 0; active().forEach((e) => { xp += entryXp(e); }); xp += (S.settings.missionsDone || 0) * XP.mission; xp += trophies().filter((t) => t.ok).length * XP.trophy; return xp; }
+/* XP PERSONALI: ogni persona ha il suo livello (Lucas: l'app sarà per singoli, solo lui e Martina condividono un account) */
+function xpTotal() { const mid = me().id; let xp = 0; active().forEach((e) => { if (e.paidBy === mid) xp += entryXp(e); }); xp += (S.settings.missionsDone || 0) * XP.mission; xp += trophies().filter((t) => t.ok).length * XP.trophy; return xp; }
 function levelInfo() { const xp = xpTotal(); let lv = 1; while (xp >= xpFor(lv + 1)) lv++; const base = xpFor(lv), next = xpFor(lv + 1); return { xp, lv, base, next, pct: Math.max(0, Math.min(100, Math.round((xp - base) / (next - base) * 100))) }; }
 /* schermata "LEVEL UP" a tutto schermo (immagine di Lucas + livello, XP e barra disegnati sopra) */
 function showLevelUp(li) {
