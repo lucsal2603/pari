@@ -943,8 +943,22 @@ body.fixed-screen .view { height: 100dvh; overflow: hidden; padding-bottom: calc
 .lvl { position: fixed; inset: 0; z-index: 95; background: #022B36; opacity: 0; transition: opacity .35s ease; overflow: hidden; }
 .lvl.in { opacity: 1; }
 .lvl.out { opacity: 0; }
-.lvl-bg { position: absolute; inset: 0; background: #022B36 url('img/levelup-sfondo.webp') center 38% / cover no-repeat; transform: scale(1.08); transition: transform 1.3s var(--ease-out); }
+.lvl-bg { position: absolute; inset: 0; background: #022B36 url('img/levelup-sfondo-2.webp') center 40% / cover no-repeat; transform: scale(1.08); transition: transform 1.3s var(--ease-out); }
 .lvl.in .lvl-bg { transform: scale(1); }
+/* mascotte e stelle: pezzi separati che oscillano */
+.lvl-masc { position: absolute; left: 50%; top: 37%; width: min(62vw, 320px); margin-left: calc(min(62vw, 320px) / -2); opacity: 0; transform: translateY(40px) scale(.6); transition: transform .7s .2s cubic-bezier(.2, .9, .3, 1.35), opacity .5s .2s ease; }
+.lvl.in .lvl-masc { opacity: 1; transform: none; }
+.lvl-masc img { display: block; width: 100%; height: auto; transform-origin: 50% 90%; animation: lvlBob 2.8s 1s ease-in-out infinite; filter: drop-shadow(0 18px 22px rgba(0, 0, 0, .35)); }
+@keyframes lvlBob { 0%, 100% { transform: translateY(0) rotate(-4deg); } 50% { transform: translateY(-16px) rotate(4deg); } }
+.lvl-star { position: absolute; width: 60px; opacity: 0; transition: opacity .5s ease; }
+.lvl.in .lvl-star { opacity: 1; }
+.lvl-star img { display: block; width: 100%; height: auto; animation: lvlStar 3s ease-in-out infinite; filter: drop-shadow(0 0 10px rgba(255, 220, 60, .55)); }
+.lvl-star.s1 { left: 6%; top: 44%; width: 64px; }
+.lvl-star.s2 { right: 7%; top: 39%; width: 54px; }
+.lvl-star.s2 img { animation-duration: 3.6s; animation-delay: .5s; }
+.lvl-star.s3 { left: 12%; top: 62%; width: 40px; }
+.lvl-star.s3 img { animation-duration: 2.6s; animation-delay: 1s; }
+@keyframes lvlStar { 0%, 100% { transform: rotate(-14deg) translateY(0); } 50% { transform: rotate(14deg) translateY(-10px); } }
 .lvl-ui { position: absolute; left: 0; right: 0; bottom: 0; padding: 56px 22px calc(var(--sab) + 26px); background: linear-gradient(to top, rgba(2, 43, 54, .92) 0, rgba(2, 43, 54, .7) 55%, transparent); display: flex; flex-direction: column; gap: 14px; transform: translateY(30px); opacity: 0; transition: transform .6s .25s var(--ease-out), opacity .6s .25s ease; }
 .lvl.in .lvl-ui { transform: none; opacity: 1; }
 .lvl-bar2 { display: flex; align-items: center; gap: 10px; height: 58px; padding: 0 16px; border-radius: 18px; background: #06323D; border: 3px solid #1FD1B5; box-shadow: 0 0 0 3px #04252E, 0 10px 24px rgba(0, 0, 0, .35); color: #E9FBF7; font-weight: 800; font-size: 15px; letter-spacing: .05em; }

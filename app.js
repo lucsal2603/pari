@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.39.0';
+const APP_VERSION = '1.40.0';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -1139,7 +1139,7 @@ function levelInfo() { const xp = xpTotal(); let lv = 1; while (xp >= xpFor(lv +
 /* schermata "LEVEL UP" a tutto schermo (immagine di Lucas + livello, XP e barra disegnati sopra) */
 function showLevelUp(li) {
   if ($('#levelup')) return; const el = document.createElement('div'); el.id = 'levelup'; el.className = 'lvl';
-  el.innerHTML = `<div class="lvl-bg"></div><div class="lvl-ui"><div class="lvl-bar2" data-no-i18n><span class="lb-l">LV</span><span class="lb-n">${li.lv}</span><span class="lb-track"><i style="width:0%"></i></span><span class="lb-l">XP</span></div><div class="lvl-xp2" data-no-i18n>${li.base} / ${li.base} XP</div><button type="button" class="lvl-btn" aria-label="Continua"><svg class="ic" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div>`;
+  el.innerHTML = `<div class="lvl-bg"></div><div class="lvl-star s1"><img src="img/levelup-stella.webp" alt=""></div><div class="lvl-star s2"><img src="img/levelup-stella.webp" alt=""></div><div class="lvl-star s3"><img src="img/levelup-stella.webp" alt=""></div><div class="lvl-masc"><img src="img/levelup-mascotte.webp" alt=""></div><div class="lvl-ui"><div class="lvl-bar2" data-no-i18n><span class="lb-l">LV</span><span class="lb-n">${li.lv}</span><span class="lb-track"><i style="width:0%"></i></span><span class="lb-l">XP</span></div><div class="lvl-xp2" data-no-i18n>${li.base} / ${li.base} XP</div><button type="button" class="lvl-btn" aria-label="Continua"><svg class="ic" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div>`;
   document.body.appendChild(el); try { if (navigator.vibrate) navigator.vibrate([40, 60, 40]); } catch (_) {}
   requestAnimationFrame(() => requestAnimationFrame(() => { el.classList.add('in'); setTimeout(() => { const f = $('.lb-track i', el); if (f) f.style.width = '100%'; /* la barra arriva sempre al massimo: il livello è stato raggiunto */ }, 500); }));
   const close = () => { el.classList.remove('in'); el.classList.add('out'); setTimeout(() => el.remove(), 450); };
