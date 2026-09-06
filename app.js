@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.35.4';
+const APP_VERSION = '1.35.5';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -1955,6 +1955,9 @@ materializeRecurring();
   if (auth.user()) { applyPendingJoin(); if (restoreHouseFromAccount() && sync.enabled()) sync.run(true); rememberHouse(); showDailyLove(); }
   route();
   setTimeout(missionCheck, 1200); // all'apertura annuncio le missioni completate nel frattempo
+  // prova voluta da Lucas: al prossimo accesso (entro la data) l'avviso scende una volta anche se non c'è niente di nuovo
+  const BANNER_FORCE = { until: '2026-09-08', key: 'pari:banner-force-1' };
+  try { if (auth.user() && todayStr() <= BANNER_FORCE.until && !localStorage.getItem(BANNER_FORCE.key)) { localStorage.setItem(BANNER_FORCE.key, '1'); setTimeout(() => { const w = missions(); const m = w.list.find((x) => x.done) || w.list[0]; missionQueue.push({ title: m.title, trophy: false }); missionNext(); }, 1500); } } catch (_) {}
   auth.refreshIfNeeded().then(() => { if (!auth.user() && currentRoute && currentRoute.name !== 'accedi') render(); });
   hideSplash();
 })();
