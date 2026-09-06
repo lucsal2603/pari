@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.35.5';
+const APP_VERSION = '1.36.1';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -741,9 +741,10 @@ function pageProfilo(r) {
   if (r.sub === 'info') return pageInfo();
   if (r.sub === 'esporta') return pageExport();
   const together = S.settings.together ? `Insieme dal ${esc(S.settings.together)} <span aria-hidden="true">❤️</span>` : 'Le nostre spese, a metà <span aria-hidden="true">❤️</span>';
+  const li = levelInfo(); const lvlPill = `<div class="lvl-xpline" data-no-i18n>${li.xp} / ${li.next} XP</div>`;
   const syncOn = sync.enabled();
   return `<div class="page">
-    <div class="profile-head">${r.back ? `<button class="icon-btn profile-back" data-back="${esc(r.back)}" aria-label="Indietro">${icon('i-back')}</button>` : ''}<div class="couple-circle"><img src="img/coppia.png" alt=""></div><div class="n">${esc(S.members[0].name)} &amp; ${esc(S.members[1].name)}</div><div class="s">${together}</div></div>
+    <div class="profile-head">${r.back ? `<button class="icon-btn profile-back" data-back="${esc(r.back)}" aria-label="Indietro">${icon('i-back')}</button>` : ''}<div class="lvl-ring" style="--p:${levelInfo().pct}"><svg viewBox="0 0 100 100" aria-hidden="true"><circle class="tr" cx="50" cy="50" r="46"/><circle class="fl" cx="50" cy="50" r="46" pathLength="100"/></svg><div class="couple-circle"><img src="img/coppia.png" alt=""></div><span class="lvl-badge" data-no-i18n>LV ${levelInfo().lv}</span></div><div class="n">${esc(S.members[0].name)} &amp; ${esc(S.members[1].name)}</div><div class="s">${together}</div>${lvlPill}</div>
     <section class="card profile-list"><div class="menu">
       <a href="#/profilo/account">${icon('i-gear')}<span>Impostazioni account</span><span class="val">Io sono ${esc(a.name)}</span>${icon('i-right', 'ic chev')}</a>
       <a href="#/profilo/trofei">${icon('i-trophy')}<span>I tuoi trofei</span><span class="val" data-no-i18n>${(() => { const t = trophies(); return t.filter((x) => x.ok).length + '/' + t.length; })()}</span>${icon('i-right', 'ic chev')}</a>
@@ -1076,10 +1077,29 @@ function missionCheck() {
   const shown = S.settings.bannerShown && S.settings.bannerShown.week === st.week ? S.settings.bannerShown : { week: st.week, ids: [], trophies: (S.settings.bannerShown || {}).trophies };
   let changed = false;
   if (!Array.isArray(shown.trophies)) { shown.trophies = st.t.map((x) => x[0]); changed = true; } // prima volta: i trofei già presi non si annunciano
-  st.m.forEach(([id, title]) => { if (!shown.ids.includes(id)) { shown.ids.push(id); changed = true; missionQueue.push({ title, trophy: false }); } });
+  st.m.forEach(([id, title]) => { if (!shown.ids.includes(id)) { shown.ids.push(id); changed = true; S.settings.missionsDone = (S.settings.missionsDone || 0) + 1; missionQueue.push({ title, trophy: false }); } });
   st.t.forEach(([id, title]) => { if (!shown.trophies.includes(id)) { shown.trophies.push(id); changed = true; missionQueue.push({ title, trophy: true }); } });
   if (changed) { S.settings.bannerShown = shown; missionBusy = true; try { save(); } finally { missionBusy = false; } }
-  missionNext();
+  missionNext(); levelCheck();
+}
+/* ---------- Livelli ed esperienza (di coppia: contano i dati condivisi) ---------- */
+const xpFor = (n) => { let t = 0; for (let k = 2; k <= n; k++) t += Math.round(60 * Math.pow(1.18, k - 2)); return t; }; // livello 2 a 60 XP, poi ogni livello chiede il 18% in più (3 = 131, 4 = 215, 5 = 314, 10 = 1146)
+const XP = { expense: 10, payment: 15, category: 5, scanned: 20, mission: 40, trophy: 100 };
+function xpTotal() { let xp = 0; active().forEach((e) => { xp += e.kind === 'payment' ? XP.payment : XP.expense; if (e.kind === 'expense' && e.cat) xp += XP.category; if (e.scanned) xp += XP.scanned; }); xp += (S.settings.missionsDone || 0) * XP.mission; xp += trophies().filter((t) => t.ok).length * XP.trophy; return xp; }
+function levelInfo() { const xp = xpTotal(); let lv = 1; while (xp >= xpFor(lv + 1)) lv++; const base = xpFor(lv), next = xpFor(lv + 1); return { xp, lv, base, next, pct: Math.max(0, Math.min(100, Math.round((xp - base) / (next - base) * 100))) }; }
+/* schermata "LEVEL UP" a tutto schermo (immagine di Lucas + livello, XP e barra disegnati sopra) */
+function showLevelUp(li) {
+  if ($('#levelup')) return; const el = document.createElement('div'); el.id = 'levelup'; el.className = 'lvl';
+  el.innerHTML = `<div class="lvl-box"><img src="img/levelup.webp" alt=""><div class="lvl-xp" data-no-i18n>${li.xp} / ${li.next} XP</div><div class="lvl-num" data-no-i18n>${li.lv}</div><div class="lvl-fill"><i style="width:0%"></i></div><button type="button" class="lvl-go" aria-label="Continua"></button></div>`;
+  document.body.appendChild(el); try { if (navigator.vibrate) navigator.vibrate([40, 60, 40]); } catch (_) {}
+  requestAnimationFrame(() => requestAnimationFrame(() => { el.classList.add('in'); setTimeout(() => { const f = $('.lvl-fill i', el); if (f) f.style.width = Math.max(4, li.pct) + '%'; }, 500); }));
+  const close = () => { el.classList.remove('in'); el.classList.add('out'); setTimeout(() => el.remove(), 450); };
+  $('.lvl-go', el).addEventListener('click', close); el.addEventListener('click', (e) => { if (e.target === el) close(); });
+}
+function levelCheck() {
+  let li; try { missionBusy = true; li = levelInfo(); } catch (_) { return; } finally { missionBusy = false; }
+  const seen = S.settings.levelSeen;
+  if (seen == null || li.lv > seen) { const wasNew = seen != null; S.settings.levelSeen = li.lv; missionBusy = true; try { save(); } finally { missionBusy = false; } if (wasNew) showLevelUp(li); }
 }
 function scheduleMissionCheck() { if (missionBusy) return; clearTimeout(missionTimer); missionTimer = setTimeout(missionCheck, 350); }
 function missionNext() {
@@ -1956,8 +1976,10 @@ materializeRecurring();
   route();
   setTimeout(missionCheck, 1200); // all'apertura annuncio le missioni completate nel frattempo
   // prova voluta da Lucas: al prossimo accesso (entro la data) l'avviso scende una volta anche se non c'è niente di nuovo
+  const LEVELUP_FORCE = { until: '2026-09-08', key: 'pari:levelup-force-1' };
+  try { if (auth.user() && todayStr() <= LEVELUP_FORCE.until && !localStorage.getItem(LEVELUP_FORCE.key)) setTimeout(() => { try { localStorage.setItem(LEVELUP_FORCE.key, '1'); showLevelUp(levelInfo()); } catch (e) { console.warn('levelup', e); } }, 2600); } catch (_) {}
   const BANNER_FORCE = { until: '2026-09-08', key: 'pari:banner-force-1' };
-  try { if (auth.user() && todayStr() <= BANNER_FORCE.until && !localStorage.getItem(BANNER_FORCE.key)) { localStorage.setItem(BANNER_FORCE.key, '1'); setTimeout(() => { const w = missions(); const m = w.list.find((x) => x.done) || w.list[0]; missionQueue.push({ title: m.title, trophy: false }); missionNext(); }, 1500); } } catch (_) {}
+  try { if (auth.user() && todayStr() <= BANNER_FORCE.until && !localStorage.getItem(BANNER_FORCE.key)) { setTimeout(() => { localStorage.setItem(BANNER_FORCE.key, '1'); const w = missions(); const m = w.list.find((x) => x.done) || w.list[0]; missionQueue.push({ title: m.title, trophy: false }); missionNext(); }, 1500); } } catch (_) {}
   auth.refreshIfNeeded().then(() => { if (!auth.user() && currentRoute && currentRoute.name !== 'accedi') render(); });
   hideSplash();
 })();
@@ -1981,5 +2003,5 @@ if ('serviceWorker' in navigator) {
     }).catch(() => {});
   });
 }
-window.PARI = { state: () => S, addEntry, balances, monthStats, sync, toast, parseReceipt, scanReceipt };
+window.PARI = { state: () => S, addEntry, balances, monthStats, sync, toast, parseReceipt, scanReceipt, levelInfo, showLevelUp, missions, trophies };
 })();
