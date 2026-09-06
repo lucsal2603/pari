@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.29.2';
+const APP_VERSION = '1.29.3';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -512,7 +512,7 @@ function pageHome() {
 let speseFilter = { q: '', cat: '', group: '' };
 function pageSpese(r) {
   return `<div class="page">
-    <div class="head left${r.back ? ' with-back' : ''}">${r.back ? `<button class="icon-btn" data-back="${esc(r.back)}" aria-label="Indietro">${icon('i-back')}</button>` : ''}<div class="title">${speseFilter.group && groups().find((g) => g.id === speseFilter.group) ? esc(groups().find((g) => g.id === speseFilter.group).name) : 'Spese'}</div><a class="icon-btn" href="#/attivita" aria-label="Attività">${icon('i-repeat')}</a></div>
+    <div class="head left${r.back ? ' with-back' : ''}">${r.back ? `<button class="icon-btn" data-back="${esc(r.back)}" aria-label="Indietro">${icon('i-back')}</button>` : ''}<div class="title">${speseFilter.group && groups().find((g) => g.id === speseFilter.group) ? esc(groups().find((g) => g.id === speseFilter.group).name) : 'Spese'}</div><span></span></div>
     <label class="search">${icon('i-search')}<input id="q" type="search" placeholder="Cerca una spesa…" value="${esc(speseFilter.q)}" autocomplete="off"></label>
     ${groups().length ? `<div class="chips" id="group-chips"><button class="chip${!speseFilter.group ? ' on' : ''}" data-group="">Tutte le sezioni</button>${groups().map((g) => `<button class="chip${speseFilter.group === g.id ? ' on' : ''}" data-group="${g.id}">${esc(g.name)}</button>`).join('')}</div>` : ''}
     <div class="chips" id="chips"><button class="chip${!speseFilter.cat ? ' on' : ''}" data-cat="">Tutte</button>${CATS.map((c) => `<button class="chip${speseFilter.cat === c.id ? ' on' : ''}" data-cat="${c.id}">${icon(c.icon)}${esc(c.name)}</button>`).join('')}</div>
