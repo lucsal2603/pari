@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.33.1';
+const APP_VERSION = '1.33.2';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -923,8 +923,8 @@ function trophies() {
   add('categorie', 'spese', 'categorie', 'Di tutto un po\'', 'Spese in 8 categorie diverse', 'Usate 8 categorie diverse', cats.size, 8, '');
   // Risparmio
   add('spilorcio', 'risparmio', 'moneta', 'Spilorcio', 'Un mese con meno spese del precedente', 'Chiudi un mese spendendo meno del precedente', spilAt ? 1 : 0, 1, spilAt, 'bool');
-  add('budget1', 'risparmio', '', 'Nel budget', 'Un mese chiuso entro il tuo budget', 'Chiudi un mese entro il tuo budget', kept, 1, keptAt, 'bool');
-  add('budget3', 'risparmio', '', 'Tre su tre', 'Tre mesi di fila entro il budget', 'Tre mesi di fila entro il budget', bestKept, 3, kept3At);
+  add('budget1', 'risparmio', 'salvadanaio', 'Nel budget', 'Un mese chiuso entro il tuo budget', 'Chiudi un mese entro il tuo budget', kept, 1, keptAt, 'bool');
+  add('budget3', 'risparmio', 'tresalvadanai', 'Tre su tre', 'Tre mesi di fila entro il budget', 'Tre mesi di fila entro il budget', bestKept, 3, kept3At);
   add('risparmio500', 'risparmio', 'moneta', 'Grande risparmio', 'Risparmiati 500 € rispetto ai mesi prima', 'Risparmia 500 € rispetto ai mesi prima', saved, 50000, '', 'money');
   add('leggero', 'risparmio', '', 'Mese leggero', 'Un mese sotto i 300 € di spese', 'Chiudi un mese sotto i 300 €', lighterAt ? 1 : 0, 1, lighterAt, 'bool');
   add('weekend', 'risparmio', 'sdraio', 'Weekend senza extraspese', 'Un weekend senza cene fuori, svaghi e shopping', 'Un weekend senza cene fuori, svaghi e shopping', weekendOk && weekendOk.done ? 1 : 0, 1, '', 'bool');
