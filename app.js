@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.27.1';
+const APP_VERSION = '1.27.2';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -879,7 +879,7 @@ function achievements() {
   const pm = monthOnly(prev); const rispetto = LANG() === 'it' && /^[aeiou]/i.test(pm) ? 'Rispetto ad {0}.' : 'Rispetto a {0}.';
   return [
     { id: 'pari', hero: true, done: settled, img: 'coppa', title: settled ? 'Tutto in pari!' : 'Manca poco!', sub: settled ? 'Avete sistemato tutti i saldi. Grande!' : T('Vi separano {0}: saldate per sbloccare il trofeo.', money(owe)), cta: settled ? 'Continua così!' : 'Registra pagamento', href: settled ? '#/home' : '#/bilanci' },
-    { id: 'meno', done: less, img: '', title: less ? T('Avete speso {0} in meno questo mese!', moneyRound(prevTot - monthTot)) : 'Meno del mese scorso', sub: less ? T(rispetto, pm) : 'Spendete meno del mese scorso per sbloccarlo.' },
+    { id: 'meno', done: less, img: 'moneta', title: less ? T('Avete speso {0} in meno questo mese!', moneyRound(prevTot - monthTot)) : 'Meno del mese scorso', sub: less ? T(rispetto, pm) : 'Spendete meno del mese scorso per sbloccarlo.' },
     { id: 'weekend', done: weekendOk, img: 'sdraio', title: 'Weekend senza extraspese!', sub: weekendOk ? 'Avete mantenuto il budget del weekend.' : 'Un weekend senza cene fuori, svaghi e shopping e si sblocca.' },
     { id: 'dieci', done: n >= 10, img: 'vetta', title: '10 spese condivise', sub: n >= 10 ? T('Avete già {0} spese insieme.', n) : 10 - n === 1 ? "Aggiungete un'altra spesa per sbloccare questo traguardo." : T('Aggiungete altre {0} spese per sbloccare questo traguardo.', 10 - n) },
     { id: 'viaggio', done: !!(tripGroup || tripExp), img: 'mondo', title: 'Primo viaggio insieme', sub: tripGroup ? T('La sezione «{0}» è il vostro primo viaggio.', tripGroup.name) : tripExp ? 'Avete già una spesa di viaggio.' : 'Create una sezione viaggio per sbloccare questo traguardo.' },
