@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.37.3';
+const APP_VERSION = '1.37.4';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -1085,7 +1085,8 @@ function missionCheck() {
 /* ---------- Livelli ed esperienza (di coppia: contano i dati condivisi) ---------- */
 const xpFor = (n) => { let t = 0; for (let k = 2; k <= n; k++) t += Math.round(60 * Math.pow(1.18, k - 2)); return t; }; // livello 2 a 60 XP, poi ogni livello chiede il 18% in più (3 = 131, 4 = 215, 5 = 314, 10 = 1146)
 const XP = { expense: 10, payment: 15, category: 5, scanned: 20, mission: 40, trophy: 100 };
-function xpTotal() { let xp = 0; active().forEach((e) => { xp += e.kind === 'payment' ? XP.payment : XP.expense; if (e.kind === 'expense' && e.cat) xp += XP.category; if (e.scanned) xp += XP.scanned; }); xp += (S.settings.missionsDone || 0) * XP.mission; xp += trophies().filter((t) => t.ok).length * XP.trophy; return xp; }
+const entryXp = (e) => (e.kind === 'payment' ? XP.payment : XP.expense) + (e.kind === 'expense' && e.cat ? XP.category : 0) + (e.scanned ? XP.scanned : 0);
+function xpTotal() { let xp = 0; active().forEach((e) => { xp += entryXp(e); }); xp += (S.settings.missionsDone || 0) * XP.mission; xp += trophies().filter((t) => t.ok).length * XP.trophy; return xp; }
 function levelInfo() { const xp = xpTotal(); let lv = 1; while (xp >= xpFor(lv + 1)) lv++; const base = xpFor(lv), next = xpFor(lv + 1); return { xp, lv, base, next, pct: Math.max(0, Math.min(100, Math.round((xp - base) / (next - base) * 100))) }; }
 /* schermata "LEVEL UP" a tutto schermo (immagine di Lucas + livello, XP e barra disegnati sopra) */
 function showLevelUp(li) {
@@ -1526,6 +1527,7 @@ function pageDone(r) {
     <h1 class="done-h">${isPay ? 'Pagamento registrato!' : 'Pagamento aggiunto!'}<svg class="done-line" viewBox="0 0 220 12" preserveAspectRatio="none"><path d="M3 8 C 60 2, 150 2, 217 7" fill="none" stroke="#A9D3B6" stroke-width="5" stroke-linecap="round"/></svg></h1>
     <p class="done-p">Tutto ok, l'abbiamo salvato.</p>
     <div class="done-card"><span class="cat-ic${isPay ? ' pay' : ''}">${icon(isPay ? 'c-pagamento' : c.icon)}</span><div class="done-txt"><b>${esc(isPay ? 'Pagamento' : e.desc)}</b><span>${sub}</span><span>${esc(dateShort(e.date))} ${esc(String(e.date).slice(0, 4))} • ${esc(payer.name)}</span></div><span class="done-amt">${esc(curSymbol())} ${esc(moneyPlain(e.amount))}</span></div>
+    <p class="done-xp" data-no-i18n><em class="xp-tag got">+${entryXp(e)} XP</em></p>
     ${!isPay && (myBudget().monthly || 0) > 0 ? (() => { const bm = budgetMonth(ym(e.date)); const pct = Math.round(bm.spent / bm.budget * 100); return `<p class="done-budget${pct > 100 ? ' over' : pct >= 80 ? ' warn' : ''}">${esc(T('Il tuo budget: {0} su {1} ({2}%)', money(bm.spent), money(bm.budget), pct))}</p>`; })() : ''}
     <div class="done-actions"><a class="btn onb-btn" href="#/home">Perfetto!</a><a class="done-link" href="#/nuova${isPay ? '?tipo=pagamento' : ''}">${isPay ? 'Registra un altro pagamento' : 'Aggiungi un altro pagamento'}</a></div>
     <svg class="done-sq l" viewBox="0 0 120 90" aria-hidden="true"><path d="M8 70 C 25 20, 45 25, 40 55 C 36 80, 60 85, 75 35" fill="none" stroke="#B9D9C4" stroke-width="7" stroke-linecap="round"/></svg>

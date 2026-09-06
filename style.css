@@ -970,3 +970,6 @@ body.fixed-screen .view { height: 100dvh; overflow: hidden; padding-bottom: calc
 .xp-tag.got { background: #FFF1C2; color: #8A6300; }
 .ach-t b .xp-tag { margin-left: 4px; }
 .tf-body .xp-tag { align-self: center; margin: 1px 0 2px; }
+
+.done-xp { margin: -4px 0 10px; text-align: center; }
+.done-xp .xp-tag { font-size: 13px; padding: 4px 12px; }
