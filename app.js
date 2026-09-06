@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.33.2';
+const APP_VERSION = '1.33.3';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -926,15 +926,15 @@ function trophies() {
   add('budget1', 'risparmio', 'salvadanaio', 'Nel budget', 'Un mese chiuso entro il tuo budget', 'Chiudi un mese entro il tuo budget', kept, 1, keptAt, 'bool');
   add('budget3', 'risparmio', 'tresalvadanai', 'Tre su tre', 'Tre mesi di fila entro il budget', 'Tre mesi di fila entro il budget', bestKept, 3, kept3At);
   add('risparmio500', 'risparmio', 'moneta', 'Grande risparmio', 'Risparmiati 500 € rispetto ai mesi prima', 'Risparmia 500 € rispetto ai mesi prima', saved, 50000, '', 'money');
-  add('leggero', 'risparmio', '', 'Mese leggero', 'Un mese sotto i 300 € di spese', 'Chiudi un mese sotto i 300 €', lighterAt ? 1 : 0, 1, lighterAt, 'bool');
+  add('leggero', 'risparmio', 'palloncino', 'Mese leggero', 'Un mese sotto i 300 € di spese', 'Chiudi un mese sotto i 300 €', lighterAt ? 1 : 0, 1, lighterAt, 'bool');
   add('weekend', 'risparmio', 'sdraio', 'Weekend senza extraspese', 'Un weekend senza cene fuori, svaghi e shopping', 'Un weekend senza cene fuori, svaghi e shopping', weekendOk && weekendOk.done ? 1 : 0, 1, '', 'bool');
   // Costanza
   add('sette', 'costanza', 'calendario', 'Costanza', '7 giorni consecutivi con una spesa', 'Aggiungi una spesa per 7 giorni di fila', bestDays, 7, bestDaysAt);
-  add('settimane', 'costanza', '', 'Un mese intero', 'Spese in 4 settimane dello stesso mese', 'Spese in 4 settimane dello stesso mese', bestWeeks, 4, bestWeeksAt);
+  add('settimane', 'costanza', 'settimane', 'Un mese intero', 'Spese in 4 settimane dello stesso mese', 'Spese in 4 settimane dello stesso mese', bestWeeks, 4, bestWeeksAt);
   add('tremesi', 'costanza', 'calendario', 'Tre mesi di fila', 'Tre mesi consecutivi con spese', 'Usate Divvy per tre mesi di seguito', bestM, 3, bestMAt);
-  add('seimesi', 'costanza', '', 'Sei mesi insieme', 'Sei mesi consecutivi con spese', 'Usate Divvy per sei mesi di seguito', bestM, 6, bestMAt);
-  add('anno', 'costanza', '', 'Un anno di Divvy', 'Dodici mesi consecutivi con spese', 'Usate Divvy per un anno intero', bestM, 12, bestMAt);
-  add('puntuali', 'costanza', '', 'Puntuali', 'Avete registrato 5 pagamenti', 'Registrate 5 pagamenti', pays.length, 5, nth(pays, 5));
+  add('seimesi', 'costanza', 'sei', 'Sei mesi insieme', 'Sei mesi consecutivi con spese', 'Usate Divvy per sei mesi di seguito', bestM, 6, bestMAt);
+  add('anno', 'costanza', 'compleanno', 'Un anno di Divvy', 'Dodici mesi consecutivi con spese', 'Usate Divvy per un anno intero', bestM, 12, bestMAt);
+  add('puntuali', 'costanza', 'sveglia', 'Puntuali', 'Avete registrato 5 pagamenti', 'Registrate 5 pagamenti', pays.length, 5, nth(pays, 5));
   // Insieme
   add('pari', 'insieme', 'coppa', 'Tutto in pari', 'Avete azzerato i saldi', 'Mettetevi in pari almeno una volta', pariAt ? 1 : 0, 1, pariAt, 'bool');
   add('team', 'insieme', '', 'Team perfetto', 'Avete pagato 10 spese a testa', 'Pagate 10 spese a testa', minPaid, 10, '');
