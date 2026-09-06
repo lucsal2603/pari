@@ -924,3 +924,8 @@ body.fixed-screen .view { height: 100dvh; overflow: hidden; padding-bottom: calc
 .tf-card.locked .tf-t { color: #6E726E; }
 .tf-card.locked .tf-bar { margin-top: auto; }
 .tf-empty { margin: 4px 2px 8px; }
+
+.ach-prog { display: block; height: 6px; border-radius: 3px; background: rgba(0, 0, 0, .08); overflow: hidden; margin-top: 6px; }
+.ach-prog i { display: block; height: 100%; border-radius: 3px; background: var(--green); }
+.ach-num { font-size: 12px; font-weight: 700; color: var(--muted); margin-top: 3px; }
+.ach-card.locked .ach-prog i { background: #8F938F; }
