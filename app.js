@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.27.2';
+const APP_VERSION = '1.27.3';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -885,7 +885,7 @@ function achievements() {
     { id: 'viaggio', done: !!(tripGroup || tripExp), img: 'mondo', title: 'Primo viaggio insieme', sub: tripGroup ? T('La sezione «{0}» è il vostro primo viaggio.', tripGroup.name) : tripExp ? 'Avete già una spesa di viaggio.' : 'Create una sezione viaggio per sbloccare questo traguardo.' },
     { id: 'record', done: !!record, img: 'pesi', title: 'Mese da record', sub: record ? T('{0}: {1} di spese.', cap(monthName(record[0])), money(record[1])) : T('Superate {0} di spese in un mese.', moneyRound(100000)) },
     { id: 'tre', done: streak, img: 'calendario', title: 'Tre mesi di fila', sub: streak ? 'Tre mesi consecutivi con spese: che costanza!' : 'Usate Divvy per tre mesi di seguito.' },
-    { id: 'scontrino', done: scanned, img: '', title: 'Primo scontrino letto', sub: scanned ? 'Il bot ha letto il vostro primo scontrino.' : 'Fotografate uno scontrino dal + per sbloccarlo.' },
+    { id: 'scontrino', done: scanned, img: 'scontrino', title: 'Primo scontrino letto', sub: scanned ? 'Il bot ha letto il vostro primo scontrino.' : 'Fotografate uno scontrino dal + per sbloccarlo.' },
   ];
 }
 const achNew = () => { const seen = S.settings.seenAch || []; return achievements().some((a) => a.done && !seen.includes(a.id)); };
