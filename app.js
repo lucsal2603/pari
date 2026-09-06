@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.43.0';
+const APP_VERSION = '1.43.1';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -1204,7 +1204,8 @@ function levelCheck() {
 }
 function scheduleMissionCheck() { if (missionBusy) return; clearTimeout(missionTimer); missionTimer = setTimeout(missionCheck, 350); }
 function missionNext() {
-  if (missionShowing || !missionQueue.length) return; const it = missionQueue.shift(); missionShowing = true;
+  if (missionShowing || !missionQueue.length) return;
+  if (typeof TOUR !== 'undefined' && TOUR) { setTimeout(missionNext, 2500); return; } // durante il tour guidato gli avvisi aspettano const it = missionQueue.shift(); missionShowing = true;
   const el = document.createElement('a'); el.className = 'mban' + (it.trophy ? ' trophy' : ''); el.href = it.trophy ? '#/profilo/trofei' : '#/missioni';
   el.innerHTML = `<img src="img/missione.webp" alt=""><span class="mban-h">${esc(T(it.trophy ? 'Trofeo sbloccato!' : 'Missione completata!'))}</span><span class="mban-s">${esc(T('Hai sbloccato:'))}</span><span class="mban-t" data-no-i18n>${esc(T(it.title))}</span>`; document.body.appendChild(el);
   try { if (navigator.vibrate) navigator.vibrate(30); } catch (_) {}

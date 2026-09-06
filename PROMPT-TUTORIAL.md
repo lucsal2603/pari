@@ -1,6 +1,6 @@
 # Animazioni della mascotte per il tutorial
 
-Sette animazioni in loop, una per passo del tutorial (`img/tutorial/<id>.webp`). Per ognuna, incolla in ChatGPT il **prompt base** seguito dal **prompt del passo**, allegando l'immagine della mascotte (per esempio `img/levelup-mascotte.webp` o `img/fatto.png`).
+Sette animazioni in loop, una per passo del tour guidato dentro l'app (`img/tutorial/<id>.webp`, mostrate a circa 110 px di altezza nella card che accompagna ogni passo). Per ognuna, incolla in ChatGPT il **prompt base** seguito dal **prompt del passo**, allegando l'immagine della mascotte (per esempio `img/levelup-mascotte.webp` o `img/fatto.png`).
 
 ## Prompt base (da mettere sempre davanti)
 
