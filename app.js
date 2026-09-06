@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.41.2';
+const APP_VERSION = '1.42.0';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -397,10 +397,10 @@ function render(r, toTop) {
   r = r || currentRoute || { name: 'home', id: '', q: {} }; currentRoute = r;
   const publicPages = ['accedi', 'registrati', 'recupero', 'legale', 'conferma'];
   if (!auth.user() && !publicPages.includes(r.name)) { r = { name: 'accedi', id: '', sub: '', q: {}, back: null }; currentRoute = r; }
-  const pages = { home: pageHome, spese: pageSpese, bilanci: pageBilanci, profilo: pageProfilo, nuova: pageForm, modifica: pageForm, spesa: pageDetail, statistiche: pageStats, attivita: pageActivity, traguardi: pageMissioni, missioni: pageMissioni, budget: pageBudget, benvenuto: pageWelcome, accedi: pageLogin, registrati: pageRegister, recupero: pageRecovery, legale: pageLegal, conferma: pageConfirm, fatto: pageDone };
+  const pages = { home: pageHome, spese: pageSpese, bilanci: pageBilanci, profilo: pageProfilo, nuova: pageForm, modifica: pageForm, spesa: pageDetail, statistiche: pageStats, attivita: pageActivity, traguardi: pageMissioni, missioni: pageMissioni, tutorial: pageTutorial, budget: pageBudget, benvenuto: pageWelcome, accedi: pageLogin, registrati: pageRegister, recupero: pageRecovery, legale: pageLegal, conferma: pageConfirm, fatto: pageDone };
   const fn = pages[r.name] || pageHome;
-  const onb = ['benvenuto', 'accedi', 'registrati', 'recupero', 'conferma', 'fatto'].includes(r.name) || (r.name === 'legale' && !auth.user());
-  document.body.classList.toggle('fixed-screen', ['accedi', 'registrati', 'recupero', 'conferma', 'benvenuto', 'fatto'].includes(r.name));
+  const onb = ['benvenuto', 'tutorial', 'accedi', 'registrati', 'recupero', 'conferma', 'fatto'].includes(r.name) || (r.name === 'legale' && !auth.user());
+  document.body.classList.toggle('fixed-screen', ['accedi', 'registrati', 'recupero', 'conferma', 'benvenuto', 'tutorial', 'fatto'].includes(r.name));
   tabbar.classList.toggle('hide', onb); view.classList.toggle('no-tabbar', onb);
   const tabName = r.name === 'profilo' ? 'profilo' : r.name === 'statistiche' || r.name === 'bilanci' ? 'home' : r.name;
   $$('.tab').forEach((t) => t.classList.toggle('on', t.dataset.tab === tabName));
@@ -1027,6 +1027,30 @@ function pageClassifica() {
     <div id="cl-body">${on ? `<div class="cl-loading"><span class="spin"></span>Carico la classifica…</div>` : `<section class="card" style="padding:18px"><p class="muted small" style="margin:0 0 12px">La classifica confronta il livello di tutti gli utenti di Divvy. Serve il codice casa.</p><a class="btn" href="#/profilo/sync">Backup e sincronizzazione</a></section>`}</div>
   </div>`;
 }
+/* ---------- Tutorial veloce al primo accesso (dopo la presentazione), con la mascotte animata a ogni passo ---------- */
+const TUT_STEPS = [
+  { id: 'ciao', title: 'Ciao, sono Divvy!', text: 'Ti faccio vedere l\'app in un minuto. Poi sei libero di esplorare.' },
+  { id: 'spesa', title: 'Aggiungi una spesa col +', text: 'Descrizione, importo e categoria: paghi tu e si divide a metà con {0}.' },
+  { id: 'scontrino', title: 'Fotografa lo scontrino', text: 'Nel + trovi "Leggi lo scontrino": leggo importo, negozio e voci, anche da uno screenshot della banca.' },
+  { id: 'saldi', title: 'Chi deve cosa', text: 'In Home vedi il saldo con {0}. Con "Metti in pari" registri il pagamento in un tocco.' },
+  { id: 'budget', title: 'Il tuo budget', text: 'Nel tab Budget decidi quanto vuoi spendere al mese: ti dico quanto resta e a che ritmo vai.' },
+  { id: 'missioni', title: 'Missioni, trofei e livelli', text: 'Ogni spesa dà XP. Con le missioni settimanali e i trofei sali di livello e scali la classifica.' },
+  { id: 'pronto', title: 'Tutto pronto!', text: 'Attiva le notifiche per sapere subito quando {0} aggiunge qualcosa. Buon divertimento!' },
+];
+let TUT = { step: 0 };
+const tutorialDone = () => { const u = auth.user(); if (!u) return true; return !!((u.user_metadata || {}).tutorial) || S.settings.tutorialDoneFor === u.id; };
+function tutorialFinish() { const u = auth.user(); if (u) { S.settings.tutorialDoneFor = u.id; try { auth.updateMeta({ tutorial: true }); } catch (_) {} } save(); TUT = { step: 0 }; go('#/home'); }
+function pageTutorial() {
+  const i = Math.max(0, Math.min(TUT_STEPS.length - 1, TUT.step)); const st = TUT_STEPS[i]; const last = i === TUT_STEPS.length - 1; const p = other().name;
+  return `<div class="page onb steps tut" data-step="${i}">
+    <div class="onb-top"><span></span><button type="button" class="onb-skip" data-tut-skip>Salta</button></div>
+    <div class="tut-anim"><img src="img/tutorial/${st.id}.webp" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'), { className: 'tut-ph' }))"></div>
+    <h1 class="onb-h tut-h">${esc(st.title)}</h1>
+    <p class="onb-p tut-p">${esc(T(st.text, p))}</p>
+    <div class="onb-dots">${TUT_STEPS.map((_, k) => `<i class="${k === i ? 'on' : ''}"></i>`).join('')}</div>
+    <button type="button" class="btn onb-btn" data-tut-next>${last ? 'Inizia' : 'Avanti'} ${arrowIc}</button>
+  </div>`;
+}
 function pageLingua() {
   const cur = LANG();
   return `<div class="page slide">${subHead('Lingua')}
@@ -1046,6 +1070,7 @@ function pageInfo() {
     </div></section>
     <section class="card section"><div class="menu"><a href="#/legale/termini">${icon('i-info')}<span>Termini di servizio</span><span></span>${icon('i-right', 'ic chev')}</a><a href="#/legale/privacy">${icon('i-lock')}<span>Informativa sulla privacy</span><span></span>${icon('i-right', 'ic chev')}</a></div></section>
     <div class="section btn-row"><button class="btn soft" id="reload-app">Ricarica l'app</button><button class="btn ghost" id="replay-onb">Rivedi la presentazione</button></div>
+    <div class="section"><button class="btn ghost" id="replay-tut" style="width:100%">Rivedi il tutorial</button></div>
   </div>`;
 }
 
@@ -1664,7 +1689,9 @@ function obGo(step, dir) {
   else doRender();
 }
 function obFinish() {
-  S.settings.onboarded = true; const u = auth.user(); if (u) { S.settings.onboardedFor = u.id; auth.updateMeta({ onboarded: true }); } save(); const nm = me().name; OB = { step: 1, name: '', partner: '', house: '', avatar: -1, split: 'equal', pct: 50 }; go('#/home');
+  S.settings.onboarded = true; const u = auth.user(); if (u) { S.settings.onboardedFor = u.id; auth.updateMeta({ onboarded: true }); } save(); const nm = me().name; OB = { step: 1, name: '', partner: '', house: '', avatar: -1, split: 'equal', pct: 50 };
+  if (!tutorialDone()) { TUT = { step: 0 }; go('#/tutorial'); return; }
+  go('#/home');
   if (!sync.enabled()) toast(`Per condividere con ${other().name}: Profilo → Backup e sincronizzazione`); else if (!S.settings.push) toast('Attiva gli avvisi da Profilo → Notifiche'); else toast(`Divvy è pronta, ${nm}`);
 }
 function bindWelcome() {
@@ -1735,6 +1762,10 @@ function bind(r) {
   if (r.name === 'budget') {
     $$('[data-set-budget]').forEach((b) => b.addEventListener('click', () => budgetSheet('Budget mensile', myBudget().monthly || 0, (v) => setBudget(v))));
     $$('[data-cat-budget]').forEach((b) => b.addEventListener('click', () => { const c = catOf(b.dataset.catBudget); budgetSheet(T('Budget per {0}', T(c.name)), (myBudget().byCat || {})[c.id] || 0, (v) => setCatBudget(c.id, v), T('Conta la tua quota delle spese, non il totale.')); }));
+  }
+  if (r.name === 'tutorial') {
+    const tn = $('[data-tut-next]'); if (tn) tn.addEventListener('click', () => { if (TUT.step >= TUT_STEPS.length - 1) { tutorialFinish(); return; } TUT.step++; render(currentRoute, true); });
+    const ts = $('[data-tut-skip]'); if (ts) ts.addEventListener('click', tutorialFinish);
   }
   if (r.name === 'spese') {
     $$('[data-group-menu]').forEach((b) => b.addEventListener('click', () => openGroupSheet(b.dataset.groupMenu)));
@@ -1841,6 +1872,7 @@ function bindProfilo(r) {
     const off = $('#push-off'); if (off) off.addEventListener('click', async () => { await disablePush(); render(); toast('Notifiche disattivate'); });
   }
   if (r.sub === 'info') { $('#replay-onb').addEventListener('click', () => { OB = { step: 1, name: '', partner: '', house: '', avatar: AVATAR_IMGS.indexOf(((me().avatar || {}).img) || ''), split: (S.settings.split || {}).mode === 'custom' ? 'custom' : 'equal', pct: ((S.settings.split || {}).pct || {})[me().id] || 50 }; go('#/benvenuto'); }); }
+  if (r.sub === 'info') { const rt = $('#replay-tut'); if (rt) rt.addEventListener('click', () => { TUT = { step: 0 }; go('#/tutorial'); }); }
   if (r.sub === 'info') $('#reload-app').addEventListener('click', () => { navigator.serviceWorker?.getRegistration().then((reg) => reg && reg.update()); try { sessionStorage.setItem('pari:nosplash', '1'); } catch (_) {} location.reload(); });
 }
 
@@ -2034,6 +2066,7 @@ materializeRecurring();
   if (auth.recovery) history.replaceState(null, '', '#/recupero');
   else if (!auth.user()) { if (!/^#\/(accedi|registrati|legale|conferma|join)/.test(location.hash)) history.replaceState(null, '', '#/accedi'); }
   else if (!onboardingDone()) history.replaceState(null, '', '#/benvenuto');
+  else if (!tutorialDone() && !/^#\/(tutorial|legale)/.test(location.hash)) history.replaceState(null, '', '#/tutorial');
   if (auth.user()) { applyPendingJoin(); if (restoreHouseFromAccount() && sync.enabled()) sync.run(true); rememberHouse(); showDailyLove(); }
   route();
   setTimeout(missionCheck, 1200); // all'apertura annuncio le missioni completate nel frattempo
