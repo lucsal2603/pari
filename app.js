@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.31.1';
+const APP_VERSION = '1.32.0';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -492,7 +492,7 @@ function pageHome() {
       <div class="s">${esc(sent.text)}</div>
       ${coupleScene('hero-couple')}
     </section>
-    <div class="home-actions"><a class="ha main" href="#/nuova?tipo=pagamento">${icon('i-balance')}<span>Registra pagamento</span></a><a class="ha" href="#/bilanci">${icon('i-scale')}<span>Dettaglio saldi</span></a></div>
+    <div class="home-actions">${sent.even ? `<a class="ha main" href="#/statistiche">${icon('i-chart')}<span>Statistiche</span></a>` : `<button type="button" class="ha main" data-settle-all>${icon('i-balance')}<span>Metti in pari</span></button>`}<a class="ha" href="#/bilanci">${icon('i-scale')}<span>Dettaglio saldi</span></a></div>
     <div class="link-row"><h2 class="sec-title">Sezioni</h2><a href="#/profilo/sezioni">Gestisci ${icon('i-right')}</a></div>
     <section class="card list-card"><div class="list stagger">${groups().map((g, i) => groupRow(g, i)).join('') || '<div class="empty small" style="padding:18px">Nessuna sezione: creane una da Gestisci.</div>'}</div></section>
     <div class="link-row"><h2 class="sec-title">Ultime spese</h2><a href="#/spese">Vedi tutte ${icon('i-right')}</a></div>
@@ -567,14 +567,15 @@ function pageBilanci(r) {
     <section class="card">${barChart(m)}<div class="legend">${S.members.map((x) => `<span><span class="pd" style="--c:${x.color}"></span>${esc(x.name)}</span>`).join('')}</div></section>`;
   }
   return `<div class="page">
-    <div class="head left${r.back ? ' with-back' : ''}">${r.back ? `<button class="icon-btn" data-back="${esc(r.back)}" aria-label="Indietro">${icon('i-back')}</button>` : ''}<div class="title">Bilanci</div><a class="icon-btn" href="#/statistiche" aria-label="Statistiche">${icon('i-chart')}</a></div>
+    <div class="head left with-back"><button class="icon-btn" data-back="${esc(r.back || '#/home')}" aria-label="Indietro">${icon('i-back')}</button><div class="title">Bilanci</div><a class="icon-btn" href="#/statistiche" aria-label="Statistiche">${icon('i-chart')}</a></div>
     ${segHTML([{ v: '0', t: 'Totali' }, { v: '1', t: 'Per periodo' }], tab, '', 'balTab')}
     <div class="section">${body}</div>
   </div>`;
 }
 
 /* ---------- STATISTICHE ---------- */
-function pageStats() {
+function pageStats(r) {
+  r = r || currentRoute || {};
   const range = S.ui.statsRange; const m = S.ui.month; const sg = statsGroup && groups().find((g) => g.id === statsGroup); const es = rangeEntries(range, m).filter((e) => !sg || e.group === sg.id); const st = aggregate(es);
   const a = me(), b = other();
   const monthsInRange = range === 'mese' ? 1 : range === '3mesi' ? 3 : 12;
@@ -585,7 +586,7 @@ function pageStats() {
   const label = range === 'mese' ? monthName(m) : range === '3mesi' ? `${monthShort(shiftYM(m, -2))} – ${monthName(m)}` : 'Anno ' + m.slice(0, 4);
   const maxP = Math.max(st.paid[a.id], st.paid[b.id], 1);
   return `<div class="page slide">
-    <div class="head"><button class="icon-btn" data-back="#/bilanci" aria-label="Indietro">${icon('i-back')}</button><div class="title">${sg ? esc(sg.name) : 'Statistiche'}</div><span></span></div>
+    <div class="head"><button class="icon-btn" data-back="${esc(r.back || '#/home')}" aria-label="Indietro">${icon('i-back')}</button><div class="title">${sg ? esc(sg.name) : 'Statistiche'}</div><span></span></div>
     ${segHTML([{ v: 'mese', t: 'Mese' }, { v: '3mesi', t: '3 mesi' }, { v: 'anno', t: 'Anno' }], ['mese', '3mesi', 'anno'].indexOf(range), 'dark', 'statsRange')}
     ${range === 'anno' ? `<div class="monthnav"><button class="icon-btn" data-year="-1" aria-label="Anno precedente">${icon('i-left')}</button><span class="label">${esc(label)}</span><button class="icon-btn" data-year="1" aria-label="Anno successivo">${icon('i-right')}</button></div>` : monthNav(m)}
     <section class="card"><div class="stat-rows">
@@ -1479,6 +1480,11 @@ function installBanner() {
 
 /* ---------- Bind eventi per pagina ---------- */
 function bind(r) {
+  $$('[data-settle-all]').forEach((b) => b.addEventListener('click', () => {
+    const bal = balances(); const cred = S.members.find((m) => (bal[m.id] || 0) > 0), deb = S.members.find((m) => (bal[m.id] || 0) < 0); const amt = cred ? bal[cred.id] : 0;
+    if (!cred || !deb || amt < 1) { toast('Siete in pari'); return; }
+    confirmSheet('Mettere in pari tutto?', T('{0} paga {1} a {2}. Il saldo torna a zero.', deb.name, money(amt), cred.name), 'Registra', () => { const e = addEntry({ kind: 'payment', desc: 'Pagamento', amount: amt, date: todayStr(), cat: '', paidBy: deb.id, to: cred.id, splitMethod: 'exact', splitInput: {}, owed: { [cred.id]: amt }, notes: '', group: S.settings.lastGroup || null }); go('#/fatto/' + e.id); });
+  }));
   $$('[data-ach-info]').forEach((b) => b.addEventListener('click', () => openSheet('Come funzionano i traguardi', `<p class="muted" style="margin:6px 0 14px;line-height:1.5">I traguardi si sbloccano da soli in base alle spese e ai saldi del gruppo. Sono uguali per tutti e due: quando uno di voi ne sblocca uno, lo vede anche l'altro.</p>`)));
   const tb = $('[data-trophy]'); if (tb) tb.addEventListener('click', () => { tb.classList.add('tap'); });
   $$('[data-back]').forEach((b) => b.addEventListener('click', () => { if (r.name === 'nuova' || r.name === 'modifica') F = null; back(b.dataset.back); }));
@@ -1687,7 +1693,7 @@ function initSwipes() {
     const GAP = 8; // spazio fra il bordo della riga trascinata e il rosso
     // verso sinistra si scopre il rosso (elimina), verso destra il verde (modifica)
     const setX = (v) => { row.style.transform = v ? `translateX(${v}px)` : ''; if (del) { del.style.width = Math.max(0, -v - GAP) + 'px'; del.classList.toggle('wide', -v > 150); } if (edit) { edit.style.width = Math.max(0, v - GAP) + 'px'; edit.classList.toggle('wide', v > 150); } };
-    row.addEventListener('pointerdown', (e) => { if (e.pointerType === 'mouse' && e.button !== 0) return; down = true; drag = false; x0 = e.clientX; y0 = e.clientY; });
+    row.addEventListener('pointerdown', (e) => { if (e.pointerType === 'mouse' && e.button !== 0) return; if (e.clientX < 24) return; down = true; drag = false; x0 = e.clientX; y0 = e.clientY; });
     row.addEventListener('pointermove', (e) => {
       if (!down) return; const ddx = e.clientX - x0, ddy = e.clientY - y0;
       if (!drag) { if (Math.abs(ddx) > 8 && Math.abs(ddx) > Math.abs(ddy) * 1.2) { drag = true; moved = true; w.classList.add('dragging'); try { row.setPointerCapture(e.pointerId); } catch (_) {} if (openSwipe && openSwipe !== w) closeSwipe(openSwipe); } else return; }
@@ -1711,6 +1717,18 @@ document.addEventListener('pointerdown', (e) => { if (openSwipe && !openSwipe.co
 document.addEventListener('dragstart', (e) => { if (e.target && e.target.closest && e.target.closest('.swipe')) e.preventDefault(); });
 /* riga sottile sotto la barra del titolo solo quando c'è contenuto che le scorre sotto */
 window.addEventListener('scroll', () => { const h = document.querySelector('.page > .head'); if (h) h.classList.toggle('stuck', window.scrollY > 4); }, { passive: true });
+
+/* ---------- Trascina dal bordo sinistro per tornare indietro ---------- */
+(function edgeBack() {
+  const view = $('#view'); const EDGE = 24, TRIG = 90; let on = false, x0 = 0, y0 = 0, dx = 0, t0 = 0, target = null;
+  const backBtn = () => $('#view .head [data-back], #view [data-back][aria-label="Indietro"], #view [data-back][aria-label="Annulla"]');
+  document.addEventListener('touchstart', (e) => { on = false; if (e.touches.length !== 1 || $('#sheet-root').firstChild) return; const t = e.touches[0]; if (t.clientX > EDGE) return; target = backBtn(); if (!target) return; on = true; x0 = t.clientX; y0 = t.clientY; dx = 0; t0 = Date.now(); }, { passive: true });
+  document.addEventListener('touchmove', (e) => { if (!on) return; const t = e.touches[0]; const ddx = t.clientX - x0, ddy = t.clientY - y0; if (dx === 0 && Math.abs(ddy) > Math.abs(ddx)) { on = false; return; } dx = Math.max(0, ddx); if (e.cancelable) e.preventDefault(); view.style.transition = 'none'; view.style.transform = `translateX(${Math.min(dx * 0.7, 140)}px)`; view.style.opacity = String(Math.max(.55, 1 - dx / 600)); }, { passive: false });
+  const end = () => { if (!on) return; on = false; const fast = dx > 40 && Date.now() - t0 < 260; view.style.transition = 'transform .28s var(--ease-out), opacity .28s ease';
+    if ((dx > TRIG || fast) && target && target.isConnected) { view.style.transform = 'translateX(60px)'; view.style.opacity = '0'; setTimeout(() => { view.style.transition = 'none'; view.style.transform = ''; view.style.opacity = ''; target.click(); }, 160); }
+    else { view.style.transform = ''; view.style.opacity = ''; setTimeout(() => { view.style.transition = ''; }, 300); } };
+  document.addEventListener('touchend', end); document.addEventListener('touchcancel', end);
+})();
 
 /* ---------- Tira giù per ricaricare (su qualsiasi pagina) ---------- */
 (function pullToRefresh() {
