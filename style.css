@@ -943,7 +943,7 @@ body.fixed-screen .view { height: 100dvh; overflow: hidden; padding-bottom: calc
 .lvl { position: fixed; inset: 0; z-index: 95; background: #022B36; opacity: 0; transition: opacity .35s ease; overflow: hidden; }
 .lvl.in { opacity: 1; }
 .lvl.out { opacity: 0; }
-.lvl-bg { position: absolute; inset: 0; background: #022B36 url('img/levelup.webp') center 38% / cover no-repeat; transform: scale(1.08); transition: transform 1.3s var(--ease-out); }
+.lvl-bg { position: absolute; inset: 0; background: #022B36 url('img/levelup-sfondo.webp') center 38% / cover no-repeat; transform: scale(1.08); transition: transform 1.3s var(--ease-out); }
 .lvl.in .lvl-bg { transform: scale(1); }
 .lvl-ui { position: absolute; left: 0; right: 0; bottom: 0; padding: 56px 22px calc(var(--sab) + 26px); background: linear-gradient(to top, rgba(2, 43, 54, .92) 0, rgba(2, 43, 54, .7) 55%, transparent); display: flex; flex-direction: column; gap: 14px; transform: translateY(30px); opacity: 0; transition: transform .6s .25s var(--ease-out), opacity .6s .25s ease; }
 .lvl.in .lvl-ui { transform: none; opacity: 1; }
