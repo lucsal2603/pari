@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.31.0';
+const APP_VERSION = '1.31.1';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -125,15 +125,17 @@ function defaultState() {
     ],
     entries: [],
     activity: [],
-    budget: { monthly: 0, byCat: {} },
+    budget: {},
     groups: [{ id: 'g1', name: 'Spese casa', createdAt: '2026-09-04T00:00:00.000Z', updatedAt: '2026-09-04T00:00:00.000Z', deleted: false }],
     settings: { me: 'm1', currency: 'EUR', together: '', sync: { url: SUPA_URL, key: SUPA_ANON, house: '' }, lastPull: null, membersUpdatedAt: null, groupsUpdatedAt: null, lastGroup: 'g1', deviceId: null, push: null, pushUpdatedAt: null, notified: [], onboarded: false, lang: detectLang(), budgetUpdatedAt: null },
     ui: { month: curYM(), statsRange: 'mese', balTab: 0, homeMode: 'paid' },
   };
 }
 let S = load(); window.__S = S;
+/* v1.31.0 aveva un budget unico di coppia: lo passo alla persona di questo telefono */
+const migrateBudget = (b, meId) => { if (!b || typeof b !== 'object') return {}; if (typeof b.monthly === 'number' || b.byCat) { const out = {}; if (b.monthly || (b.byCat && Object.keys(b.byCat).length)) out[meId] = { monthly: b.monthly || 0, byCat: b.byCat || {}, updatedAt: nowISO() }; return out; } return b; };
 function load() {
-  try { const raw = localStorage.getItem(KEY); if (raw) { const s = JSON.parse(raw); const d = defaultState(); const st = { ...d, ...s, settings: { ...d.settings, ...(s.settings || {}), sync: { ...d.settings.sync, ...((s.settings || {}).sync || {}) } }, ui: { ...d.ui, ...(s.ui || {}), month: curYM() }, budget: { ...d.budget, ...(s.budget || {}), byCat: { ...((s.budget || {}).byCat || {}) } } };
+  try { const raw = localStorage.getItem(KEY); if (raw) { const s = JSON.parse(raw); const d = defaultState(); const st = { ...d, ...s, settings: { ...d.settings, ...(s.settings || {}), sync: { ...d.settings.sync, ...((s.settings || {}).sync || {}) } }, ui: { ...d.ui, ...(s.ui || {}), month: curYM() }, budget: migrateBudget(s.budget, ((s.settings || {}).me) || 'm1') };
     if (!Array.isArray(s.groups)) { st.groups = d.groups; st.entries.forEach((e) => { if (!e.group) e.group = 'g1'; }); st.settings.lastGroup = 'g1'; }
     if (!st.settings.sync.url) { st.settings.sync.url = SUPA_URL; st.settings.sync.key = SUPA_ANON; }
     // telefoni già collegati prima dell'arrivo della presentazione: non la mostro
@@ -947,23 +949,25 @@ function pageTraguardi() {
   </div>`;
 }
 /* ---------- Budget mensile (uguale sui due telefoni) ---------- */
+const myBudget = () => (S.budget || {})[me().id] || { monthly: 0, byCat: {}, updatedAt: null };
+/* il budget è personale: conta la quota di chi usa il telefono, non il totale della coppia */
 function budgetMonth(ymStr) {
-  const es = active().filter((e) => e.kind === 'expense' && ym(e.date) === ymStr); let spent = 0; const byCat = {};
-  es.forEach((e) => { spent += e.amount; const c = e.cat || 'altro'; byCat[c] = (byCat[c] || 0) + e.amount; });
+  const mid = me().id; const es = active().filter((e) => e.kind === 'expense' && ym(e.date) === ymStr); let spent = 0; const byCat = {};
+  es.forEach((e) => { const mine = (e.owed || {})[mid] || 0; if (!mine) return; spent += mine; const c = e.cat || 'altro'; byCat[c] = (byCat[c] || 0) + mine; });
   const [y, m] = ymStr.split('-').map(Number); const dim = new Date(y, m, 0).getDate(); const cur = curYM(); const today = new Date().getDate();
   const status = ymStr === cur ? 'current' : ymStr < cur ? 'past' : 'future';
   const dayN = status === 'current' ? today : status === 'past' ? dim : 0; const daysLeft = status === 'current' ? dim - today + 1 : 0;
-  const budget = S.budget.monthly || 0; const left = budget - spent;
+  const budget = myBudget().monthly || 0; const left = budget - spent;
   const projection = status === 'current' && dayN >= 3 ? Math.round(spent / dayN * dim) : 0;
   return { spent, byCat, dim, dayN, daysLeft, status, budget, left, projection, count: es.length };
 }
-function setBudget(cents) { S.budget.monthly = Math.max(0, Math.round(cents || 0)); S.settings.budgetUpdatedAt = nowISO(); save(); sync.schedule(); }
-function setCatBudget(cat, cents) { S.budget.byCat = S.budget.byCat || {}; if (cents > 0) S.budget.byCat[cat] = Math.round(cents); else delete S.budget.byCat[cat]; S.settings.budgetUpdatedAt = nowISO(); save(); sync.schedule(); }
+function setBudget(cents) { const b = { ...myBudget(), byCat: { ...(myBudget().byCat || {}) } }; b.monthly = Math.max(0, Math.round(cents || 0)); b.updatedAt = nowISO(); S.budget = S.budget || {}; S.budget[me().id] = b; save(); sync.schedule(); }
+function setCatBudget(cat, cents) { const b = { ...myBudget(), byCat: { ...(myBudget().byCat || {}) } }; if (cents > 0) b.byCat[cat] = Math.round(cents); else delete b.byCat[cat]; b.updatedAt = nowISO(); S.budget = S.budget || {}; S.budget[me().id] = b; save(); sync.schedule(); }
 const budgetCls = (pct) => (pct > 100 ? 'over' : pct >= 80 ? 'warn' : 'ok');
 function homeBudgetLine(m) {
-  const b = S.budget.monthly || 0; if (!b) return '';
+  const b = myBudget().monthly || 0; if (!b) return '';
   const bm = budgetMonth(m); const pct = Math.round(bm.spent / b * 100);
-  return `<a class="home-budget ${budgetCls(pct)}" href="#/budget"><div class="hb-row"><span>Budget</span><b>${esc(T('{0} di {1}', money(bm.spent), money(b)))}</b></div><div class="hb-bar"><i style="width:${Math.min(100, pct)}%"></i></div><div class="hb-sub">${bm.left >= 0 ? esc(T('Restano {0}', money(bm.left))) : esc(T('Sforato di {0}', money(-bm.left)))} · ${esc(T('{0}% usato', pct))}</div></a>`;
+  return `<a class="home-budget ${budgetCls(pct)}" href="#/budget"><div class="hb-row"><span>Il tuo budget</span><b>${esc(T('{0} di {1}', money(bm.spent), money(b)))}</b></div><div class="hb-bar"><i style="width:${Math.min(100, pct)}%"></i></div><div class="hb-sub">${bm.left >= 0 ? esc(T('Restano {0}', money(bm.left))) : esc(T('Sforato di {0}', money(-bm.left)))} · ${esc(T('{0}% usato', pct))}</div></a>`;
 }
 function budgetSuggestions() {
   const cur = curYM(); const prev = budgetMonth(shiftYM(cur, -1)).spent; const trio = [1, 2, 3].map((i) => budgetMonth(shiftYM(cur, -i)).spent).filter((v) => v > 0); const avg = trio.length ? Math.round(trio.reduce((a, b) => a + b, 0) / trio.length) : 0;
@@ -974,7 +978,7 @@ function budgetSuggestions() {
 }
 function budgetSheet(title, current, onSave, extraNote) {
   const sug = budgetSuggestions();
-  openSheet(title, `<p class="muted small" style="margin:0 0 12px">${esc(extraNote || T('Il budget vale ogni mese ed è uguale su entrambi i telefoni.'))}</p>
+  openSheet(title, `<p class="muted small" style="margin:0 0 12px">${esc(extraNote || T('Il budget è solo tuo: conta la tua quota delle spese. {0} può impostare il suo.', other().name))}</p>
     <div class="field money-input" style="margin-top:0"><span class="cur">${esc(curSymbol())}</span><input id="bg-amt" type="text" inputmode="decimal" placeholder="${esc(moneyPlain(0))}" value="${current ? esc(moneyPlain(current)) : ''}"></div>
     ${sug.length ? `<div class="chips" style="margin-top:10px;padding-bottom:4px">${sug.map((x) => `<button type="button" class="chip" data-sug="${x.v}">${esc(x.t)}</button>`).join('')}</div>` : ''}
     <div class="btn-row" style="margin-top:14px">${current ? `<button type="button" class="btn danger" data-c="rm">Togli il budget</button>` : `<button type="button" class="btn soft" data-c="no">Annulla</button>`}<button type="button" class="btn" data-c="ok">Salva</button></div>`, (sh) => {
@@ -987,15 +991,15 @@ function budgetSheet(title, current, onSave, extraNote) {
   });
 }
 function budgetChart(m) {
-  const months = [5, 4, 3, 2, 1, 0].map((i) => shiftYM(m, -i)); const data = months.map((x) => budgetMonth(x)); const b = S.budget.monthly || 0;
+  const months = [5, 4, 3, 2, 1, 0].map((i) => shiftYM(m, -i)); const data = months.map((x) => budgetMonth(x)); const b = myBudget().monthly || 0;
   const max = Math.max(b, ...data.map((d) => d.spent), 1); const W = 360, H = 150, bw = 30, gap = (W - bw * 6) / 6; const base = H - 8; const y = (v) => base - (v / max) * (H - 24);
   return `<svg class="chart bchart" viewBox="0 0 ${W} ${H + 22}" aria-hidden="true">${b ? `<line x1="0" x2="${W}" y1="${y(b).toFixed(1)}" y2="${y(b).toFixed(1)}" class="bline"/>` : ''}${data.map((d, i) => { const x = gap / 2 + i * (bw + gap); const h = Math.max(3, base - y(d.spent)); const cls = b && d.spent > b ? 'over' : 'ok'; return `<g class="col${d.spent ? '' : ' dim'}"><rect class="bar ${cls}" x="${x.toFixed(1)}" y="${(base - h).toFixed(1)}" width="${bw}" height="${h.toFixed(1)}" rx="6"/><text class="lbl${months[i] === m ? ' on' : ''}" x="${(x + bw / 2).toFixed(1)}" y="${H + 12}">${esc(monthShort(months[i]))}</text></g>`; }).join('')}</svg>`;
 }
 function pageBudget(r) {
   const m = S.ui.month; const bm = budgetMonth(m); const b = bm.budget; const pct = b ? Math.round(bm.spent / b * 100) : 0; const cls = budgetCls(pct);
-  const cats = CATS.map((c) => ({ c, spent: bm.byCat[c.id] || 0, lim: (S.budget.byCat || {})[c.id] || 0 })).filter((x) => x.spent || x.lim).sort((a, b2) => (b2.lim ? 1 : 0) - (a.lim ? 1 : 0) || b2.spent - a.spent);
+  const cats = CATS.map((c) => ({ c, spent: bm.byCat[c.id] || 0, lim: (myBudget().byCat || {})[c.id] || 0 })).filter((x) => x.spent || x.lim).sort((a, b2) => (b2.lim ? 1 : 0) - (a.lim ? 1 : 0) || b2.spent - a.spent);
   let hero;
-  if (!b) hero = `<div class="bg-empty"><div class="bg-empty-t">Nessun budget per questo mese</div><p class="muted small" style="margin:6px 0 14px">Decidete insieme un tetto di spesa mensile: vi dico quanto resta e a che ritmo state andando.</p><button type="button" class="btn" data-set-budget>Imposta budget</button></div>`;
+  if (!b) hero = `<div class="bg-empty"><div class="bg-empty-t">Nessun budget per questo mese</div><p class="muted small" style="margin:6px 0 14px">Decidi quanto vuoi spendere al mese: conto la tua quota delle spese e ti dico quanto resta e a che ritmo vai.</p><button type="button" class="btn" data-set-budget>Imposta budget</button></div>`;
   else {
     const stats = bm.status === 'current'
       ? `<div class="bg-stats"><div><b>${esc(bm.left >= 0 ? money(bm.left) : money(-bm.left))}</b><span>${bm.left >= 0 ? 'Restano' : 'Sforato di'}</span></div><div><b>${bm.daysLeft}</b><span>${bm.daysLeft === 1 ? '1 giorno' : esc(T('{0} giorni', bm.daysLeft)).replace(String(bm.daysLeft), '').trim()}</span></div><div><b>${esc(bm.left > 0 ? moneyRound(Math.floor(bm.left / Math.max(1, bm.daysLeft))) : money(0))}</b><span>al giorno</span></div></div>${bm.projection ? `<div class="bg-proj ${budgetCls(Math.round(bm.projection / b * 100))}">${esc(T('Di questo passo: {0} a fine mese', money(bm.projection)))}</div>` : ''}`
@@ -1006,7 +1010,8 @@ function pageBudget(r) {
       <button type="button" class="btn soft sm" data-set-budget style="margin-top:14px">${icon('i-edit')} Modifica budget</button>`;
   }
   return `<div class="page">
-    <div class="head"><span></span><div class="title">Budget</div><span></span></div>
+    <div class="head"><span></span><div class="title">Il tuo budget</div><span></span></div>
+    <p class="bg-note muted small">Conta la tua quota delle spese, non il totale.</p>
     <section class="card bg-hero">${monthNav(m)}${hero}</section>
     <div class="link-row"><h2 class="sec-title">Per categoria</h2></div>
     <section class="card list-card"><p class="muted small" style="margin:12px 16px 4px">Tocca una categoria per darle un budget.</p><div class="list bg-cats">${(cats.length ? cats : CATS.slice(0, 4).map((c) => ({ c, spent: 0, lim: 0 }))).map(({ c, spent, lim }) => { const p = lim ? Math.round(spent / lim * 100) : 0; return `<button type="button" class="row" data-cat-budget="${c.id}"><span class="cat-ic">${icon(c.icon)}</span><span class="main"><span class="title">${esc(c.name)}</span><span class="sub">${lim ? esc(T('{0} di {1}', money(spent), money(lim))) : esc(money(spent)) + ' · ' + esc(T('senza budget'))}</span>${lim ? `<span class="bg-mini ${budgetCls(p)}"><i style="width:${Math.min(100, p)}%"></i></span>` : ''}</span><span class="right">${lim ? `<span class="bg-p ${budgetCls(p)}">${p}%</span>` : icon('i-plus', 'ic muted')}</span></button>`; }).join('')}</div></section>
@@ -1344,7 +1349,7 @@ function pageDone(r) {
     <h1 class="done-h">${isPay ? 'Pagamento registrato!' : 'Pagamento aggiunto!'}<svg class="done-line" viewBox="0 0 220 12" preserveAspectRatio="none"><path d="M3 8 C 60 2, 150 2, 217 7" fill="none" stroke="#A9D3B6" stroke-width="5" stroke-linecap="round"/></svg></h1>
     <p class="done-p">Tutto ok, l'abbiamo salvato.</p>
     <div class="done-card"><span class="cat-ic${isPay ? ' pay' : ''}">${icon(isPay ? 'c-pagamento' : c.icon)}</span><div class="done-txt"><b>${esc(isPay ? 'Pagamento' : e.desc)}</b><span>${sub}</span><span>${esc(dateShort(e.date))} ${esc(String(e.date).slice(0, 4))} • ${esc(payer.name)}</span></div><span class="done-amt">${esc(curSymbol())} ${esc(moneyPlain(e.amount))}</span></div>
-    ${!isPay && (S.budget.monthly || 0) > 0 ? (() => { const bm = budgetMonth(ym(e.date)); const pct = Math.round(bm.spent / bm.budget * 100); return `<p class="done-budget${pct > 100 ? ' over' : pct >= 80 ? ' warn' : ''}">${esc(T('Budget del mese: {0} su {1} ({2}%)', money(bm.spent), money(bm.budget), pct))}</p>`; })() : ''}
+    ${!isPay && (myBudget().monthly || 0) > 0 ? (() => { const bm = budgetMonth(ym(e.date)); const pct = Math.round(bm.spent / bm.budget * 100); return `<p class="done-budget${pct > 100 ? ' over' : pct >= 80 ? ' warn' : ''}">${esc(T('Il tuo budget: {0} su {1} ({2}%)', money(bm.spent), money(bm.budget), pct))}</p>`; })() : ''}
     <div class="done-actions"><a class="btn onb-btn" href="#/home">Perfetto!</a><a class="done-link" href="#/nuova${isPay ? '?tipo=pagamento' : ''}">${isPay ? 'Registra un altro pagamento' : 'Aggiungi un altro pagamento'}</a></div>
     <svg class="done-sq l" viewBox="0 0 120 90" aria-hidden="true"><path d="M8 70 C 25 20, 45 25, 40 55 C 36 80, 60 85, 75 35" fill="none" stroke="#B9D9C4" stroke-width="7" stroke-linecap="round"/></svg>
     <svg class="done-sq r" viewBox="0 0 120 90" aria-hidden="true"><path d="M10 60 C 30 20, 50 35, 55 60 C 60 85, 85 80, 110 30" fill="none" stroke="#B9D9C4" stroke-width="7" stroke-linecap="round"/></svg>
@@ -1488,8 +1493,8 @@ function bind(r) {
   $$('[data-settle]').forEach((b) => b.addEventListener('click', () => { const [from, to] = b.dataset.settle.split(':'); F = null; go(`#/nuova?tipo=pagamento&da=${from}&a=${to}`); }));
 
   if (r.name === 'budget') {
-    $$('[data-set-budget]').forEach((b) => b.addEventListener('click', () => budgetSheet('Budget mensile', S.budget.monthly || 0, (v) => setBudget(v))));
-    $$('[data-cat-budget]').forEach((b) => b.addEventListener('click', () => { const c = catOf(b.dataset.catBudget); budgetSheet(T('Budget per {0}', T(c.name)), (S.budget.byCat || {})[c.id] || 0, (v) => setCatBudget(c.id, v), T('Tocca una categoria per darle un budget.')); }));
+    $$('[data-set-budget]').forEach((b) => b.addEventListener('click', () => budgetSheet('Budget mensile', myBudget().monthly || 0, (v) => setBudget(v))));
+    $$('[data-cat-budget]').forEach((b) => b.addEventListener('click', () => { const c = catOf(b.dataset.catBudget); budgetSheet(T('Budget per {0}', T(c.name)), (myBudget().byCat || {})[c.id] || 0, (v) => setCatBudget(c.id, v), T('Conta la tua quota delle spese, non il totale.')); }));
   }
   if (r.name === 'spese') {
     $$('[data-group-menu]').forEach((b) => b.addEventListener('click', () => openGroupSheet(b.dataset.groupMenu)));
@@ -1635,7 +1640,7 @@ const sync = {
       const rows = S.entries.filter((e) => (e.updatedAt || '') > since).map((e) => ({ house: s.house, id: e.id, kind: 'entry', data: e, updated_at: e.updatedAt, deleted: !!e.deleted }));
       if ((S.settings.membersUpdatedAt || '') > since && S.settings.membersUpdatedAt) rows.push({ house: s.house, id: 'members', kind: 'members', data: { members: S.members, together: S.settings.together, currency: S.settings.currency || 'EUR' }, updated_at: S.settings.membersUpdatedAt || nowISO(), deleted: false });
       if ((S.settings.groupsUpdatedAt || '') > since && S.settings.groupsUpdatedAt) rows.push({ house: s.house, id: 'groups', kind: 'groups', data: { groups: S.groups }, updated_at: S.settings.groupsUpdatedAt, deleted: false });
-      if ((S.settings.budgetUpdatedAt || '') > since && S.settings.budgetUpdatedAt) rows.push({ house: s.house, id: 'budget', kind: 'budget', data: { monthly: S.budget.monthly || 0, byCat: S.budget.byCat || {} }, updated_at: S.settings.budgetUpdatedAt, deleted: false });
+      Object.entries(S.budget || {}).forEach(([mid, b]) => { if (b && b.updatedAt && b.updatedAt > since) rows.push({ house: s.house, id: 'budget-' + mid, kind: 'mbudget', data: { monthly: b.monthly || 0, byCat: b.byCat || {} }, updated_at: b.updatedAt, deleted: false }); });
       if ((S.settings.pushUpdatedAt || '') > since || (force && S.settings.push)) rows.push({ house: s.house, id: 'push-' + S.settings.deviceId, kind: 'push', data: S.settings.push ? { ...S.settings.push, member: me().id, lang: LANG() } : { device: S.settings.deviceId }, updated_at: S.settings.pushUpdatedAt || nowISO(), deleted: !S.settings.push });
       const freshMine = S.entries.filter((e) => !e.deleted && (e.createdAt || '') > since && e.paidBy === me().id && !e.recurringOf).map((e) => e.id);
       S.activity.filter((a) => (a.ts || '') > since).forEach((a) => rows.push({ house: s.house, id: 'act-' + a.id, kind: 'activity', data: a, updated_at: a.ts, deleted: false }));
@@ -1653,7 +1658,7 @@ const sync = {
       remote.forEach((row) => {
         if (row.kind === 'entry') { const e = row.data; const cur = S.entries.find((x) => x.id === e.id); if (!cur) { S.entries.push(e); arrived.push(e); changed++; } else if ((e.updatedAt || '') > (cur.updatedAt || '')) { Object.assign(cur, e); changed++; } }
         else if (row.kind === 'members') { if ((row.updated_at || '') > (S.settings.membersUpdatedAt || '')) { const m = row.data.members; if (Array.isArray(m) && m.length >= 2) { S.members = m; } if (typeof row.data.together === 'string') S.settings.together = row.data.together; if (row.data.currency) S.settings.currency = row.data.currency; S.settings.membersUpdatedAt = row.updated_at; changed++; } }
-        else if (row.kind === 'budget') { if ((row.updated_at || '') > (S.settings.budgetUpdatedAt || '')) { S.budget = { monthly: +(row.data.monthly || 0), byCat: row.data.byCat || {} }; S.settings.budgetUpdatedAt = row.updated_at; changed++; } }
+        else if (row.kind === 'mbudget') { const mid = String(row.id).replace(/^budget-/, ''); const cur = (S.budget || {})[mid]; if (!cur || (row.updated_at || '') > (cur.updatedAt || '')) { S.budget = S.budget || {}; S.budget[mid] = { monthly: +(row.data.monthly || 0), byCat: row.data.byCat || {}, updatedAt: row.updated_at }; changed++; } }
         else if (row.kind === 'groups') { (row.data.groups || []).forEach((g) => { const cur = S.groups.find((x) => x.id === g.id); if (!cur) { S.groups.push(g); changed++; } else if ((g.updatedAt || '') > (cur.updatedAt || '')) { Object.assign(cur, g); changed++; } }); if ((row.updated_at || '') > (S.settings.groupsUpdatedAt || '')) S.settings.groupsUpdatedAt = row.updated_at; }
         else if (row.kind === 'activity') { if (!S.activity.some((x) => x.id === row.data.id)) { S.activity.push(row.data); } }
       });

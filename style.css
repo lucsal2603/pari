@@ -891,3 +891,5 @@ body.fixed-screen .view { height: 100dvh; overflow: hidden; padding-bottom: calc
 .done-budget { margin: -6px 0 14px; font-size: 13.5px; font-weight: 700; color: var(--green); text-align: center; }
 .done-budget.warn { color: #B57C0A; }
 .done-budget.over { color: var(--red); }
+
+.bg-note { text-align: center; margin: -6px 0 12px; }
