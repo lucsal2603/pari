@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.27.0';
+const APP_VERSION = '1.27.1';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -884,7 +884,7 @@ function achievements() {
     { id: 'dieci', done: n >= 10, img: 'vetta', title: '10 spese condivise', sub: n >= 10 ? T('Avete già {0} spese insieme.', n) : 10 - n === 1 ? "Aggiungete un'altra spesa per sbloccare questo traguardo." : T('Aggiungete altre {0} spese per sbloccare questo traguardo.', 10 - n) },
     { id: 'viaggio', done: !!(tripGroup || tripExp), img: 'mondo', title: 'Primo viaggio insieme', sub: tripGroup ? T('La sezione «{0}» è il vostro primo viaggio.', tripGroup.name) : tripExp ? 'Avete già una spesa di viaggio.' : 'Create una sezione viaggio per sbloccare questo traguardo.' },
     { id: 'record', done: !!record, img: 'pesi', title: 'Mese da record', sub: record ? T('{0}: {1} di spese.', cap(monthName(record[0])), money(record[1])) : T('Superate {0} di spese in un mese.', moneyRound(100000)) },
-    { id: 'tre', done: streak, img: '', title: 'Tre mesi di fila', sub: streak ? 'Tre mesi consecutivi con spese: che costanza!' : 'Usate Divvy per tre mesi di seguito.' },
+    { id: 'tre', done: streak, img: 'calendario', title: 'Tre mesi di fila', sub: streak ? 'Tre mesi consecutivi con spese: che costanza!' : 'Usate Divvy per tre mesi di seguito.' },
     { id: 'scontrino', done: scanned, img: '', title: 'Primo scontrino letto', sub: scanned ? 'Il bot ha letto il vostro primo scontrino.' : 'Fotografate uno scontrino dal + per sbloccarlo.' },
   ];
 }
