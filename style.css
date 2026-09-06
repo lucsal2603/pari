@@ -935,6 +935,6 @@ body.fixed-screen .view { height: 100dvh; overflow: hidden; padding-bottom: calc
 .mban.in { transform: translate(-50%, 0); }
 .mban img { display: block; width: 100%; height: auto; }
 .mban .mban-h, .mban .mban-s, .mban .mban-t { position: absolute; left: 48.5%; width: 45%; display: flex; align-items: center; overflow: hidden; line-height: 1.1; letter-spacing: -.02em; }
-.mban .mban-h { top: 43%; height: 8.5%; font-weight: 800; color: #1F2A24; font-size: clamp(10px, 3.2vw, 16px); white-space: nowrap; }
-.mban .mban-s { top: 51.5%; height: 7%; font-weight: 600; color: #6B7A70; font-size: clamp(8px, 2.4vw, 12px); white-space: nowrap; }
+.mban .mban-h { top: 43%; height: 8.5%; left: 52%; width: 40%; font-weight: 800; color: #1F2A24; font-size: clamp(10px, 3.1vw, 16px); white-space: nowrap; }
+.mban .mban-s { top: 51.5%; height: 7%; left: 52%; width: 40%; font-weight: 600; color: #6B7A70; font-size: clamp(8px, 2.4vw, 12px); white-space: nowrap; }
 .mban .mban-t { top: 59.5%; height: 15.5%; justify-content: center; text-align: center; padding: 0 3%; font-weight: 800; color: #1E6B3A; font-size: clamp(10px, 3vw, 15px); }
