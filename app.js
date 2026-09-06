@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.38.1';
+const APP_VERSION = '1.38.2';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -1003,7 +1003,7 @@ async function boardFetch() {
 function boardRow(x) { return `<div class="cl-row${x.me ? ' me' : ''}"><span class="cl-pos" data-no-i18n>${x.pos <= 3 ? ['🥇', '🥈', '🥉'][x.pos - 1] : x.pos}</span><span class="cl-av">${icon('i-users')}</span><span class="cl-main"><b>${esc(x.name)}${x.me ? ` <em class="cl-me">Tu</em>` : ''}</b><span data-no-i18n>LV ${x.lv}</span></span><span class="cl-xp" data-no-i18n>${x.xp} XP</span></div>`; }
 function boardHTML(b) {
   const top = b.rows.slice(0, 20); const podium = [top[1], top[0], top[2]];
-  const step = (x, n) => x ? `<div class="pd pd${n}${x.me ? ' me' : ''}"><span class="pd-av">${icon('i-users')}</span><b>${esc(x.name)}</b><span class="pd-lv" data-no-i18n>LV ${x.lv}</span><span class="pd-xp" data-no-i18n>${x.xp} XP</span><i data-no-i18n>${n}</i></div>` : `<div class="pd pd${n} empty"><i data-no-i18n>${n}</i></div>`;
+  const step = (x, n) => x ? `<div class="clp clp${n}${x.me ? ' me' : ''}"><span class="clp-av">${icon('i-users')}</span><b>${esc(x.name)}</b><span class="clp-lv" data-no-i18n>LV ${x.lv}</span><span class="clp-xp" data-no-i18n>${x.xp} XP</span><i data-no-i18n>${n}</i></div>` : `<div class="clp clp${n} empty"><i data-no-i18n>${n}</i></div>`;
   const meOut = b.pos > 20 ? b.rows.find((x) => x.me) : null;
   return `<section class="cl-podium">${step(podium[0], 2)}${step(podium[1], 1)}${step(podium[2], 3)}</section>
     <div class="ach-row"><h3>I 20 gruppi con il livello più alto</h3><span class="ach-count" data-no-i18n>${b.total}</span></div>
