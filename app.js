@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.37.4';
+const APP_VERSION = '1.38.0';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -738,6 +738,7 @@ function pageProfilo(r) {
   if (r.sub === 'valuta') return pageValuta();
   if (r.sub === 'lingua') return pageLingua();
   if (r.sub === 'trofei') return pageTrofei();
+  if (r.sub === 'classifica') return pageClassifica();
   if (r.sub === 'info') return pageInfo();
   if (r.sub === 'esporta') return pageExport();
   const together = S.settings.together ? `Insieme dal ${esc(S.settings.together)} <span aria-hidden="true">❤️</span>` : 'Le nostre spese, a metà <span aria-hidden="true">❤️</span>';
@@ -747,6 +748,7 @@ function pageProfilo(r) {
     <div class="profile-head">${r.back ? `<button class="icon-btn profile-back" data-back="${esc(r.back)}" aria-label="Indietro">${icon('i-back')}</button>` : ''}<div class="lvl-ring" style="--p:${levelInfo().pct}"><svg viewBox="0 0 100 100" aria-hidden="true"><circle class="tr" cx="50" cy="50" r="46"/><circle class="fl" cx="50" cy="50" r="46" pathLength="100"/></svg><div class="couple-circle"><img src="img/coppia.png" alt=""></div><span class="lvl-badge" data-no-i18n>LV ${levelInfo().lv}</span></div><div class="n">${esc(S.members[0].name)} &amp; ${esc(S.members[1].name)}</div><div class="s">${together}</div>${lvlPill}</div>
     <section class="card profile-list"><div class="menu">
       <a href="#/profilo/account">${icon('i-gear')}<span>Impostazioni account</span><span class="val">Io sono ${esc(a.name)}</span>${icon('i-right', 'ic chev')}</a>
+      <a href="#/profilo/classifica">${icon('i-podium')}<span>Classifica</span><span class="val" data-no-i18n>${S.settings.boardPos ? '#' + S.settings.boardPos : ''}</span>${icon('i-right', 'ic chev')}</a>
       <a href="#/profilo/trofei">${icon('i-trophy')}<span>I tuoi trofei</span><span class="val" data-no-i18n>${(() => { const t = trophies(); return t.filter((x) => x.ok).length + '/' + t.length; })()}</span>${icon('i-right', 'ic chev')}</a>
       <a href="#/profilo/sezioni">${icon('i-list')}<span>Sezioni</span><span class="val">${groups().length}</span>${icon('i-right', 'ic chev')}</a>
       <a href="#/profilo/categorie">${icon('i-grid')}<span>Categorie</span><span></span>${icon('i-right', 'ic chev')}</a>
@@ -973,6 +975,48 @@ function pageTrofei() {
     ${todo.length ? `<div class="tf-grid">${todo.map(card).join('')}</div>` : `<p class="muted small tf-empty">Li avete sbloccati tutti!</p>`}
   </div>`;
 }
+/* ---------- Classifica: ogni casa pubblica livello ed XP in una riga condivisa (house "__board__", id = codice casa) ---------- */
+const BOARD_HOUSE = '__board__';
+const boardName = () => `${S.members[0].name} & ${S.members[1].name}`;
+async function boardPush(force) {
+  if (!sync.enabled()) return; const st = S.settings.sync; let li; try { li = levelInfo(); } catch (_) { return; }
+  const last = S.settings.boardPushed || {}; const now = Date.now();
+  if (!force && last.xp === li.xp && last.lv === li.lv && last.name === boardName()) return;
+  if (!force && last.at && now - last.at < 60000 && last.lv === li.lv) return; // al massimo una volta al minuto, salvo cambio di livello
+  try {
+    const row = { house: BOARD_HOUSE, id: st.house, kind: 'board', data: { name: boardName(), level: li.lv, xp: li.xp, members: S.members.length, avatar: (S.members[0].avatar || {}).img || '' }, updated_at: nowISO(), deleted: false };
+    const r = await fetch(st.url + '/rest/v1/pari_rows?on_conflict=house,id', { method: 'POST', headers: sync.headers(), body: JSON.stringify([row]) });
+    if (r.ok) { S.settings.boardPushed = { xp: li.xp, lv: li.lv, name: boardName(), at: now }; missionBusy = true; try { save(); } finally { missionBusy = false; } }
+  } catch (_) {}
+}
+async function boardFetch() {
+  if (!sync.enabled()) return null; const st = S.settings.sync;
+  const r = await fetch(st.url + '/rest/v1/pari_rows?house=eq.' + encodeURIComponent(BOARD_HOUSE) + '&kind=eq.board&deleted=eq.false&select=id,data,updated_at&limit=500', { headers: sync.headers() });
+  if (!r.ok) throw new Error(await errText(r));
+  const rows = (await r.json()).map((x) => ({ id: x.id, name: (x.data && x.data.name) || '?', lv: +((x.data && x.data.level) || 1), xp: +((x.data && x.data.xp) || 0), at: x.updated_at })).sort((a, b) => b.xp - a.xp || a.name.localeCompare(b.name));
+  const mine = rows.findIndex((x) => x.id === st.house); const li = levelInfo();
+  if (mine < 0) { rows.push({ id: st.house, name: boardName(), lv: li.lv, xp: li.xp, me: true }); rows.sort((a, b) => b.xp - a.xp || a.name.localeCompare(b.name)); }
+  rows.forEach((x, i) => { x.pos = i + 1; if (x.id === st.house) { x.me = true; x.lv = li.lv; x.xp = li.xp; } });
+  const pos = rows.findIndex((x) => x.me) + 1; S.settings.boardPos = pos; S.settings.boardTotal = rows.length; missionBusy = true; try { save(); } finally { missionBusy = false; }
+  return { rows, pos, total: rows.length };
+}
+function boardRow(x) { return `<div class="cl-row${x.me ? ' me' : ''}"><span class="cl-pos" data-no-i18n>${x.pos <= 3 ? ['🥇', '🥈', '🥉'][x.pos - 1] : x.pos}</span><span class="cl-av">${icon('i-users')}</span><span class="cl-main"><b>${esc(x.name)}${x.me ? ` <em class="cl-me">Tu</em>` : ''}</b><span data-no-i18n>LV ${x.lv}</span></span><span class="cl-xp" data-no-i18n>${x.xp} XP</span></div>`; }
+function boardHTML(b) {
+  const top = b.rows.slice(0, 20); const podium = [top[1], top[0], top[2]];
+  const step = (x, n) => x ? `<div class="pd pd${n}${x.me ? ' me' : ''}"><span class="pd-av">${icon('i-users')}</span><b>${esc(x.name)}</b><span data-no-i18n>LV ${x.lv} · ${x.xp} XP</span><i data-no-i18n>${n}</i></div>` : `<div class="pd pd${n} empty"><i data-no-i18n>${n}</i></div>`;
+  const meOut = b.pos > 20 ? b.rows.find((x) => x.me) : null;
+  return `<section class="cl-podium">${step(podium[0], 2)}${step(podium[1], 1)}${step(podium[2], 3)}</section>
+    <div class="ach-row"><h3>I 20 gruppi con il livello più alto</h3><span class="ach-count" data-no-i18n>${b.total}</span></div>
+    <section class="card list-card"><div class="cl-list">${top.slice(3).map(boardRow).join('') || `<p class="muted small" style="margin:12px 16px">Ancora pochi gruppi in classifica: invita altre coppie!</p>`}</div></section>
+    ${meOut ? `<div class="ach-row"><h3>La tua posizione</h3></div><section class="card list-card"><div class="cl-list">${boardRow(meOut)}</div></section>` : ''}`;
+}
+function pageClassifica() {
+  const on = sync.enabled(); const pos = S.settings.boardPos;
+  return `<div class="page slide cl">${subHead('Classifica')}
+    <p class="ach-sub">${on ? (pos ? esc(T('Sei al posto {0} su {1}', pos, S.settings.boardTotal || pos)) : 'Chi ha più XP sale sul podio.') : 'Attiva la sincronizzazione per entrare in classifica.'}</p>
+    <div id="cl-body">${on ? `<div class="cl-loading"><span class="spin"></span>Carico la classifica…</div>` : `<section class="card" style="padding:18px"><p class="muted small" style="margin:0 0 12px">La classifica confronta il livello di tutte le coppie che usano Divvy. Serve il codice casa.</p><a class="btn" href="#/profilo/sync">Backup e sincronizzazione</a></section>`}</div>
+  </div>`;
+}
 function pageLingua() {
   const cur = LANG();
   return `<div class="page slide">${subHead('Lingua')}
@@ -1080,7 +1124,7 @@ function missionCheck() {
   st.m.forEach(([id, title]) => { if (!shown.ids.includes(id)) { shown.ids.push(id); changed = true; S.settings.missionsDone = (S.settings.missionsDone || 0) + 1; missionQueue.push({ title, trophy: false }); } });
   st.t.forEach(([id, title]) => { if (!shown.trophies.includes(id)) { shown.trophies.push(id); changed = true; missionQueue.push({ title, trophy: true }); } });
   if (changed) { S.settings.bannerShown = shown; missionBusy = true; try { save(); } finally { missionBusy = false; } }
-  missionNext(); levelCheck();
+  missionNext(); levelCheck(); boardPush();
 }
 /* ---------- Livelli ed esperienza (di coppia: contano i dati condivisi) ---------- */
 const xpFor = (n) => { let t = 0; for (let k = 2; k <= n; k++) t += Math.round(60 * Math.pow(1.18, k - 2)); return t; }; // livello 2 a 60 XP, poi ogni livello chiede il 18% in più (3 = 131, 4 = 215, 5 = 314, 10 = 1146)
@@ -1766,6 +1810,9 @@ function bindProfilo(r) {
     });
     const n = $('#sync-now'); if (n) n.addEventListener('click', async () => { toast('Sincronizzo…'); const ok = await sync.run(true); render(); toast(ok ? 'Aggiornato' : 'Errore: ' + (sync.lastError || '')); });
     const off = $('#sync-off'); if (off) off.addEventListener('click', () => { S.settings.sync = { url: SUPA_URL, key: SUPA_ANON, house: '' }; S.settings.lastPull = null; save(); sync.status = 'idle'; render(); toast('Scollegata: i dati restano sul telefono'); });
+  }
+  if (r.sub === 'classifica' && sync.enabled()) {
+    (async () => { try { await boardPush(true); const b = await boardFetch(); const box = $('#cl-body'); if (!box) return; box.innerHTML = boardHTML(b); translateDom(box); const sub = $('.cl .ach-sub'); if (sub) sub.textContent = T('Sei al posto {0} su {1}', b.pos, b.total); } catch (e) { const box = $('#cl-body'); if (box) box.innerHTML = `<p class="muted small" style="margin:8px 2px">${esc(T('Non riesco a caricare la classifica: {0}', e.message || e))}</p>`; } })();
   }
   if (r.sub === 'trofei') { $$('[data-tf]').forEach((b) => b.addEventListener('click', () => { trophyFilter = b.dataset.tf; render(); })); }
   if (r.sub === 'lingua') {
