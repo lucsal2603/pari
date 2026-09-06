@@ -943,7 +943,7 @@ body.fixed-screen .view { height: 100dvh; overflow: hidden; padding-bottom: calc
 .lvl { position: fixed; inset: 0; z-index: 95; background: #012E39; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity .35s ease; }
 .lvl.in { opacity: 1; }
 .lvl.out { opacity: 0; }
-.lvl-box { position: relative; height: 100dvh; width: min(100vw, calc(100dvh * .563)); overflow: hidden; transform: scale(1.04); transition: transform .8s var(--ease-out); }
+.lvl-box { position: relative; height: min(100dvh, calc(100vw / .563)); width: min(100vw, calc(100dvh * .563)); overflow: hidden; transform: scale(1.04); transition: transform .8s var(--ease-out); }
 .lvl.in .lvl-box { transform: scale(1); }
 .lvl-box img { position: absolute; left: -2.35%; top: -4.7%; width: 104.7%; height: 104.7%; object-fit: cover; }
 .lvl-num { position: absolute; left: 14.1%; top: 76.1%; width: 11.2%; height: 3.5%; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 800; font-size: clamp(16px, 5.2vw, 26px); text-shadow: 0 2px 0 rgba(0, 0, 0, .35); }
