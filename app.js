@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.25.0';
+const APP_VERSION = '1.25.1';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -821,11 +821,22 @@ function pageValuta() {
     <section class="card list-card"><div class="list" id="cur-list">${CURRENCIES.map(([code, name]) => { let sym = code; try { sym = new Intl.NumberFormat(LOC(), { style: 'currency', currency: code, currencyDisplay: 'narrowSymbol' }).formatToParts(0).find((p) => p.type === 'currency').value; } catch (_) {} const nm = currencyName(code); return `<button type="button" class="row" data-cur="${code}" data-name="${esc((name + ' ' + nm).toLowerCase())}"><span class="cat-ic" style="font-weight:800;font-size:14px">${esc(sym.length > 3 ? code.slice(0, 3) : sym)}</span><span class="main"><span class="title" data-no-i18n>${esc(nm)}</span><span class="sub">${code}</span></span><span class="right">${cur === code ? icon('i-check', 'ic green') : ''}</span></button>`; }).join('')}</div></section>
   </div>`;
 }
+const langListHTML = (cur) => LANGS().map((l) => `<button type="button" class="row" data-lang="${l.code}"><span class="flag ${esc(l.flag)}" aria-hidden="true"></span><span class="main"><span class="title" data-no-i18n>${esc(l.name)}</span><span class="sub" data-no-i18n>${esc(l.code.toUpperCase())}</span></span><span class="right">${cur === l.code ? icon('i-check', 'ic green') : ''}</span></button>`).join('');
+/* pillola con bandierina e sigla: apre il foglio con le lingue (usata nella presentazione iniziale) */
+const langPill = () => `<button type="button" class="lang-pill" data-lang-pick aria-label="Lingua"><i class="flag ${esc(langInfo().flag)} mini" aria-hidden="true"></i><span data-no-i18n>${esc(LANG().toUpperCase())}</span>${icon('i-right', 'ic chev')}</button>`;
+function pickLang(code, before) {
+  if (!LANGS().some((l) => l.code === code)) return;
+  if (before) before();
+  S.settings.lang = code; if (S.settings.push) { S.settings.pushUpdatedAt = nowISO(); sync.schedule(); } save(); applyLang(); render();
+}
+function openLangSheet(before) {
+  openSheet('Lingua', `<div class="list lang-list">${langListHTML(LANG())}</div>`, (root) => { $$('[data-lang]', root).forEach((b) => b.addEventListener('click', () => { closeSheet(); pickLang(b.dataset.lang, before); })); });
+}
 function pageLingua() {
   const cur = LANG();
   return `<div class="page slide">${subHead('Lingua')}
     <p class="muted small" style="margin:0 2px 12px">${esc(T("La lingua vale solo per questo telefono: {0} può sceglierne un'altra sul suo.", other().name))}</p>
-    <section class="card list-card"><div class="list">${LANGS().map((l) => `<button type="button" class="row" data-lang="${l.code}"><span class="flag ${esc(l.flag)}" aria-hidden="true"></span><span class="main"><span class="title" data-no-i18n>${esc(l.name)}</span><span class="sub" data-no-i18n>${esc(l.code.toUpperCase())}</span></span><span class="right">${cur === l.code ? icon('i-check', 'ic green') : ''}</span></button>`).join('')}</div></section>
+    <section class="card list-card"><div class="list">${langListHTML(cur)}</div></section>
   </div>`;
 }
 function pageInfo() {
@@ -980,7 +991,7 @@ function bindRecovery() {
 /* ---------- Lettura dello scontrino (OCR sul telefono, niente servizi esterni) ---------- */
 const STORES = [
   ['esselunga', 'Esselunga', 'spesa'], ['coop', 'Coop', 'spesa'], ['conad', 'Conad', 'spesa'], ['carrefour', 'Carrefour', 'spesa'], ['lidl', 'Lidl', 'spesa'], ['eurospin', 'Eurospin', 'spesa'], ['pam', 'Pam', 'spesa'], ['despar', 'Despar', 'spesa'], ['iper', 'Iper', 'spesa'], ['bennet', 'Bennet', 'spesa'], ['tigros', 'Tigros', 'spesa'], ['famila', 'Famila', 'spesa'], ['aldi', 'Aldi', 'spesa'], ['md ', 'MD', 'spesa'], ['penny', 'Penny', 'spesa'], ['unes', 'Unes', 'spesa'], ['todis', 'Todis', 'spesa'], ['crai', 'Crai', 'spesa'], ['simply', 'Simply', 'spesa'], ['auchan', 'Auchan', 'spesa'], ['italmark', 'Italmark', 'spesa'], ['gigante', 'Il Gigante', 'spesa'],
-  ['decathlon', 'Decathlon', 'shopping'], ['zara', 'Zara', 'shopping'], ['h&m', 'H&M', 'shopping'], ['ovs', 'OVS', 'shopping'], ['ikea', 'Ikea', 'casa'], ['leroy', 'Leroy Merlin', 'casa'], ['brico', 'Brico', 'casa'], ['mediaworld', 'MediaWorld', 'shopping'], ['unieuro', 'Unieuro', 'shopping'], ['euronics', 'Euronics', 'shopping'], ['tigota', 'Tigotà', 'shopping'], ['acqua e sapone', 'Acqua & Sapone', 'casa'], ['primark', 'Primark', 'shopping'], ['amazon', 'Amazon', 'shopping'],
+  ['decathlon', 'Decathlon', 'shopping'], ['zara', 'Zara', 'shopping'], ['h&m', 'H&M', 'shopping'], ['ovs', 'OVS', 'shopping'], ['ikea', 'Ikea', 'casa'], ['leroy', 'Leroy Merlin', 'casa'], ['brico', 'Brico', 'casa'], ['mediaworld', 'MediaWorld', 'shopping'], ['unieuro', 'Unieuro', 'shopping'], ['euronics', 'Euronics', 'shopping'], ['tigota', 'Tigotà', 'shopping'], ['acqua e sapone', 'Acqua & Sapone', 'casa'], ['caddy', "Caddy's", 'casa'], ['primark', 'Primark', 'shopping'], ['amazon', 'Amazon', 'shopping'],
   ['farmacia', 'Farmacia', 'salute'], ['parafarmacia', 'Parafarmacia', 'salute'],
   ['eni', 'Eni', 'trasporti'], ['q8', 'Q8', 'trasporti'], ['esso', 'Esso', 'trasporti'], ['tamoil', 'Tamoil', 'trasporti'], ['ip ', 'IP', 'trasporti'], ['agip', 'Agip', 'trasporti'], ['autogrill', 'Autogrill', 'cibo'], ['autostrade', 'Autostrade', 'trasporti'], ['trenitalia', 'Trenitalia', 'trasporti'], ['italo', 'Italo', 'trasporti'], ['atm', 'ATM', 'trasporti'],
   ['mcdonald', "McDonald's", 'cibo'], ['burger king', 'Burger King', 'cibo'], ['kfc', 'KFC', 'cibo'], ['ristorante', 'Ristorante', 'cibo'], ['pizzeria', 'Pizzeria', 'cibo'], ['trattoria', 'Trattoria', 'cibo'], ['osteria', 'Osteria', 'cibo'], ['bar ', 'Bar', 'cibo'], ['caffe', 'Caffè', 'cibo'], ['pasticceria', 'Pasticceria', 'cibo'], ['gelateria', 'Gelateria', 'cibo'], ['sushi', 'Sushi', 'cibo'], ['kebab', 'Kebab', 'cibo'],
@@ -993,7 +1004,7 @@ const MONTHS = { gen: 1, feb: 2, mar: 3, apr: 4, mag: 5, giu: 6, lug: 7, ago: 8,
 function parseReceipt(text) {
   const lines = String(text).split(/\n+/).map((l) => l.replace(/[|_]/g, ' ').replace(/\s+/g, ' ').trim()).filter((l) => l.length > 1);
   const whole = lines.join('\n'); const low = whole.toLowerCase();
-  const digital = /hai pagato|hai autorizzato|pagamento (?:a|di|presso|effettuato|con carta|autorizzato)|prelievo o pagamento|transazione|addebito|satispay|revolut|paypal|apple pay|google pay|bonifico|beneficiario|intesa|unicredit|poste ?pay|bancoposta|fineco|n26|hype|mooney|cr[eé]dit agricole|cartaconto|bnl|bper|banco bpm|mediolanum|carta di credito|carta di debito|con la tua carta|movimento|operazione|ore fa|minuti fa/i.test(low);
+  const digital = /hai pagato|hai autorizzato|hai inviato|inviato a|hai ricevuto|pagamento (?:a|di|presso|effettuato|con carta|autorizzato)|prelievo o pagamento|transazione|addebito|satispay|revolut|paypal|apple pay|google pay|bonifico|beneficiario|intesa|unicredit|poste ?pay|bancoposta|fineco|n26|hype|mooney|cr[eé]dit agricole|cartaconto|bnl|bper|banco bpm|mediolanum|carta di credito|carta di debito|con la tua carta|movimento|operazione|ore fa|minuti fa/i.test(low);
   if (digital) return parseDigital(lines, whole);
   const norm = (l) => l.replace(/(\d)[oO](\d)/g, '$10$2').replace(/[oO](?=[.,]\d\d)/g, '0');
   const amountsIn = (l) => { const out = []; const re = /(?:€\s*)?(\d{1,4}(?:[.,]\d{3})?)[.,](\d{2})(?!\d)/g; let m; const s2 = norm(l); while ((m = re.exec(s2))) { const cents = parseInt(m[1].replace(/[.,]/g, ''), 10) * 100 + parseInt(m[2], 10); if (cents > 0 && cents < 1000000) out.push(cents); } return out; };
@@ -1015,21 +1026,24 @@ function parseDigital(lines, whole) {
   const norm = (l) => l.replace(/(\d)[oO](\d)/g, '$10$2').replace(/[oO](?=[.,]\d\d)/g, '0');
   const amountsIn = (l) => { const out = []; const re = /[-−]?\s*(?:€|eur)?\s*(\d{1,4}(?:[.,]\d{3})?)[.,](\d{2})(?!\d)\s*(?:€|eur)?/gi; let m; const s2 = norm(l); while ((m = re.exec(s2))) { const cents = parseInt(m[1].replace(/[.,]/g, ''), 10) * 100 + parseInt(m[2], 10); if (cents > 0 && cents < 1000000) out.push({ cents, euro: /€|eur/i.test(m[0]) }); } return out; };
   // importo: prima le righe "hai pagato / importo / pagamento / totale / addebito", poi qualsiasi importo con €, poi il più grande
-  let amount = 0; const pri = lines.filter((l) => /hai pagato|hai autorizzato|importo|pagamento|pagato|totale|addebito|transazione|speso|prelievo/i.test(l));
+  let amount = 0; const pri = lines.filter((l) => /hai pagato|hai autorizzato|hai inviato|importo|pagamento|pagato|totale|addebito|transazione|speso|prelievo/i.test(l));
   for (const l of pri) { const a = amountsIn(l); if (a.length) { amount = a[0].cents; break; } }
   if (!amount) { let all = []; lines.forEach((l) => (all = all.concat(amountsIn(l)))); const withEuro = all.filter((x) => x.euro); if (withEuro.length) amount = withEuro[0].cents; else if (all.length) amount = Math.max(...all.map((x) => x.cents)); }
   // esercente: prima quello scritto nella notifica ("presso X", "a X", "beneficiario X"), poi marchio noto, poi riga in maiuscolo
   let store = '', cat = '';
   const flat = whole.replace(/-\s*\n\s*/g, '-').replace(/\s*\n\s*/g, ' ');
   const mm = flat.match(/\b(?:presso|a favore di|beneficiario|esercente|merchant|pagamento a|pagato a|hai pagato [^\n]*? a|da)\b\s*[:\-]?\s*([A-Za-zÀ-ú0-9&'.\- ]{3,60})/i);
-  if (mm) { let x = mm[1].trim(); if (/^[A-ZÀ-Ú0-9]/.test(x)) { const cut = x.search(/\s+[a-zà-ú]{2,}\b/); if (cut > 0) x = x.slice(0, cut); } else x = x.replace(/\s+(il|lo|la|per|di|con|in|alle|€|eur).*$/i, ''); x = x.replace(/[\s.,;:-]+$/, ''); if (/^(?!(?:un|una|carta|conto|banca|te|tu|noi)$)[A-Za-zÀ-ú]/.test(x) && x.replace(/[^A-Za-zÀ-ú]/g, '').length >= 3) store = x; }
+  if (mm) { let x = mm[1].trim().replace(/^\d{2,}\s+/, '').replace(/\s+-\s+.*$/, ''); if (/^[A-ZÀ-Ú0-9]/.test(x)) { const cut = x.search(/\s+[a-zà-ú]+\b/); if (cut > 0) x = x.slice(0, cut); } else x = x.replace(/\s+(il|lo|la|per|di|con|in|alle|€|eur).*$/i, ''); x = x.replace(/[\s.,;:-]+$/, ''); if (/^(?!(?:un|una|carta|conto|banca|te|tu|noi)$)[A-Za-zÀ-ú]/.test(x) && x.replace(/[^A-Za-zÀ-ú]/g, '').length >= 3) store = x; }
+  // bonifici e invii (Satispay, PayPal…): la causale fra virgolette è la descrizione migliore, altrimenti chi ha ricevuto i soldi
+  if (!store) { const note = lines.find((l) => /^["“'][^"”']{3,40}["”']$/.test(l)); const rcp = flat.match(/\binviat[oa]\b[^"“]*?\s+a\s+([A-Za-zÀ-ú][A-Za-zÀ-ú' ]{2,40})/i); if (note) store = note.slice(1, -1).trim(); else if (rcp) store = rcp[1].trim().replace(/\s+(riceverà|ricevera|per|il|la).*$/i, ''); }
   const sm = storeMatch(store || whole); if (sm) { cat = sm.cat; if (!store || !GENERIC.has(sm.name)) store = sm.name; }
   if (!store) { const smw = storeMatch(whole); if (smw && !GENERIC.has(smw.name)) { store = smw.name; cat = smw.cat; } }
   if (!store) { const cand = lines.find((l) => /^[A-Z0-9&'. \-]{4,}$/.test(l) && !/[0-9]{3,}/.test(l) && !NOISE.test(l) && !/PAGAMENTO|IMPORTO|TOTALE|EUR|SATISPAY|PAYPAL|REVOLUT|OGGI|IERI/i.test(l)); if (cand) store = cand; }
   store = store.replace(/[.\s]+$/, '').slice(0, 40);
-  // "RAMEN BAR AKIRA-BRESCIA" → via la città attaccata col trattino
-  if (/^[^a-zà-ú]*$/.test(store)) store = store.replace(/\s*-\s*[A-ZÀ-Ú]{3,}$/, '');
-  if (store && store === store.toUpperCase()) store = store.toLowerCase().replace(/(^|[\s'&(-])([a-zà-ú])/g, (a, b, c) => b + c.toUpperCase());
+  // "RAMEN BAR AKIRA-BRESCIA" / "CADDY'S BRESCIA-BRESCIA" → via la città attaccata col trattino (e la stessa città ripetuta prima)
+  if (/^[^a-zà-ú]*$/.test(store)) { const cm = store.match(/\s*-\s*([A-ZÀ-Ú]{3,})$/); if (cm) { store = store.slice(0, cm.index); store = store.replace(new RegExp('\\s+' + cm[1] + '$'), ''); } }
+  if (store && store === store.toUpperCase()) store = store.toLowerCase().replace(/(^|[\s&(-])([a-zà-ú])/g, (a, b, c) => b + c.toUpperCase());
+  else if (store && store === store.toLowerCase()) store = store.replace(/(^|\s)([a-zà-ú])/g, (a, b, c) => b + c.toUpperCase());
   if (!cat && store) { const sm2 = storeMatch(store); if (sm2) cat = sm2.cat; }
   // data: gg/mm/aaaa, "5 set 2026", "5 settembre 2026", oggi/ieri
   let date = '';
@@ -1134,7 +1148,7 @@ const AVATARS = [{ bg: '#2C4A3B', fg: '#F8F4EE' }, { bg: '#F8D9D2', fg: '#D7563C
 const arrowIc = '<svg class="ic"><path d="M5 12h14M13 5l7 7-7 7"/></svg>';
 function pageWelcome() {
   const st = OB.step; const dots = `<div class="onb-dots" style="view-transition-name:onb-dots">${[1, 2, 3, 4].map((i) => `<i class="${i === st ? 'on' : ''}"></i>`).join('')}</div>`;
-  const top = `<div class="onb-top">${st > 1 ? `<button type="button" class="icon-btn onb-back" data-ob-back aria-label="Indietro">${icon('i-back')}</button>` : '<span></span>'}<button type="button" class="onb-skip" data-ob-skip>Salta</button></div>`;
+  const top = `<div class="onb-top"><div class="onb-left">${st > 1 ? `<button type="button" class="icon-btn onb-back" data-ob-back aria-label="Indietro">${icon('i-back')}</button>` : ''}${langPill()}</div><button type="button" class="onb-skip" data-ob-skip>Salta</button></div>`;
   let body = '';
   if (st === 1) body = `<img class="onb-logo" src="img/logo.png" alt="Divvy">
     <h1 class="onb-h">Ciao!<br>Come possiamo chiamarti?</h1><p class="onb-p">È il primo passo per iniziare a condividere le spese insieme.</p>
@@ -1190,6 +1204,8 @@ function obFinish() {
 }
 function bindWelcome() {
   $$('[data-ob-skip]').forEach((b) => b.addEventListener('click', obFinish));
+  // cambio lingua dalla presentazione: tengo il nome già scritto e ridisegno il passo nella lingua nuova
+  $$('[data-lang-pick]').forEach((b) => b.addEventListener('click', () => openLangSheet(() => { const n = $('#ob-name'); if (n) OB.name = n.value; })));
   const form = $('[data-ob-form]');
   if (form) form.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -1332,7 +1348,7 @@ function bindProfilo(r) {
     const off = $('#sync-off'); if (off) off.addEventListener('click', () => { S.settings.sync = { url: SUPA_URL, key: SUPA_ANON, house: '' }; S.settings.lastPull = null; save(); sync.status = 'idle'; render(); toast('Scollegata: i dati restano sul telefono'); });
   }
   if (r.sub === 'lingua') {
-    $$('[data-lang]').forEach((b) => b.addEventListener('click', () => { S.settings.lang = b.dataset.lang; if (S.settings.push) { S.settings.pushUpdatedAt = nowISO(); sync.schedule(); } save(); applyLang(); toast(T('Lingua: {0}', langInfo().name)); render(); }));
+    $$('[data-lang]').forEach((b) => b.addEventListener('click', () => { pickLang(b.dataset.lang); toast(T('Lingua: {0}', langInfo().name)); }));
   }
   if (r.sub === 'valuta') {
     $$('[data-cur]').forEach((b) => b.addEventListener('click', () => { S.settings.currency = b.dataset.cur; S.settings.membersUpdatedAt = nowISO(); save(); sync.schedule(); toast(`Valuta: ${currencyName(b.dataset.cur)}`); render(); }));
@@ -1483,10 +1499,10 @@ function openSheet(title, bodyHTML, onOpen) {
   bd.addEventListener('click', () => closeSheet()); $('.close', sh).addEventListener('click', () => closeSheet());
   // trascina per chiudere
   let y0 = 0, dy = 0, t0 = 0, drag = false;
-  sh.addEventListener('pointerdown', (ev) => { if (ev.target.closest('.sbody') && $('.sbody', sh).scrollTop > 0) return; drag = true; y0 = ev.clientY; t0 = Date.now(); dy = 0; sh.classList.add('dragging'); sh.setPointerCapture(ev.pointerId); });
-  sh.addEventListener('pointermove', (ev) => { if (!drag) return; dy = Math.max(0, ev.clientY - y0); sh.style.transform = `translateY(${dy}px)`; });
-  const end = () => { if (!drag) return; drag = false; sh.classList.remove('dragging'); const v = dy / Math.max(1, Date.now() - t0); if (dy > sh.offsetHeight * 0.3 || v > 0.5) closeSheet(); else sh.style.transform = ''; };
-  sh.addEventListener('pointerup', end); sh.addEventListener('pointercancel', end);
+  // niente setPointerCapture: con la cattura il click finiva sul foglio invece che sul bottone toccato (le righe non rispondevano)
+  const move = (ev) => { if (!drag) return; dy = Math.max(0, ev.clientY - y0); sh.style.transform = `translateY(${dy}px)`; };
+  const end = () => { if (!drag) return; drag = false; sh.classList.remove('dragging'); document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', end); document.removeEventListener('pointercancel', end); const v = dy / Math.max(1, Date.now() - t0); if (dy > sh.offsetHeight * 0.3 || v > 0.5) closeSheet(); else sh.style.transform = ''; };
+  sh.addEventListener('pointerdown', (ev) => { if (ev.target.closest('.sbody') && $('.sbody', sh).scrollTop > 0) return; drag = true; y0 = ev.clientY; t0 = Date.now(); dy = 0; sh.classList.add('dragging'); document.addEventListener('pointermove', move); document.addEventListener('pointerup', end); document.addEventListener('pointercancel', end); });
   if (onOpen) onOpen(sh);
 }
 function closeSheet(now) {

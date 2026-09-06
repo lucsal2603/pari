@@ -1,7 +1,7 @@
 /* Divvy — service worker.
    Shell (html/js/css): prima la rete, cache solo se offline → gli aggiornamenti si vedono subito.
    Immagini, icone, font: prima la cache. Supabase: mai toccato. */
-const VERSION = 'pari-v1.25.0';
+const VERSION = 'pari-v1.25.1';
 const SHELL = [
   './', './index.html', './style.css', './app.js', './i18n.js', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png', './icons/favicon.png',

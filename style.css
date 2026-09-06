@@ -772,3 +772,12 @@ body.fixed-screen .view { height: 100dvh; overflow: hidden; padding-bottom: calc
   linear-gradient(-35deg, transparent 46%, #fff 46% 54%, transparent 54%),
   #012169; }
 .list-card .row .flag { margin-left: 2px; }
+
+/* ---------- Pillola lingua nella presentazione iniziale ---------- */
+.onb-left { display: flex; align-items: center; gap: 4px; }
+.lang-pill { display: inline-flex; align-items: center; gap: 4px; padding: 6px 8px 6px 7px; border-radius: 999px; background: var(--card-2); color: var(--ink); font-weight: 800; font-size: 12.5px; letter-spacing: .02em; line-height: 1; }
+.lang-pill .flag.mini { margin: 0 3px 0 0; vertical-align: 0; }
+.lang-pill .chev { width: 13px; height: 13px; color: var(--muted); transform: rotate(90deg); }
+.lang-pill:active { opacity: .7; }
+.onb-back + .lang-pill { margin-left: 2px; }
+.lang-list .row { padding-left: 4px; }
