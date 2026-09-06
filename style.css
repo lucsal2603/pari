@@ -208,12 +208,12 @@ img.avatar.lg { width: 44px; height: 44px; }
 .swipe-del.wide .ic { margin-left: 40px; }
 .swipe-del span { display: none; }
 .swipe.dragging .swipe-del { transition: none; }
-.swipe-edit { position: absolute; top: 6px; left: 0; bottom: 6px; width: 0; border-radius: 12px; background: var(--green); color: #fff; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; overflow: hidden; white-space: nowrap; transition: width .3s var(--ease-out), background-color .2s ease; }
+.swipe-edit { position: absolute; top: 6px; left: 0; bottom: 6px; width: 0; border-radius: 12px; background: #F2C230; color: #2B2B26; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; overflow: hidden; white-space: nowrap; transition: width .3s var(--ease-out), background-color .2s ease; }
 .swipe-edit .ic { width: 20px; height: 20px; stroke-width: 2; flex: none; margin-right: 30px; transition: margin .2s ease; }
 .swipe-edit.wide .ic { margin-right: 40px; }
 .swipe-edit span { display: none; }
 .swipe.dragging .swipe-edit { transition: none; }
-.swipe-edit:active { background: var(--green-2); }
+.swipe-edit:active { background: #E0B020; }
 .swipe-del:active { background: #B23A2F; }
 .cat-ic { width: 40px; height: 40px; border-radius: 50%; background: var(--card-2); display: inline-flex; align-items: center; justify-content: center; color: var(--ink); flex: none; }
 .cat-ic .ic { width: 18px; height: 18px; }
