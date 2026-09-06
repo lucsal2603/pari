@@ -889,9 +889,11 @@ body.fixed-screen .view { height: 100dvh; overflow: hidden; padding-bottom: calc
 .bchart .bar.ok { fill: var(--green); }
 .bchart .bar.over { fill: var(--red); }
 .bchart .bline { stroke: var(--muted); stroke-width: 2; stroke-dasharray: 6 6; }
-.done-budget { margin: -6px 0 14px; font-size: 13.5px; font-weight: 700; color: var(--green); text-align: center; }
-.done-budget.warn { color: #B57C0A; }
-.done-budget.over { color: var(--red); }
+.done-budget { position: relative; z-index: 1; width: 100%; margin: 10px 0 0; padding: 10px 14px; border-radius: 14px; background: var(--card-2); font-size: 13px; font-weight: 700; color: var(--green); text-align: left; display: flex; flex-direction: column; gap: 7px; animation: fadeUp .5s var(--ease-out) .35s both; }
+.done-budget .db-bar { display: block; height: 6px; border-radius: 3px; background: rgba(0, 0, 0, .08); overflow: hidden; }
+.done-budget .db-bar b { display: block; height: 100%; border-radius: 3px; background: var(--green); }
+.done-budget.warn { color: #B57C0A; } .done-budget.warn .db-bar b { background: #E0A11C; }
+.done-budget.over { color: var(--red); } .done-budget.over .db-bar b { background: var(--red); }
 
 .bg-note { text-align: center; margin: -6px 0 12px; }
 
