@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.33.0';
+const APP_VERSION = '1.33.1';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -918,9 +918,9 @@ function trophies() {
   add('primo', 'spese', 'vetta', 'Primo passo', 'Hai aggiunto la tua prima spesa', 'Aggiungi la prima spesa', es.length, 1, nth(es, 1), 'bool');
   add('dieci', 'spese', 'vetta', 'Dieci alla volta', 'Avete condiviso 10 spese', 'Condividete 10 spese', es.length, 10, nth(es, 10));
   add('cinquanta', 'spese', 'pesi', 'Peso massimo', 'Avete diviso 50 spese', 'Dividete 50 spese', es.length, 50, nth(es, 50));
-  add('cento', 'spese', '', 'Centenario', 'Avete diviso 100 spese', 'Dividete 100 spese', es.length, 100, nth(es, 100));
+  add('cento', 'spese', 'torta', 'Centenario', 'Avete diviso 100 spese', 'Dividete 100 spese', es.length, 100, nth(es, 100));
   add('fotografo', 'spese', 'scansione', 'Fotografo di scontrini', 'Il bot ha letto 20 scontrini', 'Scansiona 20 scontrini', scanned.length, 20, nth(scanned, 20));
-  add('categorie', 'spese', '', 'Di tutto un po\'', 'Spese in 8 categorie diverse', 'Usate 8 categorie diverse', cats.size, 8, '');
+  add('categorie', 'spese', 'categorie', 'Di tutto un po\'', 'Spese in 8 categorie diverse', 'Usate 8 categorie diverse', cats.size, 8, '');
   // Risparmio
   add('spilorcio', 'risparmio', 'moneta', 'Spilorcio', 'Un mese con meno spese del precedente', 'Chiudi un mese spendendo meno del precedente', spilAt ? 1 : 0, 1, spilAt, 'bool');
   add('budget1', 'risparmio', '', 'Nel budget', 'Un mese chiuso entro il tuo budget', 'Chiudi un mese entro il tuo budget', kept, 1, keptAt, 'bool');

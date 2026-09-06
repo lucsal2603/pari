@@ -96,3 +96,7 @@ Tutto sul telefono con Tesseract.js (lingua `ita`), nessun servizio esterno. Pri
 ## Budget
 
 Il tab Budget (al posto di Bilanci, che resta raggiungibile da Home → "Dettaglio saldi") mostra per il mese scelto quanto avete speso rispetto al tetto mensile: barra, quanto resta, giorni rimasti, quanto potete spendere al giorno e la proiezione a fine mese; per i mesi passati dice se il budget è stato rispettato. Ogni categoria può avere il suo budget (tocca la riga). In fondo il grafico degli ultimi sei mesi con la linea del budget. Il budget è personale: ognuno imposta il suo e conta la propria quota delle spese (non il totale della coppia); sta in `S.budget[membro]` e viaggia nelle righe di sync `budget-<membro>` (vince l'ultima modifica). La Home mostra la riga del budget nel mese e "Registra pagamento" sotto il saldo; la pagina di conferma di una spesa dice a che punto è il budget.
+
+## I tuoi trofei
+
+Profilo → I tuoi trofei: trenta trofei in cinque famiglie (Risparmio, Costanza, Spese, Insieme, Speciali) calcolati dai dati, con filtri, riepilogo "n di 30", griglia degli sbloccati con la data e dei bloccati con il progresso. Le date vengono dai dati quando possibile (la decima spesa, l'ultima spesa del mese), altrimenti dalla prima volta che il trofeo risulta sbloccato su quel telefono. Le illustrazioni stanno in `img/traguardi/`; i trofei senza immagine mostrano un riquadro bianco.
