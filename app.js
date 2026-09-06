@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.43.9';
+const APP_VERSION = '1.43.10';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -1045,11 +1045,13 @@ function startTour() {
   if (TOUR) return; if (!auth.user()) return;
   const el = document.createElement('div'); el.className = 'tour'; el.innerHTML = `<div class="tour-hl"></div><div class="tour-card"><div class="tour-anim"></div><b class="tour-t"></b><p class="tour-p"></p><div class="tour-row"><button type="button" class="tour-skip">Salta</button><span class="tour-dots"></span><button type="button" class="btn sm tour-next">Avanti</button></div></div>`;
   document.body.appendChild(el); TOUR = { el, i: -1 };
+  const block = (e) => { if (e.cancelable) e.preventDefault(); }; el.addEventListener('touchmove', block, { passive: false }); el.addEventListener('wheel', block, { passive: false });
+  TOUR.onKey = (e) => { if ([' ', 'ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'].includes(e.key)) e.preventDefault(); }; document.addEventListener('keydown', TOUR.onKey); document.body.classList.add('touring');
   $('.tour-skip', el).addEventListener('click', endTour); $('.tour-next', el).addEventListener('click', () => tourStep(TOUR.i + 1));
   TOUR.onScroll = () => tourPlace(); window.addEventListener('resize', TOUR.onScroll); window.addEventListener('scroll', TOUR.onScroll, { passive: true });
   requestAnimationFrame(() => el.classList.add('in')); tourStep(0);
 }
-function endTour() { if (!TOUR) return; const t = TOUR; TOUR = null; window.removeEventListener('resize', t.onScroll); window.removeEventListener('scroll', t.onScroll); t.el.classList.remove('in'); setTimeout(() => t.el.remove(), 300); tutorialFinish(); if (location.hash !== '#/home') go('#/home'); }
+function endTour() { if (!TOUR) return; const t = TOUR; TOUR = null; window.removeEventListener('resize', t.onScroll); window.removeEventListener('scroll', t.onScroll); document.removeEventListener('keydown', t.onKey); document.body.classList.remove('touring'); t.el.classList.remove('in'); setTimeout(() => t.el.remove(), 300); tutorialFinish(); if (location.hash !== '#/home') go('#/home'); }
 function tourStep(i) {
   if (!TOUR) return; if (i >= TUT_STEPS.length) { endTour(); return; }
   TOUR.i = i; const st = TUT_STEPS[i]; const el = TOUR.el; const last = i === TUT_STEPS.length - 1;
@@ -2010,7 +2012,7 @@ window.addEventListener('scroll', () => { const h = document.querySelector('.pag
 (function edgeBack() {
   const view = $('#view'); const EDGE = 24, TRIG = 90; let on = false, x0 = 0, y0 = 0, dx = 0, t0 = 0, target = null;
   const backBtn = () => $('#view .head [data-back], #view [data-back][aria-label="Indietro"], #view [data-back][aria-label="Annulla"]');
-  document.addEventListener('touchstart', (e) => { on = false; if (e.touches.length !== 1 || $('#sheet-root').firstChild) return; const t = e.touches[0]; if (t.clientX > EDGE) return; target = backBtn(); if (!target) return; on = true; x0 = t.clientX; y0 = t.clientY; dx = 0; t0 = Date.now(); }, { passive: true });
+  document.addEventListener('touchstart', (e) => { on = false; if (TOUR || e.touches.length !== 1 || $('#sheet-root').firstChild) return; const t = e.touches[0]; if (t.clientX > EDGE) return; target = backBtn(); if (!target) return; on = true; x0 = t.clientX; y0 = t.clientY; dx = 0; t0 = Date.now(); }, { passive: true });
   document.addEventListener('touchmove', (e) => { if (!on) return; const t = e.touches[0]; const ddx = t.clientX - x0, ddy = t.clientY - y0; if (dx === 0 && Math.abs(ddy) > Math.abs(ddx)) { on = false; return; } dx = Math.max(0, ddx); if (e.cancelable) e.preventDefault(); view.style.transition = 'none'; view.style.transform = `translateX(${Math.min(dx * 0.7, 140)}px)`; view.style.opacity = String(Math.max(.55, 1 - dx / 600)); }, { passive: false });
   const end = () => { if (!on) return; on = false; const fast = dx > 40 && Date.now() - t0 < 260; view.style.transition = 'transform .28s var(--ease-out), opacity .28s ease';
     if ((dx > TRIG || fast) && target && target.isConnected) { view.style.transform = 'translateX(60px)'; view.style.opacity = '0'; setTimeout(() => { view.style.transition = 'none'; view.style.transform = ''; view.style.opacity = ''; target.click(); }, 160); }
@@ -2023,7 +2025,7 @@ window.addEventListener('scroll', () => { const h = document.querySelector('.pag
   const app = $('#view'); const el = document.createElement('div'); el.className = 'ptr'; el.innerHTML = `<span class="ptr-ic">${icon('i-undo')}</span><span class="ptr-t">Tira per aggiornare</span>`; document.body.appendChild(el);
   const lbl = document.querySelector('.ptr-t'), MAX = 110, TRIG = 72; let y0 = 0, pulling = false, dy = 0, busy = false;
   const canPull = () => window.scrollY <= 0 && !$('#sheet-root').firstChild && !busy && !document.body.classList.contains('fixed-screen');
-  document.addEventListener('touchstart', (e) => { if (e.touches.length !== 1 || !canPull()) { pulling = false; return; } y0 = e.touches[0].clientY; pulling = true; dy = 0; }, { passive: true });
+  document.addEventListener('touchstart', (e) => { if (TOUR || e.touches.length !== 1 || !canPull()) { pulling = false; return; } y0 = e.touches[0].clientY; pulling = true; dy = 0; }, { passive: true });
   document.addEventListener('touchmove', (e) => {
     if (!pulling) return; const d = e.touches[0].clientY - y0;
     if (d <= 0 || window.scrollY > 0) { if (dy > 0) { dy = 0; app.style.transform = ''; el.classList.remove('show', 'ready'); } return; }
