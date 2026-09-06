@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.37.1';
+const APP_VERSION = '1.37.3';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -963,7 +963,7 @@ function pageTrofei() {
   const list = all.filter((t) => trophyFilter === 'tutti' || t.cat === trophyFilter); const ok = list.filter((t) => t.ok), todo = list.filter((t) => !t.ok);
   const art = (t) => t.img ? `<img src="img/traguardi/${t.img}.webp" alt="">` : `<span class="tf-ph" aria-hidden="true"></span>`;
   const prog = (t) => t.fmt === 'bool' ? '' : `<div class="tf-bar"><i style="width:${Math.round(t.cur / t.target * 100)}%"></i></div><div class="tf-num" data-no-i18n>${t.fmt === 'money' ? `${moneyRound(t.cur)} / ${moneyRound(t.target)}` : `${t.cur} / ${t.target}`}</div>`;
-  const card = (t) => `<div class="tf-card${t.ok ? '' : ' locked'}"><div class="tf-art">${art(t)}${t.ok ? '' : `<span class="tf-lock">${icon('i-lock')}</span>`}</div><div class="tf-body"><b class="tf-t">${esc(t.title)}</b><span class="tf-d">${esc(t.ok ? t.done : t.todo)}</span>${t.ok ? `<span class="tf-date" data-no-i18n>${esc(trophyDate(t.at))}</span>` : prog(t)}</div></div>`;
+  const card = (t) => `<div class="tf-card${t.ok ? '' : ' locked'}"><div class="tf-art">${art(t)}${t.ok ? '' : `<span class="tf-lock">${icon('i-lock')}</span>`}</div><div class="tf-body"><b class="tf-t">${esc(t.title)}</b><em class="xp-tag${t.ok ? ' got' : ''}" data-no-i18n>+${XP.trophy} XP</em><span class="tf-d">${esc(t.ok ? t.done : t.todo)}</span>${t.ok ? `<span class="tf-date" data-no-i18n>${esc(trophyDate(t.at))}</span>` : prog(t)}</div></div>`;
   return `<div class="page slide tf">${subHead('I tuoi trofei')}
     <div class="chips tf-chips">${TROPHY_CATS.map(([k, n]) => `<button type="button" class="chip${trophyFilter === k ? ' on' : ''}" data-tf="${k}">${n}</button>`).join('')}</div>
     <section class="card tf-sum"><span class="tf-sum-ic">${icon('i-trophy')}</span><div class="tf-sum-t"><div><b data-no-i18n>${done} di ${total}</b> trofei sbloccati</div><div class="tf-sum-bar"><div class="tf-bar"><i style="width:${pct}%"></i></div><span data-no-i18n>${pct}%</span></div></div></section>
@@ -1064,7 +1064,7 @@ function pageMissioni() {
     <p class="ach-sub">Ogni settimana nuove missioni.<br><span data-no-i18n>${esc(range)}</span></p>
     ${hero}
     <div class="ach-row"><h3>Le missioni di questa settimana</h3><span class="ach-count" data-no-i18n>${done} / ${list.length}</span></div>
-    <div class="ach-list stagger">${list.map((m, i) => `<div class="ach-card${m.done ? ' done' : ' locked'}" style="--i:${i}">${art(m.img)}<div class="ach-t"><b>${esc(m.title)}</b><span>${esc(m.sub)}</span>${!m.done && m.fmt !== 'bool' ? `<span class="ach-prog"><i style="width:${Math.round(m.cur / m.target * 100)}%"></i></span><span class="ach-num" data-no-i18n>${m.cur} / ${m.target}</span>` : ''}</div><span class="ach-st">${icon(m.done ? 'i-check' : 'i-lock')}</span></div>`).join('')}</div>
+    <div class="ach-list stagger">${list.map((m, i) => `<div class="ach-card${m.done ? ' done' : ' locked'}" style="--i:${i}">${art(m.img)}<div class="ach-t"><b>${esc(m.title)} <em class="xp-tag${m.done ? ' got' : ''}" data-no-i18n>+${XP.mission} XP</em></b><span>${esc(m.sub)}</span>${!m.done && m.fmt !== 'bool' ? `<span class="ach-prog"><i style="width:${Math.round(m.cur / m.target * 100)}%"></i></span><span class="ach-num" data-no-i18n>${m.cur} / ${m.target}</span>` : ''}</div><span class="ach-st">${icon(m.done ? 'i-check' : 'i-lock')}</span></div>`).join('')}</div>
     <div class="ach-quote"><p>“Piccole missioni, grandi abitudini.”</p><svg class="ach-line" viewBox="0 0 200 10" aria-hidden="true"><path d="M3 6 C 50 1, 110 9, 197 4" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/></svg></div>
   </div>`;
 }
@@ -1090,9 +1090,9 @@ function levelInfo() { const xp = xpTotal(); let lv = 1; while (xp >= xpFor(lv +
 /* schermata "LEVEL UP" a tutto schermo (immagine di Lucas + livello, XP e barra disegnati sopra) */
 function showLevelUp(li) {
   if ($('#levelup')) return; const el = document.createElement('div'); el.id = 'levelup'; el.className = 'lvl';
-  el.innerHTML = `<div class="lvl-bg"></div><div class="lvl-ui"><div class="lvl-bar2" data-no-i18n><span class="lb-l">LV</span><span class="lb-n">${li.lv}</span><span class="lb-track"><i style="width:0%"></i></span><span class="lb-l">XP</span></div><div class="lvl-xp2" data-no-i18n>${li.xp} / ${li.next} XP</div><button type="button" class="lvl-btn" aria-label="Continua"><svg class="ic" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div>`;
+  el.innerHTML = `<div class="lvl-bg"></div><div class="lvl-ui"><div class="lvl-bar2" data-no-i18n><span class="lb-l">LV</span><span class="lb-n">${li.lv}</span><span class="lb-track"><i style="width:0%"></i></span><span class="lb-l">XP</span></div><div class="lvl-xp2" data-no-i18n>${li.base} / ${li.base} XP</div><button type="button" class="lvl-btn" aria-label="Continua"><svg class="ic" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div>`;
   document.body.appendChild(el); try { if (navigator.vibrate) navigator.vibrate([40, 60, 40]); } catch (_) {}
-  requestAnimationFrame(() => requestAnimationFrame(() => { el.classList.add('in'); setTimeout(() => { const f = $('.lb-track i', el); if (f) f.style.width = Math.max(4, li.pct) + '%'; }, 500); }));
+  requestAnimationFrame(() => requestAnimationFrame(() => { el.classList.add('in'); setTimeout(() => { const f = $('.lb-track i', el); if (f) f.style.width = '100%'; /* la barra arriva sempre al massimo: il livello è stato raggiunto */ }, 500); }));
   const close = () => { el.classList.remove('in'); el.classList.add('out'); setTimeout(() => el.remove(), 450); };
   $('.lvl-btn', el).addEventListener('click', close); el.addEventListener('click', (e) => { if (e.target === el || e.target.classList.contains('lvl-bg')) close(); });
 }
