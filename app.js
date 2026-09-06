@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.35.0';
+const APP_VERSION = '1.35.3';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -133,7 +133,7 @@ function defaultState() {
 }
 let S = load(); window.__S = S;
 /* v1.31.0 aveva un budget unico di coppia: lo passo alla persona di questo telefono */
-const migrateBudget = (b, meId) => { if (!b || typeof b !== 'object') return {}; if (typeof b.monthly === 'number' || b.byCat) { const out = {}; if (b.monthly || (b.byCat && Object.keys(b.byCat).length)) out[meId] = { monthly: b.monthly || 0, byCat: b.byCat || {}, updatedAt: nowISO() }; return out; } return b; };
+function migrateBudget(b, meId) { if (!b || typeof b !== 'object') return {}; if (typeof b.monthly === 'number' || b.byCat) { const out = {}; if (b.monthly || (b.byCat && Object.keys(b.byCat).length)) out[meId] = { monthly: b.monthly || 0, byCat: b.byCat || {}, updatedAt: nowISO() }; return out; } return b; } // dichiarazione di funzione: load() gira prima di questa riga
 function load() {
   try { const raw = localStorage.getItem(KEY); if (raw) { const s = JSON.parse(raw); const d = defaultState(); const st = { ...d, ...s, settings: { ...d.settings, ...(s.settings || {}), sync: { ...d.settings.sync, ...((s.settings || {}).sync || {}) } }, ui: { ...d.ui, ...(s.ui || {}), month: curYM() }, budget: migrateBudget(s.budget, ((s.settings || {}).me) || 'm1') };
     if (!Array.isArray(s.groups)) { st.groups = d.groups; st.entries.forEach((e) => { if (!e.group) e.group = 'g1'; }); st.settings.lastGroup = 'g1'; }
@@ -1068,19 +1068,24 @@ function pageMissioni() {
   </div>`;
 }
 /* ---------- Avviso "Missione completata!" che scende dall'alto (missioni della settimana e trofei) ---------- */
-var missionSnap = null, missionTimer = null, missionBusy = false, missionShowing = false, missionQueue = []; // var: save() può girare già all'avvio, prima di questa riga
-function missionState() { missionBusy = true; try { const w = missions(); const t = trophies(); return [...w.list.filter((x) => x.done).map((x) => [w.mon + ':' + x.id, x.title, false]), ...t.filter((x) => x.ok).map((x) => ['t:' + x.id, x.title, true])]; } finally { missionBusy = false; } }
+var missionTimer = null, missionBusy = false, missionShowing = false, missionQueue = []; // var: save() può girare già all'avvio, prima di questa riga
+function missionState() { missionBusy = true; try { const w = missions(); const t = trophies(); return { week: w.mon, m: w.list.filter((x) => x.done).map((x) => [x.id, x.title]), t: t.filter((x) => x.ok).map((x) => [x.id, x.title]) }; } finally { missionBusy = false; } }
+/* le missioni completate (anche mentre l'app era chiusa, o dall'altro telefono) vengono annunciate una volta sola: ricordo cosa ho già mostrato */
 function missionCheck() {
-  if (!auth.user()) return; let all; try { all = missionState(); } catch (_) { return; }
-  if (!missionSnap) { missionSnap = new Set(all.map((x) => x[0])); return; } // al primo giro prendo solo nota di quelle già fatte
-  all.forEach(([id, title, trophy]) => { if (!missionSnap.has(id)) { missionSnap.add(id); missionQueue.push({ title, trophy }); } });
+  if (!auth.user()) return; let st; try { st = missionState(); } catch (_) { return; }
+  const shown = S.settings.bannerShown && S.settings.bannerShown.week === st.week ? S.settings.bannerShown : { week: st.week, ids: [], trophies: (S.settings.bannerShown || {}).trophies };
+  let changed = false;
+  if (!Array.isArray(shown.trophies)) { shown.trophies = st.t.map((x) => x[0]); changed = true; } // prima volta: i trofei già presi non si annunciano
+  st.m.forEach(([id, title]) => { if (!shown.ids.includes(id)) { shown.ids.push(id); changed = true; missionQueue.push({ title, trophy: false }); } });
+  st.t.forEach(([id, title]) => { if (!shown.trophies.includes(id)) { shown.trophies.push(id); changed = true; missionQueue.push({ title, trophy: true }); } });
+  if (changed) { S.settings.bannerShown = shown; missionBusy = true; try { save(); } finally { missionBusy = false; } }
   missionNext();
 }
 function scheduleMissionCheck() { if (missionBusy) return; clearTimeout(missionTimer); missionTimer = setTimeout(missionCheck, 350); }
 function missionNext() {
   if (missionShowing || !missionQueue.length) return; const it = missionQueue.shift(); missionShowing = true;
   const el = document.createElement('a'); el.className = 'mban' + (it.trophy ? ' trophy' : ''); el.href = it.trophy ? '#/profilo/trofei' : '#/missioni';
-  el.innerHTML = `<img src="img/missione.webp" alt="Missione completata"><span class="mban-t" data-no-i18n>${esc(T(it.title))}</span>`; document.body.appendChild(el);
+  el.innerHTML = `<img src="img/missione.webp" alt=""><span class="mban-h">${esc(T(it.trophy ? 'Trofeo sbloccato!' : 'Missione completata!'))}</span><span class="mban-s">${esc(T('Hai sbloccato:'))}</span><span class="mban-t" data-no-i18n>${esc(T(it.title))}</span>`; document.body.appendChild(el);
   try { if (navigator.vibrate) navigator.vibrate(30); } catch (_) {}
   requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('in')));
   const hide = () => { el.classList.remove('in'); setTimeout(() => { el.remove(); missionShowing = false; missionNext(); }, 650); };
@@ -1949,7 +1954,7 @@ materializeRecurring();
   else if (!onboardingDone()) history.replaceState(null, '', '#/benvenuto');
   if (auth.user()) { applyPendingJoin(); if (restoreHouseFromAccount() && sync.enabled()) sync.run(true); rememberHouse(); showDailyLove(); }
   route();
-  setTimeout(missionCheck, 800);
+  setTimeout(missionCheck, 1200); // all'apertura annuncio le missioni completate nel frattempo
   auth.refreshIfNeeded().then(() => { if (!auth.user() && currentRoute && currentRoute.name !== 'accedi') render(); });
   hideSplash();
 })();

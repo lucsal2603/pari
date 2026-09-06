@@ -931,7 +931,10 @@ body.fixed-screen .view { height: 100dvh; overflow: hidden; padding-bottom: calc
 .ach-card.locked .ach-prog i { background: #8F938F; }
 
 /* ---------- Avviso "Missione completata!" ---------- */
-.mban { position: fixed; top: calc(var(--sat) + 6px); left: 50%; width: min(96vw, 560px); z-index: 90; transform: translate(-50%, -160%); transition: transform .6s cubic-bezier(.34, 1.35, .4, 1); filter: drop-shadow(0 12px 22px rgba(0, 0, 0, .18)); will-change: transform; }
+.mban { position: fixed; top: calc(var(--sat) + 6px); left: 50%; width: min(80vw, 430px); z-index: 90; transform: translate(-50%, -160%); transition: transform .6s cubic-bezier(.34, 1.35, .4, 1); filter: drop-shadow(0 12px 22px rgba(0, 0, 0, .18)); will-change: transform; }
 .mban.in { transform: translate(-50%, 0); }
 .mban img { display: block; width: 100%; height: auto; }
-.mban .mban-t { position: absolute; left: 49.6%; top: 61%; width: 41.5%; height: 17%; display: flex; align-items: center; justify-content: center; text-align: center; padding: 0 3%; font-weight: 800; color: #1E6B3A; font-size: clamp(11px, 3.6vw, 18px); line-height: 1.1; letter-spacing: -.01em; overflow: hidden; }
+.mban .mban-h, .mban .mban-s, .mban .mban-t { position: absolute; left: 48.5%; width: 45%; display: flex; align-items: center; overflow: hidden; line-height: 1.1; letter-spacing: -.02em; }
+.mban .mban-h { top: 43%; height: 8.5%; font-weight: 800; color: #1F2A24; font-size: clamp(10px, 3.2vw, 16px); white-space: nowrap; }
+.mban .mban-s { top: 51.5%; height: 7%; font-weight: 600; color: #6B7A70; font-size: clamp(8px, 2.4vw, 12px); white-space: nowrap; }
+.mban .mban-t { top: 59.5%; height: 15.5%; justify-content: center; text-align: center; padding: 0 3%; font-weight: 800; color: #1E6B3A; font-size: clamp(10px, 3vw, 15px); }
