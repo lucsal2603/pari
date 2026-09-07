@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.44.0';
+const APP_VERSION = '1.44.1';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -608,7 +608,7 @@ function pageHome() {
     </section>
     <div class="home-actions">${sent.even ? `<a class="ha main" href="#/statistiche">${icon('i-chart')}<span>Statistiche</span></a>` : `<button type="button" class="ha main" data-settle-all>${icon('i-balance')}<span>Metti in pari</span></button>`}<a class="ha" href="#/bilanci">${icon('i-scale')}<span>Dettaglio saldi</span></a></div>
     <div class="link-row"><h2 class="sec-title">Sezioni</h2><a href="#/profilo/sezioni">Gestisci ${icon('i-right')}</a></div>
-    <section class="card list-card"><div class="list stagger">${groups().map((g, i) => groupRow(g, i)).join('') || '<div class="empty small" style="padding:18px">Nessuna sezione: creane una da Gestisci.</div>'}</div></section>
+    <section class="card list-card"><div class="list stagger">${groups().map((g, i) => groupRow(g, i)).join('')}<button type="button" class="row add-row" data-new-section style="--i:${groups().length}"><span class="cat-ic plus">${icon('i-plus')}</span><span class="main"><span class="title">Nuova sezione</span><span class="sub">Con un codice tutto suo, da condividere con chi vuoi</span></span><span class="right">${icon('i-right', 'ic chev')}</span></button></div></section>
     <div class="link-row"><h2 class="sec-title">Ultime spese</h2><a href="#/spese">Vedi tutte ${icon('i-right')}</a></div>
     <section class="card list-card"><div class="list stagger">${recent.length ? recent.map(entryRow).join('') : emptyBox('Nessuna spesa ancora', 'Aggiungi la prima con il tasto qui sotto.', true)}</div></section>
     <div class="section"><a class="btn" href="#/nuova">${icon('i-plus')} Aggiungi spesa</a></div>
@@ -1006,6 +1006,13 @@ function openLangSheet(before) {
   openSheet('Lingua', `<div class="list lang-list">${langListHTML(LANG())}</div>`, (root) => { $$('[data-lang]', root).forEach((b) => b.addEventListener('click', () => { closeSheet(); pickLang(b.dataset.lang, before); })); });
 }
 /* foglio della sezione (matita in alto a destra nelle Spese): rinomina, statistiche, metti in pari, elimina */
+function newSectionSheet() {
+  openSheet('Nuova sezione', `<p class="muted small" style="margin:0 0 12px;line-height:1.45">Ogni sezione ha un codice tutto suo: chi lo inserisce entra e divide le spese di quella sezione con te.</p><div class="field" style="margin-top:0"><input class="input" id="ns-name" type="text" placeholder="Nome della sezione, es. Vacanze" autocomplete="off" enterkeyhint="done"></div><div class="btn-row" style="margin-top:14px"><button class="btn soft" data-c="no">Annulla</button><button class="btn" data-c="ok">Crea</button></div>`, (sh) => {
+    const inp = $('#ns-name', sh); setTimeout(() => inp.focus(), 120);
+    const create = () => { const n = (inp.value || '').trim(); if (!n) { inp.focus(); return; } const g = addGroup(n); S.settings.lastGroup = g.id; save(); closeSheet(); toast(T('Sezione "{0}" creata', n)); go('#/sezione/' + g.id); };
+    $('[data-c="no"]', sh).addEventListener('click', closeSheet); $('[data-c="ok"]', sh).addEventListener('click', create); inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); create(); } });
+  });
+}
 function renameGroupSheet(g, after) {
   openSheet('Rinomina sezione', `<div class="field" style="margin-top:0"><input class="input" id="rn" type="text" value="${esc(g.name)}"></div><div class="btn-row" style="margin-top:14px"><button class="btn soft" data-c="no">Annulla</button><button class="btn" data-c="ok">Salva</button></div>`, (sh) => { $('[data-c="no"]', sh).addEventListener('click', () => closeSheet()); $('[data-c="ok"]', sh).addEventListener('click', () => { renameGroup(g.id, $('#rn', sh).value); closeSheet(); render(); if (after) after(); }); setTimeout(() => { const i = $('#rn', sh); if (i) { i.focus(); i.select(); } }, 250); });
 }
@@ -1998,6 +2005,7 @@ function bind(r) {
     $$('[data-remove]').forEach((b) => b.addEventListener('click', () => { const m = member(b.dataset.remove); confirmSheet(T('Togliere {0} dalla sezione?', m.name), 'Non vedrà più le spese della sezione.', 'Togli', () => { removeMember(g, m.id); render(); toast(T('{0} non fa più parte della sezione', m.name)); }); }));
     const lv = $('[data-leave]'); if (lv) lv.addEventListener('click', () => confirmSheet(T('Uscire dalla sezione «{0}»?', g.name), 'Non vedrai più le sue spese. Potrai rientrare con il codice.', 'Lascia', async () => { await leaveSection(g); go('#/home'); }));
   } }
+  $$('[data-new-section]').forEach((b) => b.addEventListener('click', newSectionSheet));
   $$('[data-ach-info]').forEach((b) => b.addEventListener('click', () => openSheet('Come funzionano le missioni', `<p class="muted" style="margin:6px 0 14px;line-height:1.5">Le missioni vanno da lunedì a domenica e si azzerano ogni settimana. Si completano da sole in base alle spese del gruppo: quando una è fatta, la vedete tutti e due. I trofei permanenti sono in Profilo → I tuoi trofei.</p>`)));
   const tb = $('[data-trophy]'); if (tb) tb.addEventListener('click', () => { tb.classList.add('tap'); });
   $$('[data-back]').forEach((b) => b.addEventListener('click', () => { if (r.name === 'nuova' || r.name === 'modifica') F = null; back(b.dataset.back); }));

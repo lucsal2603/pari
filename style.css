@@ -1085,3 +1085,8 @@ body.touring .page { animation: none; } /* durante il tour la pagina appare subi
 .sec-pt span { font-size: 13px; color: var(--muted); }
 .pay-dir[data-payer-pick] { width: 100%; text-align: left; font: inherit; color: inherit; cursor: pointer; }
 .pay-dir .chev { margin-left: auto; color: var(--muted); }
+.list button.add-row { width: 100%; background: none; border: 0; border-top: 1px solid var(--line); font: inherit; color: inherit; cursor: pointer; }
+.list button.add-row:first-child { border-top: 0; }
+.add-row .cat-ic.plus { background: var(--green); color: #fff; }
+.add-row .title { color: var(--green); font-weight: 800; }
+.add-row .chev { color: var(--muted); }
