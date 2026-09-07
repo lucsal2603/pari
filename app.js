@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.44.11';
+const APP_VERSION = '1.44.12';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -194,8 +194,8 @@ const sectionMembers = (g) => Object.entries((g && g.members) || {}).filter(([, 
 const sectionPeople = (g) => sectionMembers(g).map(member);
 const sectionOthers = (g) => sectionPeople(g).filter((m) => m.id !== me().id);
 const mainSection = () => groups().find((g) => g.code && g.code === S.settings.sync.house) || groups().find((g) => g.owner === me().id) || groups()[0] || null;
-const codeOf = (gid) => { const g = gid && S.groups.find((x) => x.id === gid); return (g && g.code) || ((mainSection() || {}).code) || S.settings.sync.house; };
-const sectionCodes = () => [...new Set(groups().map((g) => g.code).filter(Boolean))];
+const codeOf = (gid) => { const g = gid && S.groups.find((x) => x.id === gid); return (g && g.code) || S.settings.sync.house || ((mainSection() || {}).code); }; /* senza sezione → casa personale */
+const sectionCodes = () => [...new Set([S.settings.sync.house, ...groups().map((g) => g.code)].filter(Boolean))];
 const isOwner = (g) => !!g && g.owner === me().id;
 /* aggiorna il registro delle persone con quelle arrivate da una sezione o dalla vecchia riga "members" */
 function mergePeople(list, rowTs) {
@@ -236,6 +236,8 @@ function migrateIdentity() {
     changed = true;
   }
   if (!S.settings.couple && !S.settings.sync.house && !S.entries.length && !S.settings.lastPull && S.members.length > 1) { S.members = S.members.filter((m) => m.id === uidNow); if (!me().name || me().name === 'Luca') me().name = (u.email || '').split('@')[0].replace(/[._-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) || 'Io'; changed = true; } /* account singolo nuovo: solo io */
+  /* account singolo: niente sezione predefinita "Spese casa": se è vuota e c'è solo io, sparisce (le sezioni le crea l'utente) */
+  if (!S.settings.couple) { const g1 = S.groups.find((g) => g.id === 'g1' && !g.deleted); if (g1 && !S.entries.some((e) => !e.deleted && e.group === 'g1') && Object.keys(g1.members || {}).every((k) => k === uidNow || isLegacyId(k))) { g1.deleted = true; g1.updatedAt = nowISO(); S.settings.groupsUpdatedAt = g1.updatedAt; if (S.settings.lastGroup === 'g1') S.settings.lastGroup = null; changed = true; } }
   /* account singolo: via i segnaposto di coppia (m1/m2) che non sono io e non compaiono in nessuna spesa, anche dalle sezioni */
   if (!S.settings.couple) { const used = new Set(); S.entries.filter((e) => !e.deleted).forEach((e) => { used.add(e.paidBy); if (e.to) used.add(e.to); Object.keys(e.owed || {}).forEach((k) => used.add(k)); });
     const drop = S.members.filter((m) => m.id !== uidNow && isLegacyId(m.id) && !used.has(m.id));
@@ -254,7 +256,7 @@ function migrateSections() {
     if (!g.members) { g.members = {}; const t = g.createdAt || nowISO(); (house ? S.members : [me()]).forEach((m) => { g.members[m.id] = { joinedAt: t, updatedAt: t }; }); ch = true; }
     if (ch) { g.updatedAt = nowISO(); changed = true; }
   });
-  if (!house && first && first.code) { S.settings.sync.house = first.code; S.settings.lastPull = null; changed = true; }
+  if (!house) { S.settings.sync.house = (first && first.code) || newSectionCode(); S.settings.lastPull = null; changed = true; } /* anche senza sezioni: codice personale per sincronizzare le proprie spese */
   if (S.version !== 2) { S.version = 2; changed = true; }
   if (changed) { S.settings.groupsUpdatedAt = nowISO(); S.settings.lastPush = null; save(); }
   return changed;
@@ -1462,6 +1464,7 @@ function showLevelUp(li) {
 function levelCheck() {
   let li; try { missionBusy = true; li = levelInfo(); } catch (_) { return; } finally { missionBusy = false; }
   const seen = S.settings.levelSeen;
+  if (seen != null && (!onboardingDone() || (typeof TOUR !== 'undefined' && TOUR))) return; /* durante presentazione e tour il LEVEL UP aspetta: si vede dopo, in Home */
   if (seen == null || li.lv > seen) { const wasNew = seen != null; S.settings.levelSeen = li.lv; missionBusy = true; try { save(); } finally { missionBusy = false; } if (wasNew) showLevelUp(li); }
 }
 function scheduleMissionCheck() { if (missionBusy) return; clearTimeout(missionTimer); missionTimer = setTimeout(missionCheck, 350); }
@@ -1999,6 +2002,12 @@ function pageWelcome() {
     <form class="onb-form" data-ob-form><label class="onb-field">${icon('i-user')}<input id="ob-name" type="text" placeholder="Il tuo nome" value="${esc(OB.name)}" autocomplete="given-name" autocapitalize="words" enterkeyhint="next"></label>
     <div class="onb-lbl">Scegli un avatar <small>(opzionale)</small></div>${avatarPicker(OB.avatar, 'data-ob-av')}
     <button class="btn onb-btn" type="submit">Continua ${arrowIc}</button></form>`;
+  else if (st === 2 && !isCoupleAccount()) {
+    body = `<img class="onb-logo" src="img/logo.png" alt="Divvy">
+    <h1 class="onb-h">Vuoi una sezione?</h1><p class="onb-p">Le sezioni raggruppano le spese (casa, vacanze…) e ognuna ha un codice per condividerla. Puoi farne una ora o più tardi dalla Home.</p>
+    <div class="onb-art"><img src="img/invito.png" alt=""></div>
+    <form class="onb-form" data-ob-form><label class="onb-field">${icon('i-list')}<input id="ob-section" type="text" placeholder="Nome della sezione (facoltativo)" value="${esc(OB.section || '')}" autocomplete="off" autocapitalize="sentences" enterkeyhint="next"></label>
+    <button class="btn onb-btn" type="submit">Continua ${arrowIc}</button></form>`; }
   else if (st === 2) { const link = inviteLink(); const shown = link.replace(/^https?:\/\//, '');
     body = `<img class="onb-logo" src="img/logo.png" alt="Divvy">
     <h1 class="onb-h">Condividi il link<br>del tuo gruppo</h1><p class="onb-p">Invita le persone con cui vuoi dividere le spese. Basta che clicchino sul link per unirsi al gruppo!</p>
@@ -2056,7 +2065,7 @@ function obFinish() {
 function bindWelcome() {
   $$('[data-ob-skip]').forEach((b) => b.addEventListener('click', obFinish));
   // cambio lingua dalla presentazione: tengo il nome già scritto e ridisegno il passo nella lingua nuova
-  $$('[data-lang-pick]').forEach((b) => b.addEventListener('click', () => openLangSheet(() => { const n = $('#ob-name'); if (n) OB.name = n.value; })));
+  $$('[data-lang-pick]').forEach((b) => b.addEventListener('click', () => openLangSheet(() => { const n = $('#ob-name'); if (n) OB.name = n.value; const si = $('#ob-section'); if (si) OB.section = si.value; })));
   const form = $('[data-ob-form]');
   if (form) form.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -2064,7 +2073,7 @@ function bindWelcome() {
       migrateIdentity(); me().name = n; S.settings.membersUpdatedAt = nowISO(); /* l'identità è l'account: il nome va sulla mia persona */
       if (OB.avatar >= 0 && AVATAR_IMGS[OB.avatar]) { me().avatar = { img: AVATAR_IMGS[OB.avatar] }; S.settings.membersUpdatedAt = nowISO(); }
       OB.partner = OB.partner || other().name; save(); obGo(2); return; }
-    if (OB.step === 2) { obGo(3); return; }
+    if (OB.step === 2) { const si = $('#ob-section'); if (si) { const n = (si.value || '').trim(); OB.section = n; if (n && !groups().some((g) => g.name.toLowerCase() === n.toLowerCase())) { const g = addGroup(n); S.settings.lastGroup = g.id; save(); } } obGo(3); return; }
     if (OB.step === 3 && !isCoupleAccount()) { obGo(4); return; }
     if (OB.step === 3) { const a = me(), b = other(); S.settings.split = OB.split === 'custom' ? { mode: 'custom', pct: { [a.id]: OB.pct, [b.id]: 100 - OB.pct } } : { mode: 'equal' }; save(); obGo(4); return; }
   });
