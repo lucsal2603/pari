@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.44.2';
+const APP_VERSION = '1.44.3';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -256,8 +256,8 @@ function migrateSections() {
   return changed;
 }
 /* ---------- Account singoli: solo l'account di Luca è "di coppia" (riconosciuto dall'impronta dell'email, non dall'email in chiaro) ---------- */
-const COUPLE_HASH = 'ecc6df58d7e59c137391c8ef87c233eb3735ab3a1dc1055b0deaaaf6bcb4925b';
-async function coupleCheck() { const u = auth.user(); if (!u || !u.email || !(crypto.subtle && crypto.subtle.digest)) return false; try { const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(u.email.trim().toLowerCase())); return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('') === COUPLE_HASH; } catch (_) { return false; } }
+const COUPLE_HASHES = ['ecc6df58d7e59c137391c8ef87c233eb3735ab3a1dc1055b0deaaaf6bcb4925b']; /* impronte SHA-256 delle email dell'account di coppia: Luca; Martina quando arriva la sua */
+async function coupleCheck() { const u = auth.user(); if (!u || !u.email || !(crypto.subtle && crypto.subtle.digest)) return false; try { const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(u.email.trim().toLowerCase())); return COUPLE_HASHES.includes([...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('')); } catch (_) { return false; } }
 const isCoupleAccount = () => !!S.settings.couple;
 async function updateCoupleFlag() { const c = await coupleCheck(); if (S.settings.couple !== c) { S.settings.couple = c; S.settings.boardCouple = c; save(); return true; } return false; }
 const hasOthers = () => S.members.some((m) => m.id !== me().id);
@@ -302,7 +302,7 @@ const auth = {
   email() { const u = this.user(); return (u && u.email) || ''; },
   h(json = true) { const o = { apikey: SUPA_ANON }; if (json) o['Content-Type'] = 'application/json'; return o; },
   setSession(j) { if (j.expires_in && !j.expires_at) j.expires_at = Math.floor(Date.now() / 1000) + j.expires_in; this.s = { access_token: j.access_token, refresh_token: j.refresh_token, expires_at: j.expires_at, user: j.user || null }; this.save(); },
-  async signUp(email, password, data) { const r = await fetch(SUPA_URL + '/auth/v1/signup', { method: 'POST', headers: this.h(), body: JSON.stringify({ email, password, data: data || {}, options: { emailRedirectTo: appUrl() } }) }); const j = await r.json(); if (!r.ok) throw new Error(authMsg(j)); if (j.access_token) { this.setSession(j); return 'ok'; } return 'confirm'; },
+  async signUp(email, password, data) { const r = await fetch(SUPA_URL + '/auth/v1/signup', { method: 'POST', headers: this.h(), body: JSON.stringify({ email, password, data: data || {}, options: { emailRedirectTo: appUrl() } }) }); const j = await r.json(); if (!r.ok) { const raw = String((j && (j.msg || j.message || j.error_description || j.error)) || '').toLowerCase(); if (raw.includes('rate limit') || r.status === 429) throw new Error('Il server ha raggiunto il limite di email di conferma: riprova tra un po\'. Non dipende dai tuoi tentativi.'); throw new Error(authMsg(j)); } /* alla registrazione il limite è quello delle email di conferma di Supabase, non un blocco per tentativi */ if (j.access_token) { this.setSession(j); return 'ok'; } return 'confirm'; },
   async signIn(email, password) { const r = await fetch(SUPA_URL + '/auth/v1/token?grant_type=password', { method: 'POST', headers: this.h(), body: JSON.stringify({ email, password }) }); const j = await r.json(); if (!r.ok) throw new Error(authMsg(j)); this.setSession(j); },
   async signOut() { try { if (this.s) await fetch(SUPA_URL + '/auth/v1/logout', { method: 'POST', headers: { apikey: SUPA_ANON, Authorization: 'Bearer ' + this.s.access_token } }); } catch (_) {} this.s = null; this.save(); },
   async refreshIfNeeded() { if (!this.s || !this.s.refresh_token) return; if (Date.now() < ((this.s.expires_at || 0) * 1000) - 120000) return; try { const r = await fetch(SUPA_URL + '/auth/v1/token?grant_type=refresh_token', { method: 'POST', headers: this.h(), body: JSON.stringify({ refresh_token: this.s.refresh_token }) }); const j = await r.json(); if (r.ok && j.access_token) this.setSession(j); else if (r.status === 400 || r.status === 401) { this.s = null; this.save(); } } catch (_) {} },
