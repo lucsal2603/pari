@@ -1110,3 +1110,8 @@ body.touring .page { animation: none; } /* durante il tour la pagina appare subi
 .couple-circle .avatar-col .ic { width: 56px; height: 56px; }
 .onb-cur { max-height: 36vh; overflow: auto; margin-bottom: 12px; -webkit-overflow-scrolling: touch; }
 .onb-cur .row { padding: 9px 0; }
+.need-share { text-align: center; padding: 22px 18px 18px; }
+.need-share img { width: 150px; height: auto; margin: 0 auto 8px; display: block; }
+.need-share h2 { font-size: 20px; font-weight: 800; margin: 6px 0 8px; }
+.need-share p { margin: 0 0 16px; color: var(--muted); font-size: 14.5px; line-height: 1.45; }
+.need-share .btn-row { display: grid; gap: 8px; }

@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.44.13';
+const APP_VERSION = '1.44.14';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -814,10 +814,13 @@ function pageDetail(r) {
 let F = null; // stato del form
 function pageForm(r) {
   const editing = r.name === 'modifica' ? S.entries.find((x) => x.id === r.id) : null;
-  if (!editing && r.q.tipo === 'pagamento' && !hasOthers()) r = { ...r, q: { ...r.q, tipo: '' } }; /* da soli non c'è nessuno da pagare: si apre la spesa normale, senza blocchi */
+  if (!editing && !isCoupleAccount() && !formGroups().length) { const isPayB = r.q.tipo === 'pagamento'; F = null; return `<div class="page up">
+    <div class="head"><button class="icon-btn" data-back="#/home" aria-label="Annulla">${icon('i-x')}</button><div class="title">${isPayB ? 'Nuovo pagamento' : 'Nuova spesa'}</div><span class="icon-btn" style="visibility:hidden"></span></div>
+    <section class="card need-share"><img src="img/invito.png" alt=""><h2>Serve una sezione con qualcuno</h2><p>Un pagamento si registra dentro una sezione condivisa con almeno un'altra persona: crea una sezione e condividi il suo codice, oppure entra in una sezione con un codice.</p>
+    <div class="btn-row"><button type="button" class="btn" data-new-section>Crea una sezione</button><a class="btn soft" href="#/profilo/sezioni">Entra con un codice</a></div></section></div>`; } /* regola di Lucas: da soli niente pagamenti */
   if (!F || F.routeKey !== location.hash) {
     F = editing ? { routeKey: location.hash, id: editing.id, kind: editing.kind, group: editing.group || null, desc: editing.desc || '', amount: moneyPlain(editing.amount), date: editing.date, cat: editing.cat || '', paidBy: editing.paidBy, splitMethod: editing.splitMethod || 'equal', splitInput: { ...(editing.splitInput || {}) }, notes: editing.notes || '', recurring: editing.recurring === 'monthly', to: Object.keys(editing.owed || {})[0] }
-      : { routeKey: location.hash, id: null, kind: r.q.tipo === 'pagamento' ? 'payment' : 'expense', desc: '', amount: '', date: todayStr(), cat: '', paidBy: me().id, splitMethod: 'equal', splitInput: {}, notes: '', recurring: false, to: other().id, group: (groups().find((g) => g.id === S.settings.lastGroup) || groups()[0] || {}).id || null };
+      : { routeKey: location.hash, id: null, kind: r.q.tipo === 'pagamento' ? 'payment' : 'expense', desc: '', amount: '', date: todayStr(), cat: '', paidBy: me().id, splitMethod: 'equal', splitInput: {}, notes: '', recurring: false, to: other().id, group: (formGroups().find((g) => g.id === S.settings.lastGroup) || formGroups()[0] || {}).id || null };
     if (editing && F.group === undefined) F.group = editing.group || null;
     if (F.kind === 'expense') { const sp = S.settings.split; if (!editing && sp && sp.mode === 'custom' && sp.pct) { F.splitMethod = 'percent'; F.splitInput = { ...sp.pct }; } else F.splitMethod = 'equal'; }
     if (!editing && F.kind === 'payment') { const pd = paymentDefault(); if (pd) { F.paidBy = pd.paidBy; F.to = pd.to; F.amount = pd.amount; } }
@@ -835,7 +838,7 @@ function pageForm(r) {
         ? `<div class="field"><div class="lbl">Pagamento</div><button type="button" class="pay-dir" data-payer-pick>${avatar(payerOf(F.paidBy))}<span class="txt"><span class="t">${esc(payerOf(F.paidBy).name)} dà a ${esc(payerOf(F.to).name)}</span><span class="d">${F.amount ? '€ ' + esc(F.amount) : 'la somma qui sopra'} · il saldo fra voi si aggiorna</span></span>${avatar(payerOf(F.to))}</button></div>`
         : `<div class="field"><button type="button" class="pay-dir soft" data-payer-pick>${avatar(payerOf(F.paidBy))}<span class="txt"><span class="t">${F.paidBy === me().id ? 'Paghi tu, ' + esc(payerOf(F.paidBy).name) : 'Pagata da ' + esc(payerOf(F.paidBy).name)}</span><span class="d" id="half-hint">${halfHint()}</span></span>${formPeople().length > 1 ? icon('i-right', 'ic chev') : ''}</button></div>
            <div class="field"><div class="lbl">Categoria <small>(opzionale)</small></div><div class="cat-circles">${CATS.map((c) => `<button type="button" class="cat-circle${F.cat === c.id ? ' on' : ''}" data-cat="${c.id}" aria-label="${esc(c.name)}" title="${esc(c.name)}">${icon(c.icon)}</button>`).join('')}</div><div class="cat-name" id="cat-name">${F.cat ? esc(catOf(F.cat).name) : 'Nessuna categoria'}</div></div>`}
-      <div class="field"><div class="lbl">Sezione</div><div class="chips" id="form-groups">${groups().map((g) => `<button type="button" class="chip${F.group === g.id ? ' on' : ''}" data-group="${g.id}">${esc(g.name)}</button>`).join('')}<button type="button" class="chip" data-group-new>${icon('i-plus')}Nuova</button></div>
+      <div class="field"><div class="lbl">Sezione</div><div class="chips" id="form-groups">${formGroups().map((g) => `<button type="button" class="chip${F.group === g.id ? ' on' : ''}" data-group="${g.id}">${esc(g.name)}</button>`).join('')}${isCoupleAccount() ? `<button type="button" class="chip" data-group-new>${icon('i-plus')}Nuova</button>` : ''}</div>
         <div id="group-new" ${F.newGroup ? '' : 'hidden'}><div style="display:flex;gap:8px"><input class="input" id="group-name" type="text" placeholder="Nome della sezione, es. Vacanze" value="${esc(F.newGroupName || '')}" autocomplete="off"><button type="button" class="btn sm" id="group-create" style="height:50px;flex:none">Crea</button></div></div>
         ${groups().length ? '' : '<div class="hint">Nessuna sezione: creane una per raggruppare le spese (es. Spese casa, Vacanze).</div>'}</div>
       <div class="field"><label for="date">Data</label><input id="date" type="date" value="${esc(F.date)}" max="2100-12-31"></div>
@@ -853,6 +856,7 @@ function halfHint() {
   return !isNaN(v) ? 'Metà a testa: ' + money(Math.round(v / 2)) : 'Divisa a metà con ' + o.name;
 }
 /* le persone fra cui dividere: quelle della sezione scelta (se ne ha), altrimenti tutte quelle che conosco */
+const formGroups = () => (isCoupleAccount() ? groups() : groups().filter((g) => sectionMembers(g).length >= 2)); /* i singoli registrano solo dentro sezioni condivise */
 function formPeople() { const g = F && F.group && S.groups.find((x) => x.id === F.group); const ppl = g && g.members ? sectionPeople(g) : []; return ppl.length ? ppl : S.members; }
 function computeOwed() {
   const amount = parseAmount(F.amount); const ids = formPeople().map((m) => m.id);
