@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.44.4';
+const APP_VERSION = '1.44.5';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -264,7 +264,10 @@ const hasOthers = () => S.members.some((m) => m.id !== me().id);
 const otherName = () => (other().id ? other().name : T('chi condivide con te'));
 /* ogni account ha il suo stato sul telefono: se entra un altro account, metto da parte lo stato di prima e carico il suo */
 function switchStateFor(uidNow) {
-  const own = S.settings.ownerUid;
+  let own = S.settings.ownerUid || S.settings.onboardedFor || S.settings.tutorialDoneFor || null; /* stati vecchi: il proprietario è chi ha fatto la presentazione */
+  /* un account appena creato parte SEMPRE da zero: se sul telefono c'è uno stato senza proprietario con dei dati, non è suo */
+  const u = auth.user(); const fresh = u && u.created_at && (Date.now() - new Date(u.created_at).getTime()) < 30 * 60000;
+  if (!own && fresh && (S.entries.length || S.settings.sync.house)) own = 'sconosciuto';
   if (own && own !== uidNow) {
     try { localStorage.setItem(KEY + ':' + own, JSON.stringify(S)); } catch (_) {}
     let raw = null; try { raw = localStorage.getItem(KEY + ':' + uidNow); } catch (_) {}
@@ -1358,7 +1361,7 @@ const MISSION_POOL = [
   ['centesimi', 'moneta', 'amount', 'Al centesimo', 'Una spesa con i centesimi precisi.', (d) => d.cents, 1],
   ['budget', 'salvadanaio', 'budget', 'Un budget per te', 'Imposta il tuo budget mensile dal tab Budget.', (d) => d.budget, 1, 'bool'],
   ['budgetcat', 'tresalvadanai', 'budget', 'Budget per categoria', 'Imposta un budget per almeno una categoria.', (d) => d.budgetCat, 1, 'bool'],
-  ['pari', 'coppa', 'pay', 'Conti in pari', 'Registrate un pagamento o chiudete la settimana in pari.', (d) => (d.pays || d.settled ? 1 : 0), 1, 'bool'],
+  ['pari', 'coppa', 'pay', 'Conti in pari', 'Registrate un pagamento o chiudete la settimana in pari.', (d) => (d.pays || (d.settled && d.es.length) ? 1 : 0), 1, 'bool'],
   ['pagamento', 'bilancia', 'pay', 'Un pagamento registrato', 'Registra un pagamento dal + o con Metti in pari.', (d) => d.pays, 1],
   ['offri', 'moneta', 'pay', 'Offri tu', 'Paga tu almeno 3 spese della settimana.', (d) => d.mine, 3],
   ['quota', 'bilancia', 'pay', 'Divisione su misura', 'Una spesa divisa non a metà.', (d) => d.custom, 1],
@@ -1386,7 +1389,7 @@ function missions(all) {
     trophies: () => { try { return trophies().filter((t) => t.ok && t.at && t.at >= mon && t.at <= sun).length; } catch (_) { return 0; } } };
   /* estrazione della settimana: stessa per tutta la casa (seme = lunedì + codice casa), al massimo 2 missioni per famiglia */
   let pick = MISSION_POOL;
-  if (!all) { const rnd = seedRand(mon + '|' + ((S.settings.sync || {}).house || (auth.user() || {}).id || '')); const pool = MISSION_POOL.slice(); for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+  if (!all) { const rnd = seedRand(mon + '|' + ((S.settings.sync || {}).house || (auth.user() || {}).id || '')); const pool = MISSION_POOL.filter((m) => hasOthers() || (m[2] !== 'pay' && m[0] !== 'quota')); /* da soli niente missioni sui pagamenti */ for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
     const fam = {}; pick = []; pool.forEach((m) => { if (pick.length >= MISSIONS_PER_WEEK || (fam[m[2]] || 0) >= 2) return; fam[m[2]] = (fam[m[2]] || 0) + 1; pick.push(m); }); }
   const L = pick.map(([id, img, fam, title, sub, val, target, fmt]) => { let cur = 0; try { cur = val(d) || 0; } catch (_) {} return { id, img, fam, title, sub: typeof sub === 'function' ? sub() : sub, cur: Math.min(cur, target), target, done: cur >= target, fmt: fmt || 'count' }; });
   return { list: L, mon, sun, daysLeft };
