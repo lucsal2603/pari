@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.44.7';
+const APP_VERSION = '1.44.8';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -1037,6 +1037,7 @@ function pageNotifiche() {
     <div class="section btn-row">${on ? `<button class="btn soft" id="push-test">Prova una notifica</button><button class="btn ghost" id="push-off">Disattiva</button>` : `<button class="btn" id="push-on" ${supported && perm !== 'denied' ? '' : 'disabled'}>Attiva le notifiche</button>`}</div>
   </div>`;
 }
+const currencyRow = (code, name, cur, attr) => { let sym = code; try { sym = new Intl.NumberFormat(LOC(), { style: 'currency', currency: code, currencyDisplay: 'narrowSymbol' }).formatToParts(0).find((p) => p.type === 'currency').value; } catch (_) {} const nm = currencyName(code); return `<button type="button" class="row" ${attr}="${code}" data-name="${esc((name + ' ' + nm).toLowerCase())}"><span class="cat-ic" style="font-weight:800;font-size:14px">${esc(sym.length > 3 ? code.slice(0, 3) : sym)}</span><span class="main"><span class="title" data-no-i18n>${esc(nm)}</span><span class="sub">${code}</span></span><span class="right">${cur === code ? icon('i-check') : ''}</span></button>`; };
 function pageValuta() {
   const cur = S.settings.currency || 'EUR';
   return `<div class="page slide">${subHead('Valuta')}
@@ -1985,7 +1986,7 @@ const avatarPicker = (sel, attr) => `<div class="onb-avatars">${AVATAR_IMGS.map(
 const AVATARS = [{ bg: '#2C4A3B', fg: '#F8F4EE' }, { bg: '#F8D9D2', fg: '#D7563C' }, { bg: '#D3E7F5', fg: '#4E8FBF' }, { bg: '#E0DBF3', fg: '#7B68B8' }, { bg: '#D3E6D8', fg: '#4C8A66' }, { bg: '#F7E7C3', fg: '#C99A2E' }];
 const arrowIc = '<svg class="ic"><path d="M5 12h14M13 5l7 7-7 7"/></svg>';
 function pageWelcome() {
-  const st = OB.step; const dots = `<div class="onb-dots" style="view-transition-name:onb-dots">${(isCoupleAccount() ? [1, 2, 3, 4] : [1, 2, 4]).map((i) => `<i class="${i === st ? 'on' : ''}"></i>`).join('')}</div>`;
+  const st = OB.step; const dots = `<div class="onb-dots" style="view-transition-name:onb-dots">${[1, 2, 3, 4].map((i) => `<i class="${i === st ? 'on' : ''}"></i>`).join('')}</div>`;
   const top = `<div class="onb-top"><div class="onb-left">${st > 1 ? `<button type="button" class="icon-btn onb-back" data-ob-back aria-label="Indietro">${icon('i-back')}</button>` : ''}${langPill()}</div><button type="button" class="onb-skip" data-ob-skip>Salta</button></div>`;
   let body = '';
   if (st === 1) body = `<img class="onb-logo" src="img/logo.png" alt="Divvy">
@@ -2011,6 +2012,13 @@ function pageWelcome() {
     <div class="onb-info"><span class="inv-ic">${icon('i-users')}</span><div><b>Unirsi è semplice</b><span>Chiunque abbia il link potrà unirsi al gruppo in un solo clic, senza bisogno di un account.</span></div></div>
     <div class="onb-info"><span class="inv-ic">${icon('i-shield')}</span><div><b>Link sicuro</b><span>Puoi sempre disattivare il link o generarne uno nuovo dalle impostazioni del gruppo.</span></div></div>
     <form class="onb-form" data-ob-form><button class="btn onb-btn" type="submit">Continua ${arrowIc}</button></form>`; }
+  else if (st === 3 && !isCoupleAccount()) { const cur = S.settings.currency || 'EUR'; const top = ['EUR', 'USD', 'GBP', 'CHF'];
+    body = `<img class="onb-logo" src="img/logo.png" alt="Divvy">
+    <h1 class="onb-h onb-dark">Con quale valuta<br>usi Divvy?</h1><p class="onb-p">Vale per tutte le tue spese. Potrai cambiarla quando vuoi dalle impostazioni.</p>
+    <form class="onb-form" data-ob-form>
+      <label class="search" style="margin-bottom:8px">${icon('i-search')}<input id="ob-cur-q" type="search" placeholder="Cerca una valuta…" autocomplete="off"></label>
+      <section class="card list-card onb-cur"><div class="list" id="ob-cur-list">${[...CURRENCIES.filter(([c]) => top.includes(c)), ...CURRENCIES.filter(([c]) => !top.includes(c))].map(([code, name]) => currencyRow(code, name, cur, 'data-ob-cur')).join('')}</div></section>
+      <button class="btn onb-btn" type="submit">Continua ${arrowIc}</button></form>`; }
   else if (st === 3) { const pm = OB.pct, po = 100 - OB.pct;
     body = `<img class="onb-logo" src="img/logo.png" alt="Divvy">
     <h1 class="onb-h onb-dark">Come vuoi<br>dividere le spese?</h1><p class="onb-p">Imposta una modalità predefinita. Potrai cambiarla per ogni singola spesa.</p>
@@ -2052,14 +2060,17 @@ function bindWelcome() {
       migrateIdentity(); me().name = n; S.settings.membersUpdatedAt = nowISO(); /* l'identità è l'account: il nome va sulla mia persona */
       if (OB.avatar >= 0 && AVATAR_IMGS[OB.avatar]) { me().avatar = { img: AVATAR_IMGS[OB.avatar] }; S.settings.membersUpdatedAt = nowISO(); }
       OB.partner = OB.partner || other().name; save(); obGo(2); return; }
-    if (OB.step === 2) { obGo(isCoupleAccount() ? 3 : 4); return; }
+    if (OB.step === 2) { obGo(3); return; }
+    if (OB.step === 3 && !isCoupleAccount()) { obGo(4); return; }
     if (OB.step === 3) { const a = me(), b = other(); S.settings.split = OB.split === 'custom' ? { mode: 'custom', pct: { [a.id]: OB.pct, [b.id]: 100 - OB.pct } } : { mode: 'equal' }; save(); obGo(4); return; }
   });
+  $$('[data-ob-cur]').forEach((b) => b.addEventListener('click', () => { S.settings.currency = b.dataset.obCur; S.settings.membersUpdatedAt = nowISO(); save(); sync.schedule(); $$('[data-ob-cur]').forEach((x) => { x.querySelector('.right').innerHTML = x === b ? icon('i-check') : ''; }); }));
+  const cq = $('#ob-cur-q'); if (cq) cq.addEventListener('input', () => { const v = cq.value.trim().toLowerCase(); $$('[data-ob-cur]').forEach((b) => { b.hidden = !!v && !(b.dataset.name.includes(v) || b.dataset.obCur.toLowerCase().includes(v)); }); });
   $$('[data-ob-split]').forEach((b) => b.addEventListener('click', () => { OB.split = b.dataset.obSplit; $$('.onb-opt').forEach((x) => x.classList.toggle('on', x === b)); $('#onb-pct').hidden = OB.split !== 'custom'; }));
   const rng = $('#pct-range'); if (rng) rng.addEventListener('input', () => { OB.pct = +rng.value; $('#pct-me').textContent = OB.pct + '%'; $('#pct-other').textContent = (100 - OB.pct) + '%'; });
   $$('[data-ob-edit]').forEach((b) => b.addEventListener('click', () => obGo(1, 'back')));
   $$('[data-ob-av]').forEach((b) => b.addEventListener('click', () => { const i = +b.dataset.obAv; OB.avatar = OB.avatar === i ? -1 : i; $$('.onb-av').forEach((x) => x.classList.toggle('on', x === b && OB.avatar === i)); }));
-  $$('[data-ob-back]').forEach((b) => b.addEventListener('click', () => obGo(OB.step === 4 && !isCoupleAccount() ? 2 : Math.max(1, OB.step - 1), 'back')));
+  $$('[data-ob-back]').forEach((b) => b.addEventListener('click', () => obGo(Math.max(1, OB.step - 1), 'back')));
   const cp = $('[data-copy-link]'); if (cp) { let t; cp.addEventListener('click', async () => {
     try { await navigator.clipboard.writeText(inviteLink()); } catch (_) { toast('Non riesco a copiare: tieni premuto sul link'); return; }
     cp.classList.remove('done'); void cp.offsetWidth; cp.classList.add('done'); clearTimeout(t); t = setTimeout(() => cp.classList.remove('done'), 1800);

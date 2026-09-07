@@ -1108,3 +1108,5 @@ body.touring .page { animation: none; } /* durante il tour la pagina appare subi
 .couple-circle img.avatar, .couple-circle img.avatar.lg { width: 100%; height: 100%; border-radius: 50%; display: block; object-fit: cover; }
 .couple-circle .avatar-col, .couple-circle .avatar-col.lg { width: 100%; height: 100%; border-radius: 50%; display: flex; }
 .couple-circle .avatar-col .ic { width: 56px; height: 56px; }
+.onb-cur { max-height: 36vh; overflow: auto; margin-bottom: 12px; -webkit-overflow-scrolling: touch; }
+.onb-cur .row { padding: 9px 0; }
