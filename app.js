@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.44.12';
+const APP_VERSION = '1.44.13';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -586,6 +586,7 @@ function entryRow(e, i) {
 function myShare(e) {
   const my = me().id; const owedByMe = (e.owed || {})[my] || 0;
   if (e.kind === 'payment') return { big: money(e.amount), cls: '', small: e.paidBy === my ? 'hai pagato tu' : 'ti ha pagato', label: '' };
+  if (e.paidBy === my && Object.keys(e.owed || {}).every((k) => k === my)) return { big: money(e.amount), cls: '', small: '', label: '' }; /* spesa solo mia: niente più/meno */
   if (e.paidBy === my) { const v = e.amount - owedByMe; return { big: '+ ' + money(v), cls: 'green', small: 'tot. ' + money(e.amount), label: 'Ricevi ' + money(v) }; }
   if (owedByMe > 0) return { big: '− ' + money(owedByMe), cls: 'red', small: 'tot. ' + money(e.amount), label: 'Devi ' + money(owedByMe) };
   return { big: money(e.amount), cls: 'muted', small: 'non ti riguarda', label: '' };
