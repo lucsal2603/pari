@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.44.6';
+const APP_VERSION = '1.44.7';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -2466,7 +2466,7 @@ materializeRecurring();
   // richiesta di Lucas (6/9 sera): la schermata LEVEL UP a OGNI accesso; per tornare alla normalità mettere LEVELUP_EVERY_OPEN a false
   const LEVELUP_EVERY_OPEN = false;
   if (LEVELUP_EVERY_OPEN && auth.user()) setTimeout(() => { try { showLevelUp(levelInfo()); } catch (e) { console.warn('levelup', e); } }, 2600);
-  const BANNER_FORCE = { until: '2026-09-08', key: 'pari:banner-force-1' };
+  const BANNER_FORCE = { until: '2026-09-06', key: 'pari:banner-force-1' };
   try { if (auth.user() && todayStr() <= BANNER_FORCE.until && !localStorage.getItem(BANNER_FORCE.key)) { setTimeout(() => { localStorage.setItem(BANNER_FORCE.key, '1'); const w = missions(); const m = w.list.find((x) => x.done) || w.list[0]; missionQueue.push({ title: m.title, trophy: false }); missionNext(); }, 1500); } } catch (_) {}
   auth.refreshIfNeeded().then(() => { if (!auth.user() && currentRoute && currentRoute.name !== 'accedi') render(); });
   hideSplash();
