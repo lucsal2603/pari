@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.44.1';
+const APP_VERSION = '1.44.2';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -134,8 +134,8 @@ function defaultState() {
 let S = load(); window.__S = S;
 /* v1.31.0 aveva un budget unico di coppia: lo passo alla persona di questo telefono */
 function migrateBudget(b, meId) { if (!b || typeof b !== 'object') return {}; if (typeof b.monthly === 'number' || b.byCat) { const out = {}; if (b.monthly || (b.byCat && Object.keys(b.byCat).length)) out[meId] = { monthly: b.monthly || 0, byCat: b.byCat || {}, updatedAt: nowISO() }; return out; } return b; } // dichiarazione di funzione: load() gira prima di questa riga
-function load() {
-  try { const raw = localStorage.getItem(KEY); if (raw) { const s = JSON.parse(raw); const d = defaultState(); const st = { ...d, ...s, settings: { ...d.settings, ...(s.settings || {}), sync: { ...d.settings.sync, ...((s.settings || {}).sync || {}) } }, ui: { ...d.ui, ...(s.ui || {}), month: curYM() }, budget: migrateBudget(s.budget, ((s.settings || {}).me) || 'm1') };
+function load(rawOverride) {
+  try { const raw = rawOverride !== undefined ? rawOverride : localStorage.getItem(KEY); if (raw) { const s = JSON.parse(raw); const d = defaultState(); const st = { ...d, ...s, settings: { ...d.settings, ...(s.settings || {}), sync: { ...d.settings.sync, ...((s.settings || {}).sync || {}) } }, ui: { ...d.ui, ...(s.ui || {}), month: curYM() }, budget: migrateBudget(s.budget, ((s.settings || {}).me) || 'm1') };
     if (!Array.isArray(s.groups)) { st.groups = d.groups; st.entries.forEach((e) => { if (!e.group) e.group = 'g1'; }); st.settings.lastGroup = 'g1'; }
     if (!st.settings.sync.url) { st.settings.sync.url = SUPA_URL; st.settings.sync.key = SUPA_ANON; }
     // telefoni già collegati prima dell'arrivo della presentazione: non la mostro
@@ -235,6 +235,7 @@ function migrateIdentity() {
     else { S.members.unshift({ id: uidNow, name: 'Io', color: '#2C4A3B' }); S.settings.me = uidNow; }
     changed = true;
   }
+  if (!S.settings.couple && !S.settings.sync.house && !S.entries.length && !S.settings.lastPull && S.members.length > 1) { S.members = S.members.filter((m) => m.id === uidNow); if (!me().name || me().name === 'Luca') me().name = (u.email || '').split('@')[0].replace(/[._-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) || 'Io'; changed = true; } /* account singolo nuovo: solo io */
   const map = pidMap();
   if (Object.keys(map).length) { const t = nowISO(); S.entries.forEach((e) => { if (normEntry(e, map)) { e.updatedAt = t; changed = true; } }); normAll(map); }
   if (changed) { if (S.entries.length || S.settings.membersUpdatedAt) S.settings.membersUpdatedAt = nowISO(); if (S.settings.push) S.settings.pushUpdatedAt = nowISO(); S.settings.lastPush = null; save(); }
@@ -254,7 +255,37 @@ function migrateSections() {
   if (changed) { S.settings.groupsUpdatedAt = nowISO(); S.settings.lastPush = null; save(); }
   return changed;
 }
-function afterAuth() { if (S.version !== 2) { try { if (!localStorage.getItem('pari:backup-v1')) localStorage.setItem('pari:backup-v1', localStorage.getItem(KEY) || ''); } catch (_) {} } /* copia dello stato prima del passaggio alle sezioni */ restoreHouseFromAccount(); const a = migrateIdentity(); const b = migrateSections(); rememberHouse(); return a || b; }
+/* ---------- Account singoli: solo l'account di Luca è "di coppia" (riconosciuto dall'impronta dell'email, non dall'email in chiaro) ---------- */
+const COUPLE_HASH = 'ecc6df58d7e59c137391c8ef87c233eb3735ab3a1dc1055b0deaaaf6bcb4925b';
+async function coupleCheck() { const u = auth.user(); if (!u || !u.email || !(crypto.subtle && crypto.subtle.digest)) return false; try { const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(u.email.trim().toLowerCase())); return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('') === COUPLE_HASH; } catch (_) { return false; } }
+const isCoupleAccount = () => !!S.settings.couple;
+async function updateCoupleFlag() { const c = await coupleCheck(); if (S.settings.couple !== c) { S.settings.couple = c; S.settings.boardCouple = c; save(); return true; } return false; }
+const hasOthers = () => S.members.some((m) => m.id !== me().id);
+const otherName = () => (other().id ? other().name : T('chi condivide con te'));
+/* ogni account ha il suo stato sul telefono: se entra un altro account, metto da parte lo stato di prima e carico il suo */
+function switchStateFor(uidNow) {
+  const own = S.settings.ownerUid;
+  if (own && own !== uidNow) {
+    try { localStorage.setItem(KEY + ':' + own, JSON.stringify(S)); } catch (_) {}
+    let raw = null; try { raw = localStorage.getItem(KEY + ':' + uidNow); } catch (_) {}
+    S = raw ? load(raw) : defaultState(); window.__S = S; if (!S.settings.deviceId) S.settings.deviceId = 'd-' + uid();
+  }
+  if (S.settings.ownerUid !== uidNow) { S.settings.ownerUid = uidNow; save(); }
+}
+/* per risparmiare spazio: una sezione che ho creato, in cui non è mai entrato nessuno, senza spese, non principale, dopo 7 giorni sparisce da sola. Se c'è (o c'è stata) almeno un'altra persona non si tocca mai. */
+function cleanupSections() {
+  const cut = Date.now() - 7 * 86400000; let n = 0;
+  groups().forEach((g) => {
+    if (!isOwner(g) || !g.code || g.code === S.settings.sync.house) return;
+    if (Object.keys(g.members || {}).some((id) => id !== me().id)) return;
+    if (Object.values(g.requests || {}).some((r) => r.status === 'pending')) return;
+    if (active().some((e) => e.group === g.id)) return;
+    if (!g.createdAt || new Date(g.createdAt).getTime() > cut) return;
+    deleteGroup(g.id); n++;
+  });
+  return n;
+}
+function afterAuth() { switchStateFor(auth.user().id); if (S.version !== 2) { try { if (!localStorage.getItem('pari:backup-v1')) localStorage.setItem('pari:backup-v1', localStorage.getItem(KEY) || ''); } catch (_) {} } /* copia dello stato prima del passaggio alle sezioni */ restoreHouseFromAccount(); const a = migrateIdentity(); const b = migrateSections(); rememberHouse(); return a || b; }
 
 
 /* ---------- Accesso (Supabase Auth: email/password, Apple, Google) ----------
@@ -328,7 +359,7 @@ const LOVE = [
 ];
 const LOVE_FORCE = { day: '2026-09-04', idx: 4 }; // frase imposta per un giorno preciso (ricompare anche se già vista)
 function showDailyLove() {
-  if (S.settings.me !== 'm2') return;
+  if ((me().legacy || S.settings.me) !== 'm2') return;
   const today = todayStr(); let st = {}; try { st = JSON.parse(localStorage.getItem('pari:love') || '{}'); } catch (_) {}
   const forced = LOVE_FORCE.day === today && st.forced !== today;
   if (st.day === today && !forced) return;
@@ -428,7 +459,8 @@ function paymentDefault() {
   if (!top) return null; const [id, x] = top; return x < 0 ? { paidBy: me().id, to: id, amount: moneyPlain(-x) } : { paidBy: id, to: me().id, amount: moneyPlain(x) };
 }
 function balanceSentence(bal, gid) {
-  const a = me(); const v = bal[a.id] || 0; const net = pairBalances(gid); const others = Object.entries(net).filter(([, x]) => Math.abs(x) >= 1);
+  const a = me(); const v = bal[a.id] || 0;
+  if (!hasOthers()) return { even: true, text: 'Nessun conto aperto', amount: 0, sign: '' }; const net = pairBalances(gid); const others = Object.entries(net).filter(([, x]) => Math.abs(x) >= 1);
   if (Math.abs(v) < 1 && !others.length) return { even: true, text: 'Siete in pari', amount: 0, sign: '' };
   if (others.length === 1) { const b = member(others[0][0]); const x = others[0][1]; if (x > 0) return { even: false, text: `${b.name} deve a ${a.name}`, amount: x, sign: '+', who: b.id }; return { even: false, text: `${a.name} deve a ${b.name}`, amount: -x, sign: '−', who: b.id }; }
   if (Math.abs(v) < 1) return { even: true, text: 'In pari nel totale', amount: 0, sign: '' };
@@ -604,11 +636,13 @@ function pageHome() {
       <div class="k">Saldo totale</div>
       <div class="amt">${sent.even ? money(0) : sent.sign + ' ' + money(sent.amount)}</div>
       <div class="s">${esc(sent.text)}</div>
-      ${coupleScene('hero-couple')}
+      ${isCoupleAccount() ? coupleScene('hero-couple') : ''}
     </section>
     <div class="home-actions">${sent.even ? `<a class="ha main" href="#/statistiche">${icon('i-chart')}<span>Statistiche</span></a>` : `<button type="button" class="ha main" data-settle-all>${icon('i-balance')}<span>Metti in pari</span></button>`}<a class="ha" href="#/bilanci">${icon('i-scale')}<span>Dettaglio saldi</span></a></div>
+    ${(() => { const items = []; groups().filter(isOwner).forEach((g) => Object.values(g.requests || {}).filter((x) => x.status === 'pending' && x.id !== me().id).forEach((x) => items.push([g, x]))); if (!items.length) return ''; return `<h2 class="sec-title">Richieste di ingresso</h2><section class="card req-card">${items.map(([g, x]) => `<div class="req-row">${avatar({ name: x.name, color: x.color, avatar: x.avatar })}<div class="req-t"><b data-no-i18n>${esc(x.name)}</b><span>${esc(T('vuole entrare in «{0}»', g.name))}</span></div><button type="button" class="btn sm ghost" data-refuse="${g.id}:${esc(x.id)}">Rifiuta</button><button type="button" class="btn sm" data-accept="${g.id}:${esc(x.id)}">Accetta</button></div>`).join('')}</section>`; })()}
     <div class="link-row"><h2 class="sec-title">Sezioni</h2><a href="#/profilo/sezioni">Gestisci ${icon('i-right')}</a></div>
     <section class="card list-card"><div class="list stagger">${groups().map((g, i) => groupRow(g, i)).join('')}<button type="button" class="row add-row" data-new-section style="--i:${groups().length}"><span class="cat-ic plus">${icon('i-plus')}</span><span class="main"><span class="title">Nuova sezione</span><span class="sub">Con un codice tutto suo, da condividere con chi vuoi</span></span><span class="right">${icon('i-right', 'ic chev')}</span></button></div></section>
+    <section class="card join-card"><div class="lbl">Entra in una sezione</div><div class="join-row"><input class="input" id="home-code" type="text" placeholder="Codice della sezione" autocapitalize="characters" autocomplete="off" spellcheck="false" enterkeyhint="send"><button type="button" class="btn sm" id="home-join">Chiedi</button></div><div class="hint">Chi ha creato la sezione riceve la richiesta e può accettarla o rifiutarla.</div>${(S.settings.pendingJoins || []).length ? `<div class="pend-list">${S.settings.pendingJoins.map((p) => `<div class="pend-row"><span class="spin small"></span><span class="pend-t"><b data-no-i18n>${esc(p.name)}</b><span>${esc(p.owner ? T('in attesa di {0}', p.owner) : T('In attesa'))}</span></span><button type="button" class="btn sm ghost" data-cancel-join="${esc(p.code)}">Annulla</button></div>`).join('')}</div>` : ''}</section>
     <div class="link-row"><h2 class="sec-title">Ultime spese</h2><a href="#/spese">Vedi tutte ${icon('i-right')}</a></div>
     <section class="card list-card"><div class="list stagger">${recent.length ? recent.map(entryRow).join('') : emptyBox('Nessuna spesa ancora', 'Aggiungi la prima con il tasto qui sotto.', true)}</div></section>
     <div class="section"><a class="btn" href="#/nuova">${icon('i-plus')} Aggiungi spesa</a></div>
@@ -656,13 +690,13 @@ function pageBilanci(r) {
   const tab = S.ui.balTab; const bal = balances(); const sent = balanceSentence(bal); const a = me(), b = other();
     let body;
   if (tab === 0) {
-    body = `<section class="card saldo${sent.even ? ' even' : sent.sign === '+' ? ' owed' : ' owe'}"><div><div class="k">Saldo attuale</div><div class="amt">${sent.even ? money(0) : sent.sign + ' ' + money(sent.amount)}</div><div class="s">${esc(sent.text)}</div></div>${coupleScene('saldo-couple')}</section>
+    body = `<section class="card saldo${sent.even ? ' even' : sent.sign === '+' ? ' owed' : ' owe'}"><div><div class="k">Saldo attuale</div><div class="amt">${sent.even ? money(0) : sent.sign + ' ' + money(sent.amount)}</div><div class="s">${esc(sent.text)}</div></div>${isCoupleAccount() ? coupleScene('saldo-couple') : ''}</section>
     <h2 class="sec-title section">Dettaglio</h2>
     <section class="card"><div class="dlist">
-      ${(() => { const net = pairBalances(); const ids = [...new Set([...groups().flatMap((g) => sectionMembers(g)), ...Object.keys(net)])].filter((id) => id !== a.id && S.members.some((m) => m.id === id)); if (!ids.length) ids.push(b.id);
+      ${(() => { const net = pairBalances(); const ids = [...new Set([...groups().flatMap((g) => sectionMembers(g)), ...Object.keys(net)])].filter((id) => id !== a.id && S.members.some((m) => m.id === id)); if (!ids.length) return `<div><span class="t">${esc(T('Nessuna spesa condivisa'))}</span><span class="money">${money(0)}</span><span></span></div>`;
         return ids.map((id) => { const p = member(id); const x = net[id] || 0; if (x > 0) return `<button type="button" data-settle="${id}:${a.id}"><span class="t">${esc(p.name)} deve a ${esc(a.name)}</span><span class="money green">${money(x)}</span>${icon('i-right')}</button>`; if (x < 0) return `<button type="button" data-settle="${a.id}:${id}"><span class="t">${esc(a.name)} deve a ${esc(p.name)}</span><span class="money red">${money(-x)}</span>${icon('i-right')}</button>`; return `<div><span class="t">${esc(T('In pari con {0}', p.name))}</span><span class="money">${money(0)}</span>${icon('i-check')}</div>`; }).join(''); })()}
     </div></section>
-    <div class="section"><a class="btn" href="#/nuova?tipo=pagamento">Registra pagamento</a></div>
+    ${hasOthers() ? `<div class="section"><a class="btn" href="#/nuova?tipo=pagamento">Registra pagamento</a></div>` : ''}
     ${groups().length ? `<h2 class="sec-title section">Per sezione</h2><section class="card"><div class="dlist">${groups().map((g) => { const bg = groupBalance(g.id); const sg = balanceSentence(bg, g.id); return `<a href="#/spese?sezione=${g.id}" style="display:grid;grid-template-columns:1fr auto 18px;align-items:center;gap:10px;padding:14px 0;border-top:1px solid var(--line);font-weight:600;font-size:14.5px"><span class="t">${esc(g.name)}<span class="muted small" style="margin-left:6px">${sg.even ? 'in pari' : esc(sg.text)}</span></span><span class="money ${sg.even ? '' : sg.sign === '+' ? 'green' : 'red'}">${sg.even ? money(0) : sg.sign + ' ' + money(sg.amount)}</span>${icon('i-right')}</a>`; }).join('')}</div></section>` : ''}
     <h2 class="sec-title section">Ultimi pagamenti</h2>
     <section class="card list-card"><div class="list stagger">${(() => { const ps = active().filter((e) => e.kind === 'payment').sort((x, y) => (y.date + y.createdAt).localeCompare(x.date + x.createdAt)).slice(0, 5); return ps.length ? ps.map(entryRow).join('') : '<div class="empty small" style="padding:18px">Nessun pagamento registrato.</div>'; })()}</div></section>`;
@@ -770,6 +804,7 @@ function pageDetail(r) {
 let F = null; // stato del form
 function pageForm(r) {
   const editing = r.name === 'modifica' ? S.entries.find((x) => x.id === r.id) : null;
+  if (!editing && r.q.tipo === 'pagamento' && !hasOthers()) { setTimeout(() => { toast('Nessuno con cui mettersi in pari'); go('#/home'); }, 0); return '<div class="page"></div>'; }
   if (!F || F.routeKey !== location.hash) {
     F = editing ? { routeKey: location.hash, id: editing.id, kind: editing.kind, group: editing.group || null, desc: editing.desc || '', amount: moneyPlain(editing.amount), date: editing.date, cat: editing.cat || '', paidBy: editing.paidBy, splitMethod: editing.splitMethod || 'equal', splitInput: { ...(editing.splitInput || {}) }, notes: editing.notes || '', recurring: editing.recurring === 'monthly', to: Object.keys(editing.owed || {})[0] }
       : { routeKey: location.hash, id: null, kind: r.q.tipo === 'pagamento' ? 'payment' : 'expense', desc: '', amount: '', date: todayStr(), cat: '', paidBy: me().id, splitMethod: 'equal', splitInput: {}, notes: '', recurring: false, to: other().id, group: (groups().find((g) => g.id === S.settings.lastGroup) || groups()[0] || {}).id || null };
@@ -891,9 +926,10 @@ function pageAccount() {
     <section class="card">${S.members.map((m, i) => `<div class="member-row"><input class="swatch" type="color" value="${m.color}" data-color="${m.id}" style="--c:${m.color}" aria-label="Colore di ${esc(m.name)}"><div class="field" style="margin:0"><input type="text" value="${esc(m.name)}" data-name="${m.id}" aria-label="Nome" placeholder="Nome"></div></div><div class="field" style="margin-top:8px"><div class="lbl" style="text-transform:none;letter-spacing:0">Avatar di ${esc(m.name)}</div>${avatarPicker(AVATAR_IMGS.indexOf(((m.avatar || {}).img) || ''), 'data-av-' + m.id)}</div>`).join('')}
     <div class="hint" style="margin-top:8px">${esc(T('Tu sei {0}. Nome e avatar arrivano anche sui telefoni con cui condividi le sezioni.', me().name))}</div>
     </section>
-    <h2 class="sec-title section">Coppia</h2>
-    <section class="card"><div class="toggle"><div><div class="t">In classifica come coppia</div><div class="d">${esc(T('Un\'unica voce «{0}» con l\'esperienza di tutti e due.', S.members[0].name + ' e ' + S.members[1].name))}</div></div><button type="button" class="switch" role="switch" aria-checked="${!!S.settings.boardCouple}" data-couple-toggle></button></div></section>
+    ${isCoupleAccount() ? `<h2 class="sec-title section">Coppia</h2>
+    <section class="card"><div class="toggle"><div><div class="t">In classifica come coppia</div><div class="d">${esc(T('Un\'unica voce «{0}» con l\'esperienza di tutti e due.', S.members[0].name + ' e ' + (S.members[1] || {}).name))}</div></div><button type="button" class="switch" role="switch" aria-checked="${!!S.settings.boardCouple}" data-couple-toggle></button></div></section>
     <section class="card"><div class="field" style="margin:0"><label for="together">Insieme dal (anno o data)</label><input id="together" type="text" value="${esc(S.settings.together)}" placeholder="2023" inputmode="numeric"><div class="hint">Compare nel profilo. Lascia vuoto per non mostrarlo.</div></div>
+    ` : '<section class="card">'}
     <div class="field"><div class="lbl">Valuta</div><a class="input" href="#/profilo/valuta" style="display:flex;align-items:center;justify-content:space-between">${esc(currencyName(S.settings.currency || 'EUR'))} (${esc(curSymbol())}) ${icon('i-right', 'ic muted')}</a></div></section>
     <div class="section"><button class="btn" id="save-account">Salva</button></div>
   </div>`;
@@ -903,7 +939,7 @@ function pageGroups() {
   const orphans = counts[''] || 0;
   return `<div class="page slide">${subHead('Sezioni')}
     <p class="muted small" style="margin:0 2px 12px">Le sezioni raggruppano le spese, come i gruppi di Splitwise (es. Spese casa, Vacanze). Quando aggiungi una spesa resta selezionata l'ultima usata.</p>
-    <section class="card"><div class="lbl">Entra con un codice</div><div style="display:flex;gap:8px"><input class="input" id="join-code" type="text" placeholder="Es. KX7P4Q" autocapitalize="characters" autocomplete="off" spellcheck="false"><button type="button" class="btn sm" id="join-go" style="height:50px;flex:none">Entra</button></div><div class="hint">Il codice te lo dà chi ha creato la sezione: lo trova aprendo la sezione.</div></section>
+    <section class="card"><div class="lbl">Entra con un codice</div><div style="display:flex;gap:8px"><input class="input" id="join-code" type="text" placeholder="Es. KX7P4Q" autocapitalize="characters" autocomplete="off" spellcheck="false"><button type="button" class="btn sm" id="join-go" style="height:50px;flex:none">Chiedi</button></div><div class="hint">Il codice te lo dà chi ha creato la sezione: riceve la tua richiesta e può accettarla.</div></section>
     <section class="card list-card"><div class="list stagger">${groups().map((g, i) => `<div class="row" style="--i:${i}"><span class="cat-ic">${icon('i-list')}</span><span class="main"><span class="title">${esc(g.name)}</span><span class="sub">${counts[g.id] || 0} ${counts[g.id] === 1 ? 'voce' : 'voci'}${S.settings.lastGroup === g.id ? ' · predefinita' : ''}<span data-no-i18n> · </span><span>${sectionMembers(g).length} ${sectionMembers(g).length === 1 ? 'persona' : 'persone'}</span></span></span><span class="right" style="flex-direction:row;gap:2px"><button type="button" class="icon-btn" data-open-sec="${g.id}" aria-label="Codice e persone">${icon('i-users')}</button><button type="button" class="icon-btn" data-rename="${g.id}" aria-label="Rinomina">${icon('i-edit')}</button>${isOwner(g) ? `<button type="button" class="icon-btn red" data-delete-group="${g.id}" aria-label="Elimina">${icon('i-trash')}</button>` : ''}</span></div>`).join('') || '<div class="empty small" style="padding:18px">Nessuna sezione.</div>'}</div></section>
     ${orphans ? `<p class="muted small" style="margin:10px 2px">${orphans} ${orphans === 1 ? 'voce è' : 'voci sono'} senza sezione.</p>` : ''}
     <div class="section"><div style="display:flex;gap:8px"><input class="input" id="new-group-name" type="text" placeholder="Nuova sezione, es. Vacanze" autocomplete="off"><button type="button" class="btn sm" id="new-group-create" style="height:50px;flex:none">Crea</button></div></div>
@@ -975,10 +1011,10 @@ function pageNotifiche() {
   const supported = 'Notification' in window && 'PushManager' in window; const perm = supported ? Notification.permission : 'unsupported';
   const on = !!S.settings.push && perm === 'granted'; const needsHome = isIOS() && !isStandalone();
   const st = !supported ? (needsHome ? 'Su iPhone le notifiche arrivano solo se l\'app è sulla schermata Home' : 'Questo browser non supporta le notifiche') : perm === 'denied' ? 'Permesso negato: riattivalo da Impostazioni iOS → Notifiche → Divvy' : on ? 'Attive su questo telefono' : 'Non attive';
-  const sample = notifText({ kind: 'expense', desc: 'Spesa', amount: 1000 }, other().name, (balances()[me().id] || 0));
+  const sample = notifText({ kind: 'expense', desc: 'Spesa', amount: 1000 }, otherName(), (balances()[me().id] || 0));
   return `<div class="page slide">${subHead('Notifiche')}
     <section class="card"><div class="status-line"><span class="sync-dot ${on ? '' : perm === 'denied' ? 'err' : 'off'}"></span>${esc(st)}</div>
-    <p class="small muted" style="margin:10px 0 0">Quando ${esc(other().name)} aggiunge una spesa o un pagamento ti arriva un avviso così:</p>
+    <p class="small muted" style="margin:10px 0 0">Quando ${esc(otherName())} aggiunge una spesa o un pagamento ti arriva un avviso così:</p>
     <div class="notif-preview"><img src="icons/icon-192.png" alt=""><div><div class="t">${esc(sample.title)}</div><div class="b">${esc(sample.body).replace('\n', '<br>')}</div></div></div>
     ${!sync.enabled() ? '<p class="small muted" style="margin:10px 0 0">Serve prima la <a href="#/profilo/sync" style="color:var(--green);font-weight:700">sincronizzazione</a>: è quella che porta la spesa da un telefono all\'altro.</p>' : ''}
     ${needsHome ? '<p class="small muted" style="margin:10px 0 0">Aggiungi Divvy alla schermata Home (Condividi → Aggiungi alla schermata Home) e apri le notifiche da lì.</p>' : ''}
@@ -1213,7 +1249,7 @@ function tourStep(i) {
 function tourApply() {
   if (!TOUR) return; const i = TOUR.i; const st = TUT_STEPS[i]; const el = TOUR.el; const last = i === TUT_STEPS.length - 1; TOUR.pending = null;
   $('.tour-anim', el).innerHTML = `<img src="img/tutorial/${st.id}.webp" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'), { className: 'tour-ph' }))">`;
-  $('.tour-t', el).textContent = T(st.title); $('.tour-p', el).textContent = T(st.text, other().name);
+  $('.tour-t', el).textContent = T(st.title); $('.tour-p', el).textContent = T(st.text, otherName());
   $('.tour-dots', el).innerHTML = TUT_STEPS.map((_, k) => `<i class="${k === i ? 'on' : ''}"></i>`).join(''); $('.tour-next', el).textContent = T(last ? 'Inizia' : 'Avanti');
   el.dataset.step = i; tourPlace(true);
 }
@@ -1539,7 +1575,7 @@ const onboardingDone = () => { const u = auth.user(); if (!u) return true; retur
 const INTRO_AT_EVERY_LOGIN = true; // richiesta di Lucas (5/9): a ogni accesso ripartono le 4 pagine dalla prima
 function afterLogin() {
   try { localStorage.removeItem(PENDING_KEY); } catch (_) {}
-  const chAuth = afterAuth(); applyPendingJoin(); if (sync.enabled() && (chAuth || !S.settings.lastPull)) sync.run(true);
+  updateCoupleFlag().then((ch) => { if (ch) render(); }); const chAuth = afterAuth(); applyPendingJoin(); if (sync.enabled() && (chAuth || !S.settings.lastPull)) sync.run(true);
   const done = onboardingDone();
   OB = { step: 1, name: done ? me().name : '', partner: '', house: '', avatar: AVATAR_IMGS.indexOf(((me().avatar || {}).img) || ''), split: (S.settings.split || {}).mode === 'custom' ? 'custom' : 'equal', pct: ((S.settings.split || {}).pct || {})[me().id] || 50 };
   go(done && !INTRO_AT_EVERY_LOGIN ? '#/home' : '#/benvenuto'); if (sync.enabled()) sync.run();
@@ -1856,25 +1892,71 @@ const inviteText = () => T('Unisciti al mio gruppo su Divvy per dividere le spes
 /* chi apre un link di invito: il codice del gruppo viene salvato e applicato dopo l'accesso */
 function applyJoin(code) { if (!code) return false; joinSection(code); return true; }
 /* ---------- Entrare in una sezione con il codice, uscirne, togliere qualcuno (solo chi l'ha creata) ---------- */
+const requestRow = (g, r) => ({ house: g.code, id: 'req-' + r.id, kind: 'request', data: { id: r.id, legacy: r.legacy, name: r.name, color: r.color, avatar: r.avatar, at: r.at, status: r.status, section: g.name, by: r.by }, updated_at: r.updatedAt || nowISO(), deleted: false });
+const codeVariants = (code) => [...new Set([code, code.toUpperCase(), code.toLowerCase()])];
+/* con un codice si CHIEDE di entrare: la richiesta arriva a chi ha creato la sezione, che accetta o rifiuta. Se risulto già fra i membri (per esempio dopo una reinstallazione) entro subito. */
 async function joinSection(code0) {
   const code = String(code0 || '').trim(); if (!code) return false;
-  const local = S.groups.find((g) => g.code && (g.code === code || g.code === code.toUpperCase()));
+  const local = S.groups.find((g) => g.code && codeVariants(code).includes(g.code));
   if (local && !local.deleted && !local.left && inSection(local, me().id)) { toast(T('Sei già nella sezione «{0}»', local.name)); return true; }
+  const pend = (S.settings.pendingJoins || []).find((p) => codeVariants(code).includes(p.code)); if (pend) { toast(T('Hai già chiesto di entrare in «{0}»', pend.name)); return true; }
   const s = S.settings.sync; if (!s.url || !s.key) { toast('Serve la sincronizzazione'); return false; }
   toast('Cerco la sezione…');
-  for (const c of [...new Set([code, code.toUpperCase(), code.toLowerCase()])]) {
+  for (const c of codeVariants(code)) {
     let rows; try { rows = await sync.fetchRows(s.url + '/rest/v1/pari_rows?house=eq.' + encodeURIComponent(c) + '&id=eq.section&deleted=eq.false'); } catch (e) { toast('Non riesco a collegarmi'); return false; }
     const row = rows && rows[0]; if (!row || !row.data || row.data.deleted) continue;
-    const now = nowISO(); mergeSection(row.data, row.updated_at);
-    const g = S.groups.find((x) => x.id === row.data.id); if (!g) continue;
-    g.left = false; g.deleted = false; g.code = g.code || c; g.members = g.members || {}; g.members[me().id] = { joinedAt: now, updatedAt: now }; g.updatedAt = now;
-    S.settings.groupsUpdatedAt = now; S.settings.membersUpdatedAt = nowISO(); if (S.settings.push) S.settings.pushUpdatedAt = now;
-    if (!S.settings.sync.house) { S.settings.sync.house = g.code; rememberHouse(); }
-    S.settings.lastPush = null; save();
-    try { await sync.run(true); await sync.pullHouse(g.code); } catch (_) {}
-    toast(T('Sei nella sezione «{0}»', g.name)); render(); return true;
+    const d = row.data; const meId = me().id; const mine = (d.members || {})[meId];
+    if (mine && !mine.leftAt) return enterSection(row, c);
+    const now = nowISO(); const p = me();
+    try { await sync.post([{ house: c, id: 'req-' + meId, kind: 'request', data: { id: meId, legacy: p.legacy, name: p.name, color: p.color, avatar: p.avatar, at: now, status: 'pending', section: d.name }, updated_at: now, deleted: false }]); } catch (e) { toast('Non riesco a collegarmi'); return false; }
+    const ownerName = ((d.people || []).find((x) => x.id === d.owner) || {}).name || '';
+    S.settings.pendingJoins = (S.settings.pendingJoins || []).filter((x) => x.code !== c).concat([{ code: c, name: d.name, owner: ownerName, at: now }]); save(); render();
+    toast(T('Richiesta inviata: chi ha creato «{0}» può accettarla', d.name)); return true;
   }
   toast('Codice non trovato. Chi te l\'ha dato deve avere l\'app aggiornata.'); return false;
+}
+/* entro davvero nella sezione (accettato, o già membro) */
+async function enterSection(row, c) {
+  const now = nowISO(); mergeSection(row.data, row.updated_at);
+  const g = S.groups.find((x) => x.id === row.data.id); if (!g) return false;
+  g.left = false; g.deleted = false; g.code = g.code || c; g.members = g.members || {}; if (!g.members[me().id] || g.members[me().id].leftAt) g.members[me().id] = { joinedAt: now, updatedAt: now }; g.updatedAt = now;
+  S.settings.groupsUpdatedAt = now; S.settings.membersUpdatedAt = nowISO(); if (S.settings.push) S.settings.pushUpdatedAt = now;
+  if (!S.settings.sync.house) { S.settings.sync.house = g.code; rememberHouse(); }
+  S.settings.lastPush = null; save();
+  try { await sync.run(true); await sync.pullHouse(g.code); } catch (_) {}
+  toast(T('Sei nella sezione «{0}»', g.name)); render(); return true;
+}
+/* le mie richieste in attesa: a ogni sincronizzazione guardo se chi ha creato la sezione ha risposto */
+async function checkPendingJoins() {
+  const list = S.settings.pendingJoins || []; if (!list.length || !sync.enabled()) return; const s = S.settings.sync; let changed = false;
+  for (const p of list.slice()) {
+    let rows; try { rows = await sync.fetchRows(s.url + '/rest/v1/pari_rows?house=eq.' + encodeURIComponent(p.code) + '&id=in.(section,' + encodeURIComponent('req-' + me().id) + ')'); } catch (_) { continue; }
+    const req = rows.find((r) => r.kind === 'request'); const sec = rows.find((r) => r.kind === 'section'); const st = req && req.data && req.data.status;
+    const drop = () => { S.settings.pendingJoins = (S.settings.pendingJoins || []).filter((x) => x.code !== p.code); changed = true; };
+    if (st === 'accepted' && sec && sec.data) { drop(); save(); await enterSection(sec, p.code); }
+    else if (st === 'refused') { drop(); toast(T('Richiesta per «{0}» rifiutata', p.name)); }
+    else if (!sec || (sec.data && sec.data.deleted)) { drop(); }
+  }
+  if (changed) { save(); render(); }
+}
+async function cancelJoin(code) {
+  const p = (S.settings.pendingJoins || []).find((x) => x.code === code); if (!p) return;
+  try { await sync.post([{ house: code, id: 'req-' + me().id, kind: 'request', data: { id: me().id, status: 'cancelled' }, updated_at: nowISO(), deleted: true }]); } catch (_) {}
+  S.settings.pendingJoins = S.settings.pendingJoins.filter((x) => x.code !== code); save(); render(); toast('Richiesta annullata');
+}
+/* chi ha creato la sezione risponde */
+async function acceptRequest(g, id) {
+  const r = (g.requests || {})[id]; if (!r) return; const now = nowISO();
+  mergePeople([{ id: r.id, legacy: r.legacy, name: r.name, color: r.color, avatar: r.avatar }], now);
+  const who = pid(r.id); g.members = g.members || {}; g.members[who] = { joinedAt: now, updatedAt: now, by: me().id }; g.updatedAt = now; r.status = 'accepted'; r.updatedAt = now; r.by = me().id;
+  S.settings.groupsUpdatedAt = now; S.settings.membersUpdatedAt = now; save();
+  try { await sync.post([...sync.outgoing('', true).filter((x) => x.house === g.code && x.kind === 'section'), requestRow(g, r)]); } catch (_) {}
+  sync.schedule(); render(); toast(T('{0} è nella sezione «{1}»', r.name, g.name));
+}
+async function refuseRequest(g, id) {
+  const r = (g.requests || {})[id]; if (!r) return; const now = nowISO(); r.status = 'refused'; r.updatedAt = now; r.by = me().id; save();
+  try { await sync.post([requestRow(g, r)]); } catch (_) {}
+  render(); toast('Richiesta rifiutata');
 }
 async function leaveSection(g) {
   const now = nowISO(); g.members = g.members || {}; g.members[me().id] = { ...(g.members[me().id] || { joinedAt: now }), leftAt: now, updatedAt: now }; g.updatedAt = now; S.settings.groupsUpdatedAt = now; save();
@@ -1888,7 +1970,7 @@ const avatarPicker = (sel, attr) => `<div class="onb-avatars">${AVATAR_IMGS.map(
 const AVATARS = [{ bg: '#2C4A3B', fg: '#F8F4EE' }, { bg: '#F8D9D2', fg: '#D7563C' }, { bg: '#D3E7F5', fg: '#4E8FBF' }, { bg: '#E0DBF3', fg: '#7B68B8' }, { bg: '#D3E6D8', fg: '#4C8A66' }, { bg: '#F7E7C3', fg: '#C99A2E' }];
 const arrowIc = '<svg class="ic"><path d="M5 12h14M13 5l7 7-7 7"/></svg>';
 function pageWelcome() {
-  const st = OB.step; const dots = `<div class="onb-dots" style="view-transition-name:onb-dots">${[1, 2, 3, 4].map((i) => `<i class="${i === st ? 'on' : ''}"></i>`).join('')}</div>`;
+  const st = OB.step; const dots = `<div class="onb-dots" style="view-transition-name:onb-dots">${(isCoupleAccount() ? [1, 2, 3, 4] : [1, 2, 4]).map((i) => `<i class="${i === st ? 'on' : ''}"></i>`).join('')}</div>`;
   const top = `<div class="onb-top"><div class="onb-left">${st > 1 ? `<button type="button" class="icon-btn onb-back" data-ob-back aria-label="Indietro">${icon('i-back')}</button>` : ''}${langPill()}</div><button type="button" class="onb-skip" data-ob-skip>Salta</button></div>`;
   let body = '';
   if (st === 1) body = `<img class="onb-logo" src="img/logo.png" alt="Divvy">
@@ -1928,8 +2010,8 @@ function pageWelcome() {
     <h1 class="onb-h onb-dark">Tutto pronto,<br>${esc(a.name)}! <span aria-hidden="true">🎉</span></h1><p class="onb-p">Da ora tenere i conti sarà molto più semplice.</p>
     <div class="onb-art"><img src="img/benvenuto-4.png" alt=""></div>
     <div class="onb-summary"><div class="row-between"><b class="onb-sum-t">Il tuo riepilogo</b><button type="button" class="onb-edit" data-ob-edit>Modifica</button></div>
-      <div class="onb-people"><span>${avatar(a, true)}${esc(a.name)}</span><span>${avatar(b, true)}${esc(b.name)}</span></div>
-      <div class="onb-kv">${icon('i-balance')}<span>Divisione predefinita</span><b>${pm}% / ${100 - pm}%</b></div>
+      <div class="onb-people"><span>${avatar(a, true)}${esc(a.name)}</span>${hasOthers() ? `<span>${avatar(b, true)}${esc(b.name)}</span>` : ''}</div>
+      ${isCoupleAccount() ? `<div class="onb-kv">${icon('i-balance')}<span>Divisione predefinita</span><b>${pm}% / ${100 - pm}%</b></div>` : ''}
       <div class="onb-kv">${icon('i-coins')}<span>Valuta</span><b>${esc(currencyName(S.settings.currency || 'EUR'))} (${esc(curSymbol())})</b></div></div>
     <div class="onb-form"><button type="button" class="btn onb-btn" data-ob-finish>Inizia con Divvy ${arrowIc}</button></div>`; }
   return `<div class="page onb steps" style="view-transition-name:onb-stage">${top}${body}${dots}</div>`;
@@ -1942,7 +2024,7 @@ function obGo(step, dir) {
 function obFinish() {
   S.settings.onboarded = true; const u = auth.user(); if (u) { S.settings.onboardedFor = u.id; auth.updateMeta({ onboarded: true }); } save(); const nm = me().name; OB = { step: 1, name: '', partner: '', house: '', avatar: -1, split: 'equal', pct: 50 };
   go('#/home'); if (!tutorialDone()) setTimeout(startTour, 700);
-  if (!sync.enabled()) toast(`Per condividere con ${other().name}: Profilo → Backup e sincronizzazione`); else if (!S.settings.push) toast('Attiva gli avvisi da Profilo → Notifiche'); else toast(`Divvy è pronta, ${nm}`);
+  if (!sync.enabled()) toast(`Per condividere con ${otherName()}: Profilo → Backup e sincronizzazione`); else if (!S.settings.push) toast('Attiva gli avvisi da Profilo → Notifiche'); else toast(`Divvy è pronta, ${nm}`);
 }
 function bindWelcome() {
   $$('[data-ob-skip]').forEach((b) => b.addEventListener('click', obFinish));
@@ -1955,14 +2037,14 @@ function bindWelcome() {
       migrateIdentity(); me().name = n; S.settings.membersUpdatedAt = nowISO(); /* l'identità è l'account: il nome va sulla mia persona */
       if (OB.avatar >= 0 && AVATAR_IMGS[OB.avatar]) { me().avatar = { img: AVATAR_IMGS[OB.avatar] }; S.settings.membersUpdatedAt = nowISO(); }
       OB.partner = OB.partner || other().name; save(); obGo(2); return; }
-    if (OB.step === 2) { obGo(3); return; }
+    if (OB.step === 2) { obGo(isCoupleAccount() ? 3 : 4); return; }
     if (OB.step === 3) { const a = me(), b = other(); S.settings.split = OB.split === 'custom' ? { mode: 'custom', pct: { [a.id]: OB.pct, [b.id]: 100 - OB.pct } } : { mode: 'equal' }; save(); obGo(4); return; }
   });
   $$('[data-ob-split]').forEach((b) => b.addEventListener('click', () => { OB.split = b.dataset.obSplit; $$('.onb-opt').forEach((x) => x.classList.toggle('on', x === b)); $('#onb-pct').hidden = OB.split !== 'custom'; }));
   const rng = $('#pct-range'); if (rng) rng.addEventListener('input', () => { OB.pct = +rng.value; $('#pct-me').textContent = OB.pct + '%'; $('#pct-other').textContent = (100 - OB.pct) + '%'; });
   $$('[data-ob-edit]').forEach((b) => b.addEventListener('click', () => obGo(1, 'back')));
   $$('[data-ob-av]').forEach((b) => b.addEventListener('click', () => { const i = +b.dataset.obAv; OB.avatar = OB.avatar === i ? -1 : i; $$('.onb-av').forEach((x) => x.classList.toggle('on', x === b && OB.avatar === i)); }));
-  $$('[data-ob-back]').forEach((b) => b.addEventListener('click', () => obGo(Math.max(1, OB.step - 1), 'back')));
+  $$('[data-ob-back]').forEach((b) => b.addEventListener('click', () => obGo(OB.step === 4 && !isCoupleAccount() ? 2 : Math.max(1, OB.step - 1), 'back')));
   const cp = $('[data-copy-link]'); if (cp) { let t; cp.addEventListener('click', async () => {
     try { await navigator.clipboard.writeText(inviteLink()); } catch (_) { toast('Non riesco a copiare: tieni premuto sul link'); return; }
     cp.classList.remove('done'); void cp.offsetWidth; cp.classList.add('done'); clearTimeout(t); t = setTimeout(() => cp.classList.remove('done'), 1800);
@@ -2006,6 +2088,10 @@ function bind(r) {
     const lv = $('[data-leave]'); if (lv) lv.addEventListener('click', () => confirmSheet(T('Uscire dalla sezione «{0}»?', g.name), 'Non vedrai più le sue spese. Potrai rientrare con il codice.', 'Lascia', async () => { await leaveSection(g); go('#/home'); }));
   } }
   $$('[data-new-section]').forEach((b) => b.addEventListener('click', newSectionSheet));
+  const hj = $('#home-join'), hc = $('#home-code'); if (hj && hc) { const ask = async () => { const c = (hc.value || '').trim(); if (!c) { hc.focus(); return; } hj.disabled = true; await joinSection(c); hj.disabled = false; if (hc.isConnected) hc.value = ''; }; hj.addEventListener('click', ask); hc.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); ask(); } }); }
+  $$('[data-cancel-join]').forEach((b) => b.addEventListener('click', () => cancelJoin(b.dataset.cancelJoin)));
+  $$('[data-accept]').forEach((b) => b.addEventListener('click', () => { const [gid, id] = b.dataset.accept.split(':'); const g = S.groups.find((x) => x.id === gid); if (g) acceptRequest(g, id); }));
+  $$('[data-refuse]').forEach((b) => b.addEventListener('click', () => { const [gid, id] = b.dataset.refuse.split(':'); const g = S.groups.find((x) => x.id === gid); if (g) refuseRequest(g, id); }));
   $$('[data-ach-info]').forEach((b) => b.addEventListener('click', () => openSheet('Come funzionano le missioni', `<p class="muted" style="margin:6px 0 14px;line-height:1.5">Le missioni vanno da lunedì a domenica e si azzerano ogni settimana. Si completano da sole in base alle spese del gruppo: quando una è fatta, la vedete tutti e due. I trofei permanenti sono in Profilo → I tuoi trofei.</p>`)));
   const tb = $('[data-trophy]'); if (tb) tb.addEventListener('click', () => { tb.classList.add('tap'); });
   $$('[data-back]').forEach((b) => b.addEventListener('click', () => { if (r.name === 'nuova' || r.name === 'modifica') F = null; back(b.dataset.back); }));
@@ -2049,6 +2135,7 @@ function bind(r) {
 }
 
 function bindForm(r) {
+  if (!$('#f')) return; /* pagina vuota (per esempio pagamento senza nessuno con cui farlo) */
   if (r.q.da && !F.id && F.kind === 'payment' && !F._prefilled) { F.paidBy = r.q.da; F.to = r.q.a; const net = pairBalances(); const v = r.q.a === me().id ? (net[r.q.da] || 0) : -(net[r.q.a] || 0); F.amount = v > 0 ? moneyPlain(v) : ''; F._prefilled = true; render(); return; }
   const form = $('#f');
   const rerender = () => { const pos = window.scrollY; render(); window.scrollTo(0, pos); };
@@ -2088,7 +2175,7 @@ function bindProfilo(r) {
     $('#save-account').addEventListener('click', () => {
       $$('[data-name]').forEach((i) => { const m = member(i.dataset.name); const v = i.value.trim(); if (v) m.name = v; });
       $$('[data-color]').forEach((i) => (member(i.dataset.color).color = i.value));
-      S.settings.together = $('#together').value.trim(); S.settings.membersUpdatedAt = nowISO();
+      const tg = $('#together'); if (tg) S.settings.together = tg.value.trim(); S.settings.membersUpdatedAt = nowISO();
       save(); sync.schedule(); toast('Impostazioni salvate'); go('#/profilo');
     });
     $$('[data-color]').forEach((i) => i.addEventListener('input', () => i.style.setProperty('--c', i.value)));
@@ -2129,8 +2216,8 @@ function bindProfilo(r) {
     const q = $('#cur-q'); q.addEventListener('input', () => { const v = q.value.trim().toLowerCase(); $$('[data-cur]').forEach((b) => { b.hidden = !!v && !(b.dataset.name.includes(v) || b.dataset.cur.toLowerCase().includes(v)); }); });
   }
   if (r.sub === 'notifiche') {
-    const on = $('#push-on'); if (on) on.addEventListener('click', async () => { on.disabled = true; const ok = await enablePush(); render(); if (ok) { toast('Notifiche attivate'); const t = notifText({ kind: 'expense', desc: 'Spesa', amount: 1000 }, other().name, balances()[me().id] || 0); showLocalNotification(t.title, t.body); } });
-    const test = $('#push-test'); if (test) test.addEventListener('click', async () => { const t = notifText({ kind: 'expense', desc: 'Spesa', amount: 1000 }, other().name, balances()[me().id] || 0); const ok = await showLocalNotification(t.title, t.body); toast(ok ? 'Inviata: guarda in alto' : 'Non riesco a mostrarla'); });
+    const on = $('#push-on'); if (on) on.addEventListener('click', async () => { on.disabled = true; const ok = await enablePush(); render(); if (ok) { toast('Notifiche attivate'); const t = notifText({ kind: 'expense', desc: 'Spesa', amount: 1000 }, otherName(), balances()[me().id] || 0); showLocalNotification(t.title, t.body); } });
+    const test = $('#push-test'); if (test) test.addEventListener('click', async () => { const t = notifText({ kind: 'expense', desc: 'Spesa', amount: 1000 }, otherName(), balances()[me().id] || 0); const ok = await showLocalNotification(t.title, t.body); toast(ok ? 'Inviata: guarda in alto' : 'Non riesco a mostrarla'); });
     const off = $('#push-off'); if (off) off.addEventListener('click', async () => { await disablePush(); render(); toast('Notifiche disattivate'); });
   }
   if (r.sub === 'info') { $('#replay-onb').addEventListener('click', () => { OB = { step: 1, name: '', partner: '', house: '', avatar: AVATAR_IMGS.indexOf(((me().avatar || {}).img) || ''), split: (S.settings.split || {}).mode === 'custom' ? 'custom' : 'equal', pct: ((S.settings.split || {}).pct || {})[me().id] || 50 }; go('#/benvenuto'); }); }
@@ -2183,6 +2270,7 @@ const sync = {
       if ((g.updatedAt || '') > since || force) rows.push({ house: g.code, id: 'section', kind: 'section', data: { id: g.id, name: g.name, code: g.code, owner: g.owner, members: g.members || {}, people: people.filter((p) => inSection(g, p.id)), createdAt: g.createdAt, updatedAt: g.updatedAt, deleted: !!g.deleted }, updated_at: nowISO(), deleted: false });
       if (g.deleted) return;
       if (pushMembers) rows.push({ house: g.code, id: 'members', kind: 'members', data: { members: sectionPeople(g).map((m) => ({ id: m.id, legacy: m.legacy, name: m.name, color: m.color, avatar: m.avatar })), together: S.settings.together, currency: S.settings.currency || 'EUR' }, updated_at: S.settings.membersUpdatedAt, deleted: false });
+      Object.values(g.requests || {}).forEach((r) => { if ((r.updatedAt || '') > since && r.by === meId) rows.push(requestRow(g, r)); });
       if (pushPush) rows.push({ house: g.code, id: 'push-' + S.settings.deviceId, kind: 'push', data: S.settings.push ? { ...S.settings.push, member: meId, lang: LANG() } : { device: S.settings.deviceId }, updated_at: S.settings.pushUpdatedAt || nowISO(), deleted: !S.settings.push });
     });
     const main = (mainSection() || {}).code || S.settings.sync.house;
@@ -2202,6 +2290,7 @@ const sync = {
       else if (row.kind === 'mbudget') { const mid = pid(String(row.id).replace(/^budget-/, ''), map); const cur = (S.budget || {})[mid]; if (!cur || (row.updated_at || '') > (cur.updatedAt || '')) { S.budget = S.budget || {}; S.budget[mid] = { monthly: +(d.monthly || 0), byCat: d.byCat || {}, updatedAt: row.updated_at }; changed++; } }
       else if (row.kind === 'groups') { (d.groups || []).forEach((g) => { const cur = S.groups.find((x) => x.id === g.id); if (!cur) { const t = g.createdAt || row.updated_at; const ng = { ...g, code: g.code || legacyCode(S.settings.sync.house, g.id), owner: pid(g.owner || 'm1', map), members: g.members || Object.fromEntries(S.members.map((m) => [m.id, { joinedAt: t, updatedAt: t }])) }; S.groups.push(ng); changed++; this.newHouses.push(ng.code); } else if ((g.updatedAt || '') > (cur.updatedAt || '')) { cur.name = g.name; cur.deleted = !!g.deleted; cur.updatedAt = g.updatedAt; changed++; } }); if ((row.updated_at || '') > (S.settings.groupsUpdatedAt || '')) S.settings.groupsUpdatedAt = row.updated_at; }
       else if (row.kind === 'activity') { if (map[d.by]) d.by = map[d.by]; if (!S.activity.some((x) => x.id === d.id)) S.activity.push(d); }
+      else if (row.kind === 'request') { const g = S.groups.find((x) => x.code === row.house); if (g && d.id) { g.requests = g.requests || {}; const cur = g.requests[d.id]; if (row.deleted || d.status === 'cancelled') { if (cur) { delete g.requests[d.id]; changed++; } } else if (!cur || (row.updated_at || '') > (cur.updatedAt || '')) { const wasPending = !!cur && cur.status === 'pending'; g.requests[d.id] = { ...d, updatedAt: row.updated_at }; changed++; if (d.status === 'pending' && !wasPending && isOwner(g) && d.id !== me().id) toast(T('{0} vuole entrare in «{1}»', d.name, g.name)); } } }
     });
     return { changed, arrived };
   },
@@ -2229,6 +2318,7 @@ const sync = {
       this.status = 'ok'; save();
       if (arrived.length && S.settings.lastPull) notifyIncoming(arrived);
       if (changed) { materializeRecurring(); if (!['nuova', 'modifica'].includes((currentRoute || {}).name)) render(); }
+      if ((S.settings.pendingJoins || []).length) setTimeout(checkPendingJoins, 50); /* fuori dal giro: se accettato entro con un giro nuovo */
       return true;
     } catch (e) { this.status = 'err'; this.lastError = e.message || String(e); console.warn('sync', e); return false; }
     finally { this.running = false; updateSyncDot(); }
@@ -2351,7 +2441,7 @@ materializeRecurring();
   if (auth.recovery) history.replaceState(null, '', '#/recupero');
   else if (!auth.user()) { if (!/^#\/(accedi|registrati|legale|conferma|join)/.test(location.hash)) history.replaceState(null, '', '#/accedi'); }
   else if (!onboardingDone()) history.replaceState(null, '', '#/benvenuto');
-  if (auth.user()) { const chAuth = afterAuth(); applyPendingJoin(); if (sync.enabled() && (chAuth || !S.settings.lastPull)) sync.run(true); showDailyLove(); }
+  if (auth.user()) { await updateCoupleFlag(); const chAuth = afterAuth(); if (cleanupSections()) render(); applyPendingJoin(); if (sync.enabled() && (chAuth || !S.settings.lastPull)) sync.run(true); showDailyLove(); }
   route();
   if (auth.user() && onboardingDone() && !tutorialDone()) setTimeout(startTour, 1500); // tour guidato al primo accesso
   setTimeout(missionCheck, 1200); // all'apertura annuncio le missioni completate nel frattempo
@@ -2384,5 +2474,5 @@ if ('serviceWorker' in navigator) {
     }).catch(() => {});
   });
 }
-window.PARI = { state: () => S, addEntry, balances, monthStats, sync, toast, parseReceipt, scanReceipt, levelInfo, showLevelUp, missions, trophies, missionPool: () => MISSION_POOL, joinSection, leaveSection, removeMember, pairBalances, sectionCodes, mainSection, migrateIdentity, migrateSections, me, groups: () => S.groups, splitEqual };
+window.PARI = { state: () => S, addEntry, balances, monthStats, sync, toast, parseReceipt, scanReceipt, levelInfo, showLevelUp, missions, trophies, missionPool: () => MISSION_POOL, joinSection, leaveSection, removeMember, acceptRequest, refuseRequest, checkPendingJoins, cancelJoin, cleanupSections, isCoupleAccount, hasOthers, pairBalances, sectionCodes, mainSection, migrateIdentity, migrateSections, me, groups: () => S.groups, splitEqual };
 })();

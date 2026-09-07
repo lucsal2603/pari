@@ -1090,3 +1090,18 @@ body.touring .page { animation: none; } /* durante il tour la pagina appare subi
 .add-row .cat-ic.plus { background: var(--green); color: #fff; }
 .add-row .title { color: var(--green); font-weight: 800; }
 .add-row .chev { color: var(--muted); }
+/* richieste di ingresso e zona codice in Home */
+.join-card { margin-top: 12px; padding: 14px 16px; }
+.join-card .lbl { text-transform: uppercase; letter-spacing: .06em; font-size: 11.5px; font-weight: 800; color: var(--muted); margin-bottom: 8px; }
+.join-row { display: flex; gap: 8px; }
+.join-row .input { flex: 1; min-width: 0; text-transform: uppercase; letter-spacing: .08em; font-weight: 700; }
+.join-row .input::placeholder { text-transform: none; letter-spacing: 0; font-weight: 500; }
+.join-row .btn { height: 50px; flex: none; }
+.pend-list { margin-top: 10px; }
+.pend-row, .req-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); }
+.req-card { padding: 4px 16px; }
+.req-card .req-row:first-child { border-top: 0; }
+.pend-t, .req-t { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.pend-t b, .req-t b { font-size: 15px; font-weight: 800; }
+.pend-t span, .req-t span { font-size: 13px; color: var(--muted); }
+.spin.small { width: 14px; height: 14px; border-width: 2px; flex: none; }
