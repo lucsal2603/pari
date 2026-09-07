@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.43.12';
+const APP_VERSION = '1.43.13';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -1206,9 +1206,10 @@ function missions(all) {
   return { list: L, mon, sun, daysLeft };
 }
 const missionsNew = () => { const w = missions(); const seen = S.settings.seenMissions || {}; const ids = seen.week === w.mon ? (seen.ids || []) : []; return w.list.some((m) => m.done && !ids.includes(m.id)); };
+const FLAG_SVG = '<svg class="ach-flag" viewBox="0 0 24 24" aria-hidden="true"><line class="fl-pole" x1="6" y1="21" x2="6" y2="3" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path class="fl-cloth" d="M7.2 4.2 C 10.5 2.4, 13.5 6.2, 19 4.2 L 19 12.2 C 13.5 14.2, 10.5 10.4, 7.2 12.2 Z" fill="currentColor"/></svg>';
 function pageMissioni() {
   const w = missions(); const list = w.list; const done = list.filter((m) => m.done).length; const all = done === list.length;
-  const seen = S.settings.seenMissions || {}; const ids = new Set(seen.week === w.mon ? seen.ids || [] : []); let changed = false; list.forEach((m) => { if (m.done && !ids.has(m.id)) { ids.add(m.id); changed = true; } }); if (changed || seen.week !== w.mon) { S.settings.seenMissions = { week: w.mon, ids: [...ids] }; save(); }
+  const seen = S.settings.seenMissions || {}; const ids = new Set(seen.week === w.mon ? seen.ids || [] : []); let changed = false; const fresh = new Set(); list.forEach((m) => { if (m.done && !ids.has(m.id)) { ids.add(m.id); fresh.add(m.id); changed = true; } }); if (changed || seen.week !== w.mon) { S.settings.seenMissions = { week: w.mon, ids: [...ids] }; save(); }
   const range = `${dateShort(w.mon)} – ${dateShort(w.sun)}`;
   const art = (img) => `<img class="ach-art" src="img/traguardi/${img}.webp" alt="">`;
   const hero = `<section class="ach-hero${all ? '' : ' locked'}">${art(all ? 'coppa' : 'team')}<div class="ach-hero-t"><h2>${all ? 'Settimana perfetta!' : esc(T('{0} di {1} missioni', done, list.length))}</h2><p>${all ? 'Avete completato tutte le missioni. Grande!' : esc(w.daysLeft === 1 ? T('Ultimo giorno: si azzerano lunedì.') : T('Mancano {0} giorni: si azzerano lunedì.', w.daysLeft))}</p><a class="btn ach-cta" href="${all ? '#/home' : '#/nuova'}">${all ? 'Continua così!' : 'Aggiungi spesa'}</a></div></section>`;
@@ -1217,7 +1218,7 @@ function pageMissioni() {
     <p class="ach-sub">Ogni settimana nuove missioni.<br><span data-no-i18n>${esc(range)}</span></p>
     ${hero}
     <div class="ach-row"><h3>Le missioni di questa settimana</h3><span class="ach-count" data-no-i18n>${done} / ${list.length}</span></div>
-    <div class="ach-list stagger">${list.map((m, i) => `<div class="ach-card${m.done ? ' done' : ' locked'}" style="--i:${i}">${art(m.img)}<div class="ach-t"><b>${esc(m.title)} <em class="xp-tag${m.done ? ' got' : ''}" data-no-i18n>+${XP.mission} XP</em></b><span>${esc(m.sub)}</span>${!m.done && m.fmt !== 'bool' ? `<span class="ach-prog"><i style="width:${Math.round(m.cur / m.target * 100)}%"></i></span><span class="ach-num" data-no-i18n>${m.cur} / ${m.target}</span>` : ''}</div><span class="ach-st">${icon(m.done ? 'i-check' : 'i-lock')}</span></div>`).join('')}</div>
+    <div class="ach-list stagger">${list.map((m, i) => `<div class="ach-card${m.done ? (fresh.has(m.id) ? ' locked fresh' : ' done') : ' locked'}" style="--i:${i}">${art(m.img)}<div class="ach-t"><b>${esc(m.title)} <em class="xp-tag${m.done && !fresh.has(m.id) ? ' got' : ''}" data-no-i18n>+${XP.mission} XP</em></b><span>${esc(m.sub)}</span>${!m.done && m.fmt !== 'bool' ? `<span class="ach-prog"><i style="width:${Math.round(m.cur / m.target * 100)}%"></i></span><span class="ach-num" data-no-i18n>${m.cur} / ${m.target}</span>` : ''}</div><span class="ach-st">${icon('i-lock')}${FLAG_SVG}</span></div>`).join('')}</div>
     <div class="ach-quote"><p>“Piccole missioni, grandi abitudini.”</p><svg class="ach-line" viewBox="0 0 200 10" aria-hidden="true"><path d="M3 6 C 50 1, 110 9, 197 4" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/></svg></div>
   </div>`;
 }
@@ -1820,6 +1821,7 @@ function bind(r) {
     if (!cred || !deb || amt < 1) { toast('Siete in pari'); return; }
     confirmSheet('Mettere in pari tutto?', T('{0} paga {1} a {2}. Il saldo torna a zero.', deb.name, money(amt), cred.name), 'Registra', () => { const e = addEntry({ kind: 'payment', desc: 'Pagamento', amount: amt, date: todayStr(), cat: '', paidBy: deb.id, to: cred.id, splitMethod: 'exact', splitInput: {}, owed: { [cred.id]: amt }, notes: '', group: S.settings.lastGroup || null }); go('#/fatto/' + e.id); });
   }));
+  $$('.ach-card.fresh').forEach((c, k) => setTimeout(() => { if (!c.isConnected) return; c.classList.remove('locked'); c.classList.add('done', 'flag-in'); const x = $('.xp-tag', c); if (x) x.classList.add('got'); }, 900 + k * 650));
   $$('[data-ach-info]').forEach((b) => b.addEventListener('click', () => openSheet('Come funzionano le missioni', `<p class="muted" style="margin:6px 0 14px;line-height:1.5">Le missioni vanno da lunedì a domenica e si azzerano ogni settimana. Si completano da sole in base alle spese del gruppo: quando una è fatta, la vedete tutti e due. I trofei permanenti sono in Profilo → I tuoi trofei.</p>`)));
   const tb = $('[data-trophy]'); if (tb) tb.addEventListener('click', () => { tb.classList.add('tap'); });
   $$('[data-back]').forEach((b) => b.addEventListener('click', () => { if (r.name === 'nuova' || r.name === 'modifica') F = null; back(b.dataset.back); }));
