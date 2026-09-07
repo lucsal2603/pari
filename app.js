@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.44.14';
+const APP_VERSION = '1.44.15';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -314,7 +314,17 @@ const auth = {
   async signUp(email, password, data) { const r = await fetch(SUPA_URL + '/auth/v1/signup', { method: 'POST', headers: this.h(), body: JSON.stringify({ email, password, data: data || {}, options: { emailRedirectTo: appUrl() } }) }); const j = await r.json(); if (!r.ok) { const raw = String((j && (j.msg || j.message || j.error_description || j.error)) || '').toLowerCase(); if (raw.includes('rate limit') || r.status === 429) throw new Error('Il server ha raggiunto il limite di email di conferma: riprova tra un po\'. Non dipende dai tuoi tentativi.'); throw new Error(authMsg(j)); } /* alla registrazione il limite è quello delle email di conferma di Supabase, non un blocco per tentativi */ if (j.access_token) { this.setSession(j); return 'ok'; } return 'confirm'; },
   async signIn(email, password) { const r = await fetch(SUPA_URL + '/auth/v1/token?grant_type=password', { method: 'POST', headers: this.h(), body: JSON.stringify({ email, password }) }); const j = await r.json(); if (!r.ok) throw new Error(authMsg(j)); this.setSession(j); },
   async signOut() { try { if (this.s) await fetch(SUPA_URL + '/auth/v1/logout', { method: 'POST', headers: { apikey: SUPA_ANON, Authorization: 'Bearer ' + this.s.access_token } }); } catch (_) {} this.s = null; this.save(); },
-  async refreshIfNeeded() { if (!this.s || !this.s.refresh_token) return; if (Date.now() < ((this.s.expires_at || 0) * 1000) - 120000) return; try { const r = await fetch(SUPA_URL + '/auth/v1/token?grant_type=refresh_token', { method: 'POST', headers: this.h(), body: JSON.stringify({ refresh_token: this.s.refresh_token }) }); const j = await r.json(); if (r.ok && j.access_token) this.setSession(j); else if (r.status === 400 || r.status === 401) { this.s = null; this.save(); } } catch (_) {} },
+  async refreshIfNeeded() {
+    if (!this.s || !this.s.refresh_token) return; if (Date.now() < ((this.s.expires_at || 0) * 1000) - 120000) return;
+    if (this._refreshing) return this._refreshing; /* un rinnovo alla volta: due richieste con lo stesso refresh token lo brucerebbero */
+    this._refreshing = (async () => { try {
+      const tok = this.s.refresh_token; const r = await fetch(SUPA_URL + '/auth/v1/token?grant_type=refresh_token', { method: 'POST', headers: this.h(), body: JSON.stringify({ refresh_token: tok }) }); const j = await r.json().catch(() => ({}));
+      if (r.ok && j.access_token) { this.setSession(j); return; }
+      const msg = String((j && (j.error_description || j.msg || j.message || j.error_code || j.error)) || '').toLowerCase();
+      if ((r.status === 400 || r.status === 401) && /refresh token|invalid|not found|already used|revoked|session/.test(msg)) { console.warn('sessione scaduta', msg); this.s = null; this.save(); } /* altri errori (rete, server): la sessione resta e si riprova dopo */
+    } catch (_) {} finally { this._refreshing = null; } })();
+    return this._refreshing;
+  },
   async recover(email) { const r = await fetch(SUPA_URL + '/auth/v1/recover?redirect_to=' + encodeURIComponent(appUrl()), { method: 'POST', headers: this.h(), body: JSON.stringify({ email }) }); if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(authMsg(j)); } },
   async updatePassword(password) { const r = await fetch(SUPA_URL + '/auth/v1/user', { method: 'PUT', headers: { ...this.h(), Authorization: 'Bearer ' + this.s.access_token }, body: JSON.stringify({ password }) }); const j = await r.json(); if (!r.ok) throw new Error(authMsg(j)); this.s.user = j; this.save(); },
   async updateMeta(data) { if (!this.s) return; try { const r = await fetch(SUPA_URL + '/auth/v1/user', { method: 'PUT', headers: { ...this.h(), Authorization: 'Bearer ' + this.s.access_token }, body: JSON.stringify({ data }) }); if (r.ok) { this.s.user = await r.json(); this.save(); } } catch (_) {} },
@@ -548,6 +558,7 @@ function render(r, toTop) {
   r = r || currentRoute || { name: 'home', id: '', q: {} }; currentRoute = r;
   const publicPages = ['accedi', 'registrati', 'recupero', 'legale', 'conferma'];
   if (!auth.user() && !publicPages.includes(r.name)) { r = { name: 'accedi', id: '', sub: '', q: {}, back: null }; currentRoute = r; }
+  if (auth.user() && ['accedi', 'registrati'].includes(r.name)) { r = { name: onboardingDone() ? 'home' : 'benvenuto', id: '', sub: '', q: {}, back: null }; currentRoute = r; history.replaceState(null, '', onboardingDone() ? '#/home' : '#/benvenuto'); }
   const pages = { home: pageHome, spese: pageSpese, sezione: pageSezione, bilanci: pageBilanci, profilo: pageProfilo, nuova: pageForm, modifica: pageForm, spesa: pageDetail, statistiche: pageStats, attivita: pageActivity, traguardi: pageMissioni, missioni: pageMissioni, budget: pageBudget, benvenuto: pageWelcome, accedi: pageLogin, registrati: pageRegister, recupero: pageRecovery, legale: pageLegal, conferma: pageConfirm, fatto: pageDone };
   const fn = pages[r.name] || pageHome;
   const onb = ['benvenuto', 'accedi', 'registrati', 'recupero', 'conferma', 'fatto'].includes(r.name) || (r.name === 'legale' && !auth.user());
@@ -2487,6 +2498,7 @@ materializeRecurring();
   if (auth.recovery) history.replaceState(null, '', '#/recupero');
   else if (!auth.user()) { if (!/^#\/(accedi|registrati|legale|conferma|join)/.test(location.hash)) history.replaceState(null, '', '#/accedi'); }
   else if (!onboardingDone()) history.replaceState(null, '', '#/benvenuto');
+  else if (/^#\/(accedi|registrati|conferma)/.test(location.hash)) history.replaceState(null, '', '#/home'); /* già dentro: mai la pagina di accesso al ricaricamento */
   if (auth.user()) { await updateCoupleFlag(); const chAuth = afterAuth(); if (cleanupSections()) render(); applyPendingJoin(); if (sync.enabled() && (chAuth || !S.settings.lastPull)) sync.run(true); showDailyLove(); }
   route();
   if (auth.user() && onboardingDone() && !tutorialDone()) setTimeout(startTour, 1500); // tour guidato al primo accesso
