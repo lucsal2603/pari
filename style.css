@@ -1105,3 +1105,4 @@ body.touring .page { animation: none; } /* durante il tour la pagina appare subi
 .pend-t b, .req-t b { font-size: 15px; font-weight: 800; }
 .pend-t span, .req-t span { font-size: 13px; color: var(--muted); }
 .spin.small { width: 14px; height: 14px; border-width: 2px; flex: none; }
+.couple-circle .avatar, .couple-circle .avatar-col { width: 100%; height: 100%; border-radius: 50%; display: flex; }

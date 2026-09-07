@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.44.3';
+const APP_VERSION = '1.44.4';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -893,11 +893,11 @@ function pageProfilo(r) {
   if (r.sub === 'classifica') return pageClassifica();
   if (r.sub === 'info') return pageInfo();
   if (r.sub === 'esporta') return pageExport();
-  const together = S.settings.together ? `Insieme dal ${esc(S.settings.together)} <span aria-hidden="true">❤️</span>` : 'Le nostre spese, a metà <span aria-hidden="true">❤️</span>';
+  const together = !isCoupleAccount() ? 'Le tue spese, condivise quando vuoi' : S.settings.together ? `Insieme dal ${esc(S.settings.together)} <span aria-hidden="true">❤️</span>` : 'Le nostre spese, a metà <span aria-hidden="true">❤️</span>';
   const li = levelInfo(); const lvlPill = `<div class="lvl-xpline" data-no-i18n>${li.xp} / ${li.next} XP</div>`;
   const syncOn = sync.enabled();
   return `<div class="page">
-    <div class="profile-head">${r.back ? `<button class="icon-btn profile-back" data-back="${esc(r.back)}" aria-label="Indietro">${icon('i-back')}</button>` : ''}<div class="lvl-ring" style="--p:${levelInfo().pct}"><svg viewBox="0 0 100 100" aria-hidden="true"><circle class="tr" cx="50" cy="50" r="46"/><circle class="fl" cx="50" cy="50" r="46" pathLength="100"/></svg><div class="couple-circle"><img src="img/coppia.png" alt=""></div><span class="lvl-badge" data-no-i18n>LV ${levelInfo().lv}</span></div><div class="n">${esc(S.members[0].name)} &amp; ${esc(S.members[1].name)}</div><div class="s">${together}</div>${lvlPill}</div>
+    <div class="profile-head">${r.back ? `<button class="icon-btn profile-back" data-back="${esc(r.back)}" aria-label="Indietro">${icon('i-back')}</button>` : ''}<div class="lvl-ring" style="--p:${levelInfo().pct}"><svg viewBox="0 0 100 100" aria-hidden="true"><circle class="tr" cx="50" cy="50" r="46"/><circle class="fl" cx="50" cy="50" r="46" pathLength="100"/></svg><div class="couple-circle">${isCoupleAccount() && S.members[1] ? '<img src="img/coppia.png" alt="">' : avatar(me(), true)}</div><span class="lvl-badge" data-no-i18n>LV ${levelInfo().lv}</span></div><div class="n">${isCoupleAccount() && S.members[1] ? esc(S.members[0].name) + ' &amp; ' + esc(S.members[1].name) : esc(me().name)}</div><div class="s">${together}</div>${lvlPill}</div>
     <section class="card profile-list"><div class="menu">
       <a href="#/profilo/account">${icon('i-gear')}<span>Impostazioni account</span><span class="val">Io sono ${esc(a.name)}</span>${icon('i-right', 'ic chev')}</a>
       <a href="#/profilo/classifica">${icon('i-podium')}<span>Classifica</span><span class="val" data-no-i18n>${S.settings.boardPos ? '#' + S.settings.boardPos : ''}</span>${icon('i-right', 'ic chev')}</a>
@@ -1274,7 +1274,7 @@ function pageInfo() {
   const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
   return `<div class="page slide">${subHead("Informazioni sull'app")}
     <section class="card" style="text-align:center;padding:26px 18px"><img src="icons/preview-256.png" alt="" width="72" height="72" style="border-radius:18px"><div style="font-weight:800;font-size:22px;margin-top:12px">Divvy</div><div class="muted small">Versione ${APP_VERSION}${standalone ? ' · installata' : ' · nel browser'}</div>
-    <p class="small" style="margin:14px 0 0;color:var(--ink-2)">Le spese di ${esc(S.members[0].name)} e ${esc(S.members[1].name)}, divise a metà. Funziona anche senza rete: i dati sono salvati sul telefono.</p></section>
+    <p class="small" style="margin:14px 0 0;color:var(--ink-2)">${isCoupleAccount() && S.members[1] ? `Le spese di ${esc(S.members[0].name)} e ${esc(S.members[1].name)}, divise a metà. Funziona anche senza rete: i dati sono salvati sul telefono.` : 'Le tue spese, da solo o con chi entra nelle tue sezioni. Funziona anche senza rete: i dati sono salvati sul telefono.'}</p></section>
     <section class="card section"><div class="kv">
       <div><span class="k">Voci salvate</span><span class="v">${active().length}</span></div>
       <div><span class="k">Attività registrate</span><span class="v">${S.activity.length}</span></div>
