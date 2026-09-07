@@ -1056,19 +1056,17 @@ body.touring .page { animation: none; } /* durante il tour la pagina appare subi
 .tour[data-step] .tour-anim, .tour[data-step] .tour-t, .tour[data-step] .tour-p { animation: tutIn .4s var(--ease-out) both; }
 @keyframes tutIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
-/* ---------- Missione appena completata: la card si colora e il lucchetto diventa una bandierina che si srotola da sinistra a destra ---------- */
+/* ---------- Missione appena completata: la card si colora e il lucchetto diventa la spunta, disegnata da sinistra a destra ---------- */
 .ach-card { transition: background .6s ease; }
 .ach-card .ach-art { transition: filter .7s ease, opacity .7s ease; }
 .ach-t b, .ach-t span { transition: color .5s ease; }
 .ach-st { position: relative; display: grid; place-items: center; transition: background .5s ease, color .5s ease; }
 .ach-st > * { grid-area: 1 / 1; }
-.ach-st .ach-flag { width: 24px; height: 24px; display: block; }
+.ach-st .ach-ok { width: 22px; height: 22px; display: block; }
 .ach-st .ic { transition: opacity .3s ease, transform .35s cubic-bezier(.4, 0, .8, .4); }
-.ach-card.locked .ach-flag { opacity: 0; }
+.ach-card.locked .ach-ok { opacity: 0; }
 .ach-card.done .ach-st .ic { opacity: 0; transform: scale(.2) rotate(-40deg); }
-.ach-card.flag-in .ach-st { animation: achStPop .55s .5s cubic-bezier(.2, .9, .3, 1.35) both; }
-.ach-card.flag-in .fl-pole { stroke-dasharray: 20; animation: flPole .38s .3s cubic-bezier(.2, .8, .3, 1) both; }
-.ach-card.flag-in .fl-cloth { transform-box: fill-box; transform-origin: 0% 50%; animation: flCloth .65s .58s cubic-bezier(.2, .9, .3, 1.25) both; }
-@keyframes flPole { from { stroke-dashoffset: 20; } to { stroke-dashoffset: 0; } }
-@keyframes flCloth { 0% { transform: scaleX(0) skewY(-14deg); } 65% { transform: scaleX(1.06) skewY(7deg); } 85% { transform: scaleX(.98) skewY(-3deg); } 100% { transform: scaleX(1) skewY(0); } }
+.ach-card.ok-in .ach-st { animation: achStPop .55s .45s cubic-bezier(.2, .9, .3, 1.35) both; }
+.ach-card.ok-in .ok-path { stroke-dasharray: 24; animation: okDraw .55s .4s cubic-bezier(.3, .7, .2, 1) both; }
+@keyframes okDraw { from { stroke-dashoffset: 24; } to { stroke-dashoffset: 0; } }
 @keyframes achStPop { 0% { transform: scale(1); } 45% { transform: scale(1.22); } 100% { transform: scale(1); } }
