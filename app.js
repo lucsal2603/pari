@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.44.5';
+const APP_VERSION = '1.44.6';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -923,7 +923,19 @@ function pageProfilo(r) {
   </div>`;
 }
 function subHead(title, backTo = '#/profilo') { return `<div class="head"><button class="icon-btn" data-back="${backTo}" aria-label="Indietro">${icon('i-back')}</button><div class="title">${esc(title)}</div><span></span></div>`; }
+const NAME_LOCK_DAYS = 30;
+const nameLockLeft = () => { const t = S.settings.nameChangedAt; if (!t) return 0; return Math.max(0, Math.ceil((new Date(t).getTime() + NAME_LOCK_DAYS * 86400000 - Date.now()) / 86400000)); };
 function pageAccount() {
+  if (!isCoupleAccount()) { const m = me(); const u = auth.user() || {}; const left = nameLockLeft();
+    return `<div class="page slide">${subHead('Impostazioni account')}
+    <h2 class="sec-title">Il tuo account</h2>
+    <section class="card"><div class="field" style="margin:0"><div class="lbl">Email</div><div class="input" style="display:flex;align-items:center;color:var(--muted)" data-no-i18n>${esc(u.email || '—')}</div></div>
+      <div class="field"><label for="acc-name">Nome</label><input id="acc-name" type="text" value="${esc(m.name)}" data-name="${m.id}" placeholder="Nome" autocomplete="given-name" ${left ? 'disabled' : ''}><div class="hint">${left ? esc(T('Potrai cambiarlo tra {0} giorni.', left)) : 'Si può cambiare una volta ogni 30 giorni.'}</div></div>
+      <div class="field"><div class="lbl">Avatar</div>${avatarPicker(AVATAR_IMGS.indexOf(((m.avatar || {}).img) || ''), 'data-av-' + m.id)}<div class="hint">Lo puoi cambiare quando vuoi.</div></div>
+      <input type="hidden" data-color="${m.id}" value="${esc(m.color)}"></section>
+    <section class="card"><div class="field" style="margin:0"><div class="lbl">Valuta</div><a class="input" href="#/profilo/valuta" style="display:flex;align-items:center;justify-content:space-between">${esc(currencyName(S.settings.currency || 'EUR'))} (${esc(curSymbol())}) ${icon('i-right', 'ic muted')}</a></div></section>
+    <div class="section"><button class="btn" id="save-account">Salva</button></div>
+  </div>`; }
   return `<div class="page slide">${subHead('Impostazioni account')}
     <h2 class="sec-title">Chi siamo</h2>
     <section class="card">${S.members.map((m, i) => `<div class="member-row"><input class="swatch" type="color" value="${m.color}" data-color="${m.id}" style="--c:${m.color}" aria-label="Colore di ${esc(m.name)}"><div class="field" style="margin:0"><input type="text" value="${esc(m.name)}" data-name="${m.id}" aria-label="Nome" placeholder="Nome"></div></div><div class="field" style="margin-top:8px"><div class="lbl" style="text-transform:none;letter-spacing:0">Avatar di ${esc(m.name)}</div>${avatarPicker(AVATAR_IMGS.indexOf(((m.avatar || {}).img) || ''), 'data-av-' + m.id)}</div>`).join('')}
@@ -2176,7 +2188,9 @@ function bindProfilo(r) {
   if (r.sub === 'account') {
     const ct = $('[data-couple-toggle]'); if (ct) ct.addEventListener('click', () => { S.settings.boardCouple = !S.settings.boardCouple; ct.setAttribute('aria-checked', S.settings.boardCouple); save(); boardPush(true); render(); });
     $('#save-account').addEventListener('click', () => {
-      $$('[data-name]').forEach((i) => { const m = member(i.dataset.name); const v = i.value.trim(); if (v) m.name = v; });
+      let blocked = false;
+      $$('[data-name]').forEach((i) => { const m = member(i.dataset.name); const v = i.value.trim(); if (!v || v === m.name) return; if (!isCoupleAccount() && m.id === me().id) { if (nameLockLeft()) { blocked = true; return; } S.settings.nameChangedAt = nowISO(); } m.name = v; }); /* singoli: il nome cambia una volta ogni 30 giorni */
+      if (blocked) { toast(T('Potrai cambiarlo tra {0} giorni.', nameLockLeft())); return; }
       $$('[data-color]').forEach((i) => (member(i.dataset.color).color = i.value));
       const tg = $('#together'); if (tg) S.settings.together = tg.value.trim(); S.settings.membersUpdatedAt = nowISO();
       save(); sync.schedule(); toast('Impostazioni salvate'); go('#/profilo');
