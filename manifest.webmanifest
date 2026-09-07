@@ -1,7 +1,7 @@
 {
   "name": "Divvy",
   "short_name": "Divvy",
-  "description": "Le spese di Luca e Martina, divise a metà.",
+  "description": "Le tue spese, da solo o divise con chi vuoi.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

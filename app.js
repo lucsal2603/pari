@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.44.9';
+const APP_VERSION = '1.44.10';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -265,7 +265,7 @@ async function coupleCheck() { const u = auth.user(); if (!u || !u.email || !(cr
 const isCoupleAccount = () => !!S.settings.couple;
 async function updateCoupleFlag() { const c = await coupleCheck(); if (S.settings.couple !== c) { S.settings.couple = c; S.settings.boardCouple = c; save(); return true; } return false; }
 const hasOthers = () => S.members.some((m) => m.id !== me().id);
-const otherName = () => (other().id ? other().name : T('chi condivide con te'));
+const otherName = () => (isCoupleAccount() && other().id ? other().name : T('chi condivide con te')); /* per i singoli mai un nome: né segnaposto né persone vere */
 /* ogni account ha il suo stato sul telefono: se entra un altro account, metto da parte lo stato di prima e carico il suo */
 function switchStateFor(uidNow) {
   let own = S.settings.ownerUid || S.settings.onboardedFor || S.settings.tutorialDoneFor || null; /* stati vecchi: il proprietario è chi ha fatto la presentazione */
@@ -1190,7 +1190,7 @@ function pageTrofei() {
 /* ---------- Classifica: ogni casa pubblica livello ed XP in una riga condivisa (house "__board__", id = codice casa) ---------- */
 const BOARD_HOUSE = '__board__';
 const boardName = () => asCouple() ? `${S.members[0].name} e ${S.members[1].name}` : me().name;
-const boardAvatarSrc = () => { if (asCouple()) return 'img/coppia.png'; const a = (me().avatar || {}).img; return a ? 'img/' + a : (me().id === 'm1' ? 'img/luca-avatar.png' : 'img/martina-avatar.png'); };
+const boardAvatarSrc = () => { if (asCouple()) return 'img/coppia.png'; const a = (me().avatar || {}).img; return a ? 'img/' + a : (isCoupleAccount() ? (me().id === 'm1' || me().legacy === 'm1' ? 'img/luca-avatar.png' : 'img/martina-avatar.png') : ''); }; /* i singoli senza avatar hanno l'icona, non le nostre foto */
 const boardAv = (src, cls) => src ? `<img class="${cls}" src="${esc(src)}" alt="">` : `<span class="${cls}">${icon('i-user')}</span>`;
 const boardId = () => asCouple() ? S.settings.sync.house : S.settings.sync.house + ':' + me().id;
 async function boardPush(force) {
