@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.44.10';
+const APP_VERSION = '1.44.11';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -811,7 +811,7 @@ function pageDetail(r) {
 let F = null; // stato del form
 function pageForm(r) {
   const editing = r.name === 'modifica' ? S.entries.find((x) => x.id === r.id) : null;
-  if (!editing && r.q.tipo === 'pagamento' && !hasOthers()) { setTimeout(() => { toast('Nessuno con cui mettersi in pari'); go('#/home'); }, 0); return '<div class="page"></div>'; }
+  if (!editing && r.q.tipo === 'pagamento' && !hasOthers()) r = { ...r, q: { ...r.q, tipo: '' } }; /* da soli non c'è nessuno da pagare: si apre la spesa normale, senza blocchi */
   if (!F || F.routeKey !== location.hash) {
     F = editing ? { routeKey: location.hash, id: editing.id, kind: editing.kind, group: editing.group || null, desc: editing.desc || '', amount: moneyPlain(editing.amount), date: editing.date, cat: editing.cat || '', paidBy: editing.paidBy, splitMethod: editing.splitMethod || 'equal', splitInput: { ...(editing.splitInput || {}) }, notes: editing.notes || '', recurring: editing.recurring === 'monthly', to: Object.keys(editing.owed || {})[0] }
       : { routeKey: location.hash, id: null, kind: r.q.tipo === 'pagamento' ? 'payment' : 'expense', desc: '', amount: '', date: todayStr(), cat: '', paidBy: me().id, splitMethod: 'equal', splitInput: {}, notes: '', recurring: false, to: other().id, group: (groups().find((g) => g.id === S.settings.lastGroup) || groups()[0] || {}).id || null };
@@ -1892,7 +1892,7 @@ function pageDone(r) {
     <p class="done-p">Tutto ok, l'abbiamo salvato.</p>
     <div class="done-card"><span class="cat-ic${isPay ? ' pay' : ''}">${icon(isPay ? 'c-pagamento' : c.icon)}</span><div class="done-txt"><b>${esc(isPay ? 'Pagamento' : e.desc)}</b><span>${sub}</span><span>${esc(dateShort(e.date))} ${esc(String(e.date).slice(0, 4))} • ${esc(payer.name)}</span></div><span class="done-amt">${esc(curSymbol())} ${esc(moneyPlain(e.amount))}<em class="xp-tag got" data-no-i18n>+${entryXp(e)} XP</em></span></div>
     ${!isPay && (myBudget().monthly || 0) > 0 ? (() => { const bm = budgetMonth(ym(e.date)); const pct = Math.round(bm.spent / bm.budget * 100); return `<div class="done-budget ${budgetCls(pct)}"><span>${esc(T('Il tuo budget: {0} su {1} ({2}%)', money(bm.spent), money(bm.budget), pct))}</span><i class="db-bar"><b style="width:${Math.min(100, pct)}%"></b></i></div>`; })() : ''}
-    <div class="done-actions"><a class="btn onb-btn" href="#/home">Perfetto!</a><a class="done-link" href="#/nuova${isPay ? '?tipo=pagamento' : ''}">${isPay ? 'Registra un altro pagamento' : 'Aggiungi un altro pagamento'}</a></div>
+    <div class="done-actions"><a class="btn onb-btn" href="#/home">Perfetto!</a><a class="done-link" href="#/nuova${isPay && hasOthers() ? '?tipo=pagamento' : ''}">${isPay ? 'Registra un altro pagamento' : 'Aggiungi un altro pagamento'}</a></div>
     <svg class="done-sq l" viewBox="0 0 120 90" aria-hidden="true"><path d="M8 70 C 25 20, 45 25, 40 55 C 36 80, 60 85, 75 35" fill="none" stroke="#B9D9C4" stroke-width="7" stroke-linecap="round"/></svg>
     <svg class="done-sq r" viewBox="0 0 120 90" aria-hidden="true"><path d="M10 60 C 30 20, 50 35, 55 60 C 60 85, 85 80, 110 30" fill="none" stroke="#B9D9C4" stroke-width="7" stroke-linecap="round"/></svg>
   </div>`;
