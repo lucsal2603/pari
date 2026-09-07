@@ -23,17 +23,11 @@ I riquadri bianchi tratteggiati (illustrazioni e avatar) sono segnaposto: lì va
 2. Tocca **Condividi** (il quadrato con la freccia), poi **Aggiungi alla schermata Home**.
 3. Da lì in poi si apre a tutto schermo come un'app.
 
-## Vedere le stesse spese su due telefoni
+## Sezioni con codice (condividere le spese)
 
-Di base i dati stanno solo sul telefono. Per condividerli serve un piccolo database gratuito su [Supabase](https://supabase.com), circa cinque minuti:
+Dalla versione 1.44 ogni **sezione** ha un **codice** (lo vedi dalla matita della sezione → "Codice e persone", o da Profilo → Sezioni). Chi lo scrive in Profilo → Sezioni → "Entra con un codice", o apre il link `#/join/CODICE`, entra nella sezione e da lì le spese si dividono tra i suoi membri, quanti si vuole. Una persona può stare in più sezioni con persone diverse. Solo chi ha creato la sezione può togliere gli altri (e eliminarla); gli altri possono uscire quando vogliono. Una sezione di cui nessuno conosce il codice è personale: nessuna divisione.
 
-1. Crea un account e un **nuovo progetto** (regione Europa, piano Free).
-2. Nel menu a sinistra apri **SQL Editor**, incolla il contenuto di [`supabase.sql`](supabase.sql) ed esegui (**Run**).
-3. Vai in **Project Settings → API** e copia **Project URL** e la chiave **anon public**.
-4. Nell'app, **Profilo → Backup e sincronizzazione**: incolla URL e chiave, scegli un **codice casa** (una parola segreta qualunque) e premi **Salva e collega**.
-5. Fai lo stesso sull'altro telefono con gli **stessi tre valori**. Da quel momento le spese si allineano da sole (ogni volta che si apre l'app e circa ogni 45 secondi mentre è aperta).
-
-In alternativa, senza database: **Profilo → Esporta dati → Backup completo** su un telefono e **Importa backup** sull'altro (non crea doppioni).
+Sotto il cofano: ogni persona ha un id globale (l'id dell'account; i vecchi `m1`/`m2` restano come alias `legacy` e vengono tradotti al volo), ogni sezione ha `code`, `owner` e `members` (per persona `joinedAt`/`leftAt`), su Supabase la "casa" di una riga è il codice della sezione (`section` = riga della sezione, `entry`/`activity` nella casa della loro sezione, `members` e `push` in ogni sezione per la funzione `notify`, il budget personale nella casa `__people__`). La casa di prima (`sync.house`) è diventata il codice della prima sezione: la migrazione è automatica all'avvio.
 
 ## Notifiche (quando l'altro aggiunge una spesa)
 
