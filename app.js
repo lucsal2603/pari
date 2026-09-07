@@ -5,7 +5,7 @@
 (() => {
 'use strict';
 
-const APP_VERSION = '1.44.8';
+const APP_VERSION = '1.44.9';
 const KEY = 'pari:v1';
 /* Progetto Supabase "divvy": indirizzo e chiave pubblica (anon) sono pensati per stare nel client; la privacy è nel codice casa */
 const SUPA_URL = 'https://odvbwrrpbkuqccoprrrc.supabase.co';
@@ -236,6 +236,10 @@ function migrateIdentity() {
     changed = true;
   }
   if (!S.settings.couple && !S.settings.sync.house && !S.entries.length && !S.settings.lastPull && S.members.length > 1) { S.members = S.members.filter((m) => m.id === uidNow); if (!me().name || me().name === 'Luca') me().name = (u.email || '').split('@')[0].replace(/[._-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) || 'Io'; changed = true; } /* account singolo nuovo: solo io */
+  /* account singolo: via i segnaposto di coppia (m1/m2) che non sono io e non compaiono in nessuna spesa, anche dalle sezioni */
+  if (!S.settings.couple) { const used = new Set(); S.entries.filter((e) => !e.deleted).forEach((e) => { used.add(e.paidBy); if (e.to) used.add(e.to); Object.keys(e.owed || {}).forEach((k) => used.add(k)); });
+    const drop = S.members.filter((m) => m.id !== uidNow && isLegacyId(m.id) && !used.has(m.id));
+    if (drop.length) { S.members = S.members.filter((m) => !drop.includes(m)); drop.forEach((m) => S.groups.forEach((g) => { if (g.members && g.members[m.id]) { delete g.members[m.id]; g.updatedAt = nowISO(); S.settings.groupsUpdatedAt = g.updatedAt; } })); S.settings.membersUpdatedAt = nowISO(); changed = true; } }
   const map = pidMap();
   if (Object.keys(map).length) { const t = nowISO(); S.entries.forEach((e) => { if (normEntry(e, map)) { e.updatedAt = t; changed = true; } }); normAll(map); }
   if (changed) { if (S.entries.length || S.settings.membersUpdatedAt) S.settings.membersUpdatedAt = nowISO(); if (S.settings.push) S.settings.pushUpdatedAt = nowISO(); S.settings.lastPush = null; save(); }
@@ -2033,7 +2037,7 @@ function pageWelcome() {
     <h1 class="onb-h onb-dark">Tutto pronto,<br>${esc(a.name)}! <span aria-hidden="true">🎉</span></h1><p class="onb-p">Da ora tenere i conti sarà molto più semplice.</p>
     <div class="onb-art"><img src="img/benvenuto-4.png" alt=""></div>
     <div class="onb-summary"><div class="row-between"><b class="onb-sum-t">Il tuo riepilogo</b><button type="button" class="onb-edit" data-ob-edit>Modifica</button></div>
-      <div class="onb-people"><span>${avatar(a, true)}${esc(a.name)}</span>${hasOthers() ? `<span>${avatar(b, true)}${esc(b.name)}</span>` : ''}</div>
+      <div class="onb-people"><span>${avatar(a, true)}${esc(a.name)}</span>${isCoupleAccount() && hasOthers() ? `<span>${avatar(b, true)}${esc(b.name)}</span>` : ''}</div>
       ${isCoupleAccount() ? `<div class="onb-kv">${icon('i-balance')}<span>Divisione predefinita</span><b>${pm}% / ${100 - pm}%</b></div>` : ''}
       <div class="onb-kv">${icon('i-coins')}<span>Valuta</span><b>${esc(currencyName(S.settings.currency || 'EUR'))} (${esc(curSymbol())})</b></div></div>
     <div class="onb-form"><button type="button" class="btn onb-btn" data-ob-finish>Inizia con Divvy ${arrowIc}</button></div>`; }
